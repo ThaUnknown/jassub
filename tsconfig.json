@@ -1,0 +1,28 @@
+{
+  "extends": "eslint-config-standard-universal/tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable",
+      "WebWorker"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": false,
+    "types": [
+      "@webgpu/types"
+    ],
+    "outDir": "./dist"
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/worker/pre-worker.js",
+    "src/wasm/jassub-worker-modern.js"
+  ]
+}

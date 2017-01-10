@@ -1,0 +1,66 @@
+name: Emscripten
+
+on:
+  push:
+    branches: [main, ci]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Cancel previous runs
+      uses: styfle/cancel-workflow-action@0.9.1
+      with:
+          access_token: ${{ github.token }}
+          all_but_latest: true
+
+    - name: Checkout Base Repo
+      uses: actions/checkout@v4
+
+    - name: Checkout Submodules
+      run: |
+        git submodule sync
+        git submodule update --init --recursive --force
+
+    - name: Build Docker Image
+      run: |
+        docker build -t libass/jassub .
+
+    - name: Build Binaries
+      run: |
+        docker run --rm -v "${PWD}":/code libass/jassub:latest
+
+    - name: Upload Nightly Build
+      uses: actions/upload-artifact@v4
+      if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      with:
+        name: js
+        path: src/wasm
+
+# TODO: re-implement this
+  # update_gh-pages:
+  #   if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: gh-pages
+
+  #     - name: Download nightly build
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: js
+  #         path: jassub/assets
+
+  #     - name: Push new version
+  #       run: |
+  #         git config --global user.email "actions@noreply.github.com"
+  #         git config --global user.name "GitHub Action"
+  #         git add jassub/assets
+  #         git commit -m "$(printf \
+  #           "Update binaries to latest nightly\n\nFrom %s" "${{ github.sha }}")"
+  #         git push origin gh-pages

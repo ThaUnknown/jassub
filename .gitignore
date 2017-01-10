@@ -1,0 +1,11 @@
+*.bc
+*.lo
+*.la
+*.o
+*.pyc
+*.tgz
+node_modules/
+build/lib/*
+test
+.pnpm-store
+dist/*

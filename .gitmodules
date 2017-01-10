@@ -1,0 +1,20 @@
+[submodule "lib/libass"]
+	path = lib/libass
+	url = https://github.com/libass/libass.git
+	ignore = dirty
+[submodule "lib/fribidi"]
+	path = lib/fribidi
+	url = https://github.com/fribidi/fribidi.git
+	ignore = dirty
+[submodule "lib/freetype"]
+	path = lib/freetype
+	url = https://gitlab.freedesktop.org/freetype/freetype.git
+	ignore = dirty
+[submodule "lib/harfbuzz"]
+	path = lib/harfbuzz
+	url = https://github.com/harfbuzz/harfbuzz.git
+	ignore = dirty
+[submodule "lib/brotli"]
+	path = lib/brotli
+	url = https://github.com/google/brotli.git
+	ignore = dirty

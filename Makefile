@@ -276,7 +276,7 @@ EMCC_COMMON_ARGS = \
 	#--memory-init-file 0 \
 	#-s OUTLINING_LIMIT=20000 \
 
-dist: src/subtitles-octopus-worker.bc dist/js/subtitles-octopus-worker.js dist/js/subtitles-octopus-worker-legacy.js dist/js/subtitles-octopus.js dist/js/COPYRIGHT
+dist: src/subtitles-octopus-worker.bc dist/js/subtitles-octopus-worker.js dist/js/subtitles-octopus-worker-legacy.js dist/js/subtitles-octopus.js
 
 dist/js/subtitles-octopus-worker.js: src/subtitles-octopus-worker.bc src/pre-worker.js src/SubOctpInterface.js src/post-worker.js build/lib/brotli/js/decode.js
 	mkdir -p dist/js
@@ -303,9 +303,8 @@ dist/js/subtitles-octopus-worker-legacy.js: src/subtitles-octopus-worker.bc src/
 		-s MIN_SAFARI_VERSION=60005 \
 		$(EMCC_COMMON_ARGS)
 
-dist/js/subtitles-octopus.js: dist/license/all src/subtitles-octopus.js
+dist/js/subtitles-octopus.js: src/subtitles-octopus.js
 	mkdir -p dist/js
-	awk '1 {print "// "$$0}' dist/license/all | cat - src/subtitles-octopus.js > $@
 
 LIB_LICENSES := brotli expat freetype fribidi fontconfig harfbuzz libass
 LIB_LICENSES_FINDOPT_brotli   := -path ./research -prune -false -o ! -path ./js/decode.min.js

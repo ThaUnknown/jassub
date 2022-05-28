@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <cstdint>
 #include "../lib/libass/libass/ass.h"
 
 #include "libass.cpp"
@@ -19,57 +20,77 @@
 
 int log_level = 3;
 
-typedef struct {
+class ReusableBuffer2D {
+private:
     void *buffer;
-    int size;
+    size_t size;
     int lessen_counter;
-} buffer_t;
 
-void* buffer_resize(buffer_t *buf, int new_size, int keep_content) {
-    if (buf->size >= new_size) {
-        if (buf->size >= 1.3 * new_size) {
-            // big reduction request
-            buf->lessen_counter++;
-        } else {
-            buf->lessen_counter = 0;
-        }
-        if (buf->lessen_counter < 10) {
-            // not reducing the buffer yet
-            return buf->buffer;
-        }
+public:
+    ReusableBuffer2D(): buffer(NULL), size(0), lessen_counter(0) {}
+
+    ~ReusableBuffer2D() {
+        free(buffer);
     }
 
-    void *newbuf;
-    if (keep_content) {
-        newbuf = realloc(buf->buffer, new_size);
-    } else {
-        newbuf = malloc(new_size);
+    void clear() {
+        free(buffer);
+        buffer = NULL;
+        size = 0;
+        lessen_counter = 0;
     }
-    if (!newbuf) return NULL;
 
-    if (!keep_content) free(buf->buffer);
-    buf->buffer = newbuf;
-    buf->size = new_size;
-    buf->lessen_counter = 0;
-    return buf->buffer;
-}
+    /*
+     * Request a raw pointer to a buffer being able to hold at least
+     * x times y values of size member_size.
+     * If zero is set to true, the requested region will be zero-initialised.
+     * On failure NULL is returned.
+     * The pointer is valid during the lifetime of the ReusableBuffer
+     * object until the next call to get_rawbuf or clear.
+     */
+    void *get_rawbuf(size_t x, size_t y, size_t member_size, bool zero) {
+        if (x > SIZE_MAX / member_size / y)
+            return NULL;
 
-void buffer_init(buffer_t *buf) {
-    buf->buffer = NULL;
-    buf->size = -1;
-    buf->lessen_counter = 0;
-}
+        size_t new_size = x * y * member_size;
+        if (!new_size) new_size = 1;
+        if (size >= new_size) {
+            if (size >= 1.3 * new_size) {
+                // big reduction request
+                lessen_counter++;
+            } else {
+                lessen_counter = 0;
+            }
+            if (lessen_counter < 10) {
+                // not reducing the buffer yet
+                if (zero)
+                    memset(buffer, 0, new_size);
+                return buffer;
+            }
+        }
 
-void buffer_free(buffer_t *buf) {
-    free(buf->buffer);
-}
+        free(buffer);
+        buffer = malloc(new_size);
+        if (buffer) {
+            size = new_size;
+            memset(buffer, 0, size);
+        } else
+            size = 0;
+        lessen_counter = 0;
+        return buffer;
+    }
+};
 
 void msg_callback(int level, const char *fmt, va_list va, void *data) {
     if (level > log_level) // 6 for verbose
         return;
-    printf("libass: ");
-    vprintf(fmt, va);
-    printf("\n");
+
+    const int ERR_LEVEL = 1;
+    FILE* stream = level <= ERR_LEVEL ? stderr : stdout;
+
+    fprintf(stream, "libass: ");
+    vfprintf(stream, fmt, va);
+    fprintf(stream, "\n");
 }
 
 const float MIN_UINT8_CAST = 0.9 / 255;
@@ -85,7 +106,137 @@ public:
     unsigned char* image;
 } RenderBlendResult;
 
+/**
+ * \brief Overwrite tag with whitespace to nullify its effect
+ * Boundaries are inclusive at both ends.
+ */
+static void _remove_tag(char *begin, char *end) {
+    if (end < begin)
+        return;
+    memset(begin, ' ', end - begin + 1);
+}
+
+/**
+ * \param begin point to the first character of the tag name (after backslash)
+ * \param end   last character that can be read; at least the name itself
+                and the following character if any must be included
+ * \return true if tag may cause animations, false if it will definitely not
+ */
+static bool _is_animated_tag(char *begin, char *end) {
+    if (end <= begin)
+        return false;
+
+    size_t length = end - begin + 1;
+
+    #define check_simple_tag(tag)  (sizeof(tag)-1 < length && !strncmp(begin, tag, sizeof(tag)-1))
+    #define check_complex_tag(tag) (check_simple_tag(tag) && (begin[sizeof(tag)-1] == '(' \
+                                        || begin[sizeof(tag)-1] == ' ' || begin[sizeof(tag)-1] == '\t'))
+    switch (begin[0]) {
+        case 'k': //-fallthrough
+        case 'K':
+            // Karaoke: k, kf, ko, K and kt ; no other valid ASS-tag starts with k/K
+            return true;
+        case 't':
+            // Animated transform: no other valid tag begins with t
+            // non-nested t-tags have to be complex tags even in single argument
+            // form, but nested t-tags (which act like independent t-tags) are allowed to be
+            // simple-tags without parentheses due to VSF-parsing quirk.
+            // Since all valid simple t-tags require the existence of a complex t-tag, we only check for complex tags
+            // to avoid false positives from invalid simple t-tags. This makes animation-dropping somewhat incorrect
+            // but as animation detection remains accurate, we consider this to be "good enough"
+            return check_complex_tag("t");
+        case 'm':
+            // Movement: complex tag; again no other valid tag begins with m
+            // but ensure it's complex just to be sure
+            return check_complex_tag("move");
+        case 'f':
+            // Fade: \fad and Fade (complex): \fade; both complex
+            // there are several other valid tags beginning with f
+            return check_complex_tag("fad") || check_complex_tag("fade");
+    }
+
+    return false;
+    #undef check_complex_tag
+    #undef check_simple_tag
+}
+
+/**
+ * \param start First character after { (optionally spaces can be dropped)
+ * \param end   Last character before } (optionally spaces can be dropped)
+ * \param drop_animations If true animation tags will be discarded
+ * \return true if after processing the event may contain animations
+           (i.e. when dropping animations this is always false)
+ */
+static bool _is_block_animated(char *start, char *end, bool drop_animations)
+{
+    char *tag_start = NULL; // points to beginning backslash
+    for (char *p = start; p <= end; p++) {
+        if (*p == '\\') {
+            // It is safe to go one before and beyond unconditionally
+            // because the text passed in must be surronded by { }
+            if (tag_start && _is_animated_tag(tag_start + 1, p - 1)) {
+                if (!drop_animations)
+                    return true;
+                // For \t transforms this will assume the final state
+                _remove_tag(tag_start, p - 1);
+            }
+            tag_start = p;
+        }
+    }
+
+    if (tag_start && _is_animated_tag(tag_start + 1, end)) {
+        if (!drop_animations)
+            return true;
+        _remove_tag(tag_start, end);
+    }
+
+    return false;
+}
+
+/**
+ * \param event ASS event to be processed
+ * \param drop_animations If true animation tags will be discarded
+ * \return true if after processing the event may contain animations
+           (i.e. when dropping animations this is always false)
+ */
+static bool _is_event_animated(ASS_Event *event, bool drop_animations) {
+    // Event is animated if it has an Effect or animated override tags
+    if (event->Effect && event->Effect[0] != '\0') {
+        if (!drop_animations) return 1;
+        event->Effect[0] = '\0';
+    }
+
+    // Search for override blocks
+    // Only closed {...}-blocks are parsed by VSFilters and libass
+    char *block_start = NULL; // points to opening {
+    for (char *p = event->Text; *p != '\0'; p++) {
+        switch (*p) {
+            case '{':
+                // Escaping the opening curly bracket to not start an override block is
+                // a VSFilter-incompatible libass extension. But we only use libass, so...
+                if (!block_start && (p == event->Text || *(p-1) != '\\'))
+                    block_start = p;
+                break;
+            case '}':
+                if (block_start && p - block_start > 2
+                        && _is_block_animated(block_start + 1, p - 1, drop_animations))
+                    return true;
+                block_start = NULL;
+                break;
+            default:
+                break;
+        }
+    }
+
+    return false;
+}
+
 class SubtitleOctopus {
+private:
+    ReusableBuffer2D m_blend;
+    RenderBlendResult m_blendResult;
+    bool drop_animations;
+    int scanned_events; // next unscanned event index
 public:
     ASS_Library* ass_library;
     ASS_Renderer* ass_renderer;
@@ -103,16 +254,37 @@ public:
         track = NULL;
         canvas_w = 0;
         canvas_h = 0;
+        drop_animations = false;
+        scanned_events = 0;
     }
 
     void setLogLevel(int level) {
         log_level = level;
     }
 
+    void setDropAnimations(int value) {
+        drop_animations = !!value;
+        if (drop_animations)
+            scanAnimations(scanned_events);
+    }
+
+    /*
+     * \brief Scan events starting at index i for animations
+     * and discard animated tags when found.
+     * Note that once animated tags were dropped they cannot be restored.
+     * Updates the class member scanned_events to last scanned index.
+     */
+    void scanAnimations(int i) {
+        for (; i < track->n_events; i++) {
+             _is_event_animated(track->events + i, drop_animations);
+        }
+        scanned_events = i;
+    }
+
     void initLibrary(int frame_w, int frame_h) {
         ass_library = ass_library_init();
         if (!ass_library) {
-            printf("ass_library_init failed!\n");
+            fprintf(stderr, "jso: ass_library_init failed!\n");
             exit(2);
         }
 
@@ -120,14 +292,14 @@ public:
 
         ass_renderer = ass_renderer_init(ass_library);
         if (!ass_renderer) {
-            printf("ass_renderer_init failed!\n");
+            fprintf(stderr, "jso: ass_renderer_init failed!\n");
             exit(3);
         }
 
         resizeCanvas(frame_w, frame_h);
 
         reloadFonts();
-        buffer_init(&m_blend);
+        m_blend.clear();
     }
 
     /* TRACK */
@@ -135,18 +307,20 @@ public:
         removeTrack();
         track = ass_read_file(ass_library, subfile, NULL);
         if (!track) {
-            printf("Failed to start a track\n");
+            fprintf(stderr, "jso: Failed to start a track\n");
             exit(4);
         }
+        scanAnimations(0);
     }
 
     void createTrackMem(char *buf, unsigned long bufsize) {
         removeTrack();
         track = ass_read_memory(ass_library, buf, (size_t)bufsize, NULL);
         if (!track) {
-            printf("Failed to start a track\n");
+            fprintf(stderr, "jso: Failed to start a track\n");
             exit(4);
         }
+        scanAnimations(0);
     }
 
     void removeTrack() {
@@ -202,7 +376,7 @@ public:
         ass_free_track(track);
         ass_renderer_done(ass_renderer);
         ass_library_done(ass_library);
-        buffer_free(&m_blend);
+        m_blend.clear();
     }
     void reloadLibrary() {
         quitLibrary();
@@ -255,7 +429,7 @@ public:
     }
 
     void setMemoryLimits(int glyph_limit, int bitmap_cache_limit) {
-        printf("libass: setting total libass memory limits to: glyph=%d MiB, bitmap cache=%d MiB\n",
+        printf("jso: setting total libass memory limits to: glyph=%d MiB, bitmap cache=%d MiB\n",
             glyph_limit, bitmap_cache_limit);
         ass_set_cache_limits(ass_renderer, glyph_limit, bitmap_cache_limit);
     }
@@ -293,12 +467,11 @@ public:
         }
 
         // make float buffer for blending
-        float* buf = (float*)buffer_resize(&m_blend, sizeof(float) * width * height * 4, 0);
+        float* buf = (float*)m_blend.get_rawbuf(width, height, sizeof(float) * 4, true);
         if (buf == NULL) {
-            printf("libass: error: cannot allocate buffer for blending");
+            fprintf(stderr, "jso: cannot allocate buffer for blending\n");
             return &m_blendResult;
         }
-        memset(buf, 0, sizeof(float) * width * height * 4);
 
         // blend things in
         for (cur = img; cur != NULL; cur = cur->next) {
@@ -371,12 +544,10 @@ public:
         m_blendResult.image = (unsigned char*)result;
         return &m_blendResult;
     }
-
-private:
-    buffer_t m_blend;
-    RenderBlendResult m_blendResult;
 };
 
 int main(int argc, char *argv[]) { return 0; }
 
+#ifdef __EMSCRIPTEN__
 #include "./SubOctpInterface.cpp"
+#endif

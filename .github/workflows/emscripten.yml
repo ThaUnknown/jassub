@@ -2,6 +2,7 @@ name: Emscripten
 
 on:
   push:
+    branches: [master, ci, v2, wasm-decode]
   pull_request:
   workflow_dispatch:
 
@@ -9,6 +10,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+    - name: Cancel previous runs
+      uses: styfle/cancel-workflow-action@0.9.1
+      with:
+          access_token: ${{ github.token }}
+          all_but_latest: true
+
     - name: Checkout Base Repo
       uses: actions/checkout@v2
 

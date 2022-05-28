@@ -110,6 +110,7 @@ Module.onRuntimeInitialized = function () {
 
   self.octObj.initLibrary(screen.width, screen.height)
   self.octObj.createTrack('/sub.ass')
+  self.octObj.setDropAnimations(self.dropAllAnimations)
   self.ass_track = self.octObj.track
   self.ass_library = self.octObj.ass_library
   self.ass_renderer = self.octObj.ass_renderer

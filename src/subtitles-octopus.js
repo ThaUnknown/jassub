@@ -48,6 +48,7 @@ export default class SubtitlesOctopus extends EventTarget {
    * @param {Number} [options.prescaleFactor=1.0] Scale down (< 1.0) the subtitles canvas to improve performance at the expense of quality, or scale it up (> 1.0).
    * @param {Number} [options.prescaleHeightLimit=1080] The height in pixels beyond which the subtitles canvas won't be prescaled.
    * @param {Number} [options.prescaleHeightLimit=0] The maximum rendering height in pixels of the subtitles canvas. Beyond this subtitles will be upscaled by the browser.
+   * @param {Boolean} [options.dropAllAnimations] Attempt to discard all animated tags. Enabling this may severly mangle complex subtitles and should only be considered as an last ditch effort of uncertain success for hardware otherwise incapable of displaing anything. Will not reliably work with manually edited or allocated events.
    * @param {String} [options.workerUrl='subtitles-octopus-worker.js'] The URL of the worker.
    * @param {String} [options.subUrl=options.subContent] The URL of the subtitle file to play.
    * @param {String} [options.subContent=options.subUrl] The content of the subtitle file to play.
@@ -137,6 +138,7 @@ export default class SubtitlesOctopus extends EventTarget {
       availableFonts: options.availableFonts || [],
       debug: this.debug,
       targetFps: options.targetFps,
+      dropAllAnimations: options.dropAllAnimations,
       libassMemoryLimit: options.libassMemoryLimit || 0,
       libassGlyphLimit: options.libassGlyphLimit || 0,
       hasAlphaBug: this.hasAlphaBug

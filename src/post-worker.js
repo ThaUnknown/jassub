@@ -11,6 +11,7 @@ self.nextIsRaf = false
 self.lastCurrentTimeReceivedAt = Date.now()
 self.targetFps = 24
 self.libassMemoryLimit = 0 // in MiB
+self.dropAllAnimations = false
 
 self.width = 0
 self.height = 0
@@ -355,8 +356,8 @@ function parseAss (content) {
           format = value
         }
         body.push({
-          key: key,
-          value: value
+          key,
+          value
         })
       }
     }
@@ -450,6 +451,7 @@ self.init = data => {
   self.fontFiles = data.fonts
   self.blendMode = data.blendMode
   self.asyncRender = data.asyncRender
+  self.dropAllAnimations = !!data.dropAllAnimations || self.dropAllAnimations
   // Force fallback if engine does not support 'lossy' mode.
   // We only use createImageBitmap in the worker and historic WebKit versions supported
   // the API in the normal but not the worker scope, so we can't check this earlier.
@@ -530,7 +532,7 @@ self.getEvents = () => {
   }
   postMessage({
     target: 'getEvents',
-    events: events
+    events
   })
 }
 
@@ -582,7 +584,7 @@ self.getStyles = () => {
   postMessage({
     target: 'getStyles',
     time: Date.now(),
-    styles: styles
+    styles
   })
 }
 

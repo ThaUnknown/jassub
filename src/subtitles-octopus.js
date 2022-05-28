@@ -166,7 +166,7 @@ export default class SubtitlesOctopus extends EventTarget {
       left = videoSize.x
     }
 
-    if (this._canvas.style.top !== top || this._canvas.style.left !== left) {
+    if (this._canvas.style.top !== top + 'px' || this._canvas.style.left !== left + 'px') {
       if (videoSize != null) {
         this._canvas.style.top = top + 'px'
         this._canvas.style.left = left + 'px'
@@ -183,14 +183,14 @@ export default class SubtitlesOctopus extends EventTarget {
             this._canvasctrl.width = width
             this._canvasctrl.height = height
             this.sendMessage('canvas', { width, height })
-          }, 50)
+          }, 100)
         } else {
           this._canvasctrl.width = width
           this._canvasctrl.height = height
           this.sendMessage('canvas', { width, height })
           this._resizeTimeoutBuffer = setTimeout(() => {
             this._resizeTimeoutBuffer = undefined
-          }, 50)
+          }, 100)
         }
       }
     }

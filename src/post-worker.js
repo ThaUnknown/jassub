@@ -163,95 +163,68 @@ self.setIsPaused = function (isPaused) {
 
 self.renderImageData = (time, force) => {
   const renderStartTime = Date.now()
+  let result = null
   if (self.blendMode === 'wasm') {
-    const result = self.octObj.renderBlend(time, force)
-    return {
-      w: result.dest_width,
-      h: result.dest_height,
-      x: result.dest_x,
-      y: result.dest_y,
-      changed: result.changed,
-      image: result.image,
-      times: {
-        renderTime: Date.now() - renderStartTime - result.blend_time,
-        blendTime: result.blend_time
-      }
+    result = self.octObj.renderBlend(time, force)
+    result.times = {
+      renderTime: Date.now() - renderStartTime - result.time | 0,
+      blendTime: result.time | 0
     }
   } else {
-    const result = self.octObj.renderImage(time, self.changed)
-    result.changed = Module.getValue(self.changed, 'i32')
-    result.times = { renderTime: Date.now() - renderStartTime }
-    return result
+    result = self.octObj.renderImage(time, force)
+    result.times = {
+      renderTime: Date.now() - renderStartTime - result.time | 0,
+      cppDecodeTime: result.time | 0
+    }
   }
+  return result
 }
 
 self.processRender = (result) => {
   const images = []
   let buffers = []
   const decodeStartTime = Date.now()
-  if (self.blendMode === 'wasm') {
-    if (result.image) {
-      result.buffer = HEAPU8.buffer.slice(result.image, result.image + result.w * result.h * 4)
-      images.push(result)
-      buffers.push(result.buffer)
-    }
-  } else {
-    let res = result
-    while (res.ptr !== 0) {
-      const decode = self.decodeResultBitmap(res)
-      if (decode) {
-        images.push(decode)
-        buffers.push(decode.buffer)
-      }
-      res = res.next
-    }
-  }
   // use callback to not rely on async/await
   if (self.asyncRender) {
     const promises = []
-    for (const image of images) {
-      if (image.buffer) promises.push(createImageBitmap(new ImageData(new Uint8ClampedArray(image.buffer), image.w, image.h), 0, 0, image.w, image.h))
+    for (let image = result; image.ptr !== 0; image = image.next) {
+      if (image.image) {
+        images.unshift({ w: image.w, h: image.h, x: image.x, y: image.y })
+        promises.unshift(createImageBitmap(new ImageData(new Uint8ClampedArray(HEAPU8.subarray(image.image, image.image + image.w * image.h * 4)), image.w, image.h)))
+      }
     }
     Promise.all(promises).then(bitmaps => {
       for (let i = 0; i < images.length; i++) {
-        images[i].buffer = bitmaps[i]
+        images[i].image = bitmaps[i]
       }
       buffers = bitmaps
       self.paintImages({ images, buffers, times: result.times, decodeStartTime })
     })
   } else {
+    for (let image = result; image.ptr !== 0; image = image.next) {
+      if (image.image) {
+        images.unshift({ w: image.w, h: image.h, x: image.x, y: image.y })
+        buffers.unshift(HEAPU8.buffer.slice(image.image, image.image + image.w * image.h * 4))
+      }
+    }
     self.paintImages({ images, buffers, times: result.times, decodeStartTime })
   }
 }
 
-self.decodeResultBitmap = ({ bitmap, stride, w, h, color, dst_x, dst_y }) => {
-  if (w === 0 || h === 0) return null
-  const a = (255 - (color & 255)) / 255
-  if (a === 0) return null
-  const c = ((color << 8) & 0xff0000) | ((color >> 8) & 0xff00) | ((color >> 24) & 0xff)
-  const data = new Uint32Array(w * h) // operate on a single position at once, instead of 4 positions
-  for (let y = h + 1, pos = bitmap, res = 0; --y; pos += stride) {
-    for (let z = 0; z < w; ++z, ++res) {
-      const k = HEAPU8[pos + z]
-      if (k !== 0) data[res] = ((a * k) << 24) | c
-    }
-  }
-  return { w, h, x: dst_x, y: dst_y, buffer: data.buffer }
-}
-
 self.render = (time, force) => {
-  self.busy = true
   const result = self.renderImageData(time, force)
   if (result.changed !== 0 || force) {
     self.processRender(result)
   } else {
-    self.busy = false
+    postMessage({
+      target: 'unbusy'
+    })
   }
 }
 
 self.demand = data => {
   self.lastCurrentTime = data.time
-  if (!self.busy) self.render(data.time, true)
+  self.render(data.time)
 }
 
 self.renderLoop = (force) => {
@@ -269,14 +242,14 @@ self.paintImages = ({ images, buffers, decodeStartTime, times }) => {
     const drawStartTime = Date.now()
     self.offscreenCanvasCtx.clearRect(0, 0, self.offscreenCanvas.width, self.offscreenCanvas.height)
     for (const image of images) {
-      if (image.buffer) {
+      if (image.image) {
         if (self.asyncRender) {
-          self.offscreenCanvasCtx.drawImage(image.buffer, image.x, image.y)
-          image.buffer.close()
+          self.offscreenCanvasCtx.drawImage(image.image, image.x, image.y)
+          image.image.close()
         } else {
           self.bufferCanvas.width = image.w
           self.bufferCanvas.height = image.h
-          self.bufferCtx.putImageData(new ImageData(new Uint8ClampedArray(image.buffer), image.w, image.h), 0, 0)
+          self.bufferCtx.putImageData(new ImageData(new Uint8ClampedArray(HEAPU8.subarray(image.image, image.image + image.w * image.h * 4)), image.w, image.h), 0, 0)
           self.offscreenCanvasCtx.drawImage(self.bufferCanvas, image.x, image.y)
         }
       }
@@ -295,7 +268,9 @@ self.paintImages = ({ images, buffers, decodeStartTime, times }) => {
       times
     }, buffers)
   }
-  self.busy = false
+  postMessage({
+    target: 'unbusy'
+  })
 }
 
 if (typeof SDL !== 'undefined') {

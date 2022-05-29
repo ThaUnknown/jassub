@@ -145,7 +145,10 @@ export default class SubtitlesOctopus extends EventTarget {
     })
     if (_offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
     this.setVideo(options.video)
-    if (this._onDemandRender) this._video.requestVideoFrameCallback(this._demandRender.bind(this))
+    if (this._onDemandRender) {
+      this.busy = false
+      this._video.requestVideoFrameCallback(this._demandRender.bind(this))
+    }
   }
 
   /**
@@ -452,9 +455,16 @@ export default class SubtitlesOctopus extends EventTarget {
     })
   }
 
+  _unbusy () {
+    this.busy = false
+  }
+
   _demandRender (now, metadata) {
     if (this._destroyed) return null
-    this.sendMessage('demand', { time: metadata.mediaTime + this.timeOffset })
+    if (!this.busy) {
+      this.busy = true
+      this.sendMessage('demand', { time: metadata.mediaTime + this.timeOffset })
+    }
     this._video.requestVideoFrameCallback(this._demandRender.bind(this))
   }
 

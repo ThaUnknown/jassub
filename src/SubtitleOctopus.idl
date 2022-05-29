@@ -155,14 +155,15 @@ interface libass {
 };
 
 [NoDelete]
-interface RenderBlendResult {
+interface RenderResult {
     attribute long changed;
-    attribute double blend_time;
-    attribute long dest_x;
-    attribute long dest_y;
-    attribute long dest_width;
-    attribute long dest_height;
+    attribute double time;
+    attribute long x;
+    attribute long y;
+    attribute long w;
+    attribute long h;
     attribute ByteString image;
+    attribute RenderResult next;
 };
 
 interface SubtitleOctopus {
@@ -177,7 +178,7 @@ interface SubtitleOctopus {
     void createTrackMem(DOMString buf, unsigned long bufsize);
     void removeTrack();
     void resizeCanvas(long frame_w, long frame_h);
-    ASS_Image renderImage(double time, IntPtr changed);
+    RenderResult renderImage(double time, long force);
     void quitLibrary();
     void reloadLibrary();
     void reloadFonts();
@@ -191,5 +192,5 @@ interface SubtitleOctopus {
     void removeStyle(long eid);
     void removeAllEvents();
     void setMemoryLimits(long glyph_limit, long bitmap_cache_limit);
-    RenderBlendResult renderBlend(double tm, long force);
+    RenderResult renderBlend(double tm, long force);
 };

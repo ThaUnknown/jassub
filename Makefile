@@ -277,6 +277,7 @@ EMCC_COMMON_ARGS = \
 	#--closure 1 
 	#--memory-init-file 0
 
+
 dist: src/subtitles-octopus-worker.bc dist/js/subtitles-octopus-worker.js dist/js/subtitles-octopus.js
 
 dist/js/subtitles-octopus-worker.js: src/subtitles-octopus-worker.bc src/pre-worker.js src/SubOctpInterface.js src/post-worker.js build/lib/brotli/js/decode.js

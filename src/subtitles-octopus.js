@@ -472,14 +472,14 @@ export default class SubtitlesOctopus extends EventTarget {
     const drawStartTime = Date.now()
     this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
     for (const image of images) {
-      if (image.buffer) {
+      if (image.image) {
         if (async) {
-          this._ctx.drawImage(image.buffer, image.x, image.y)
-          image.buffer.close()
+          this._ctx.drawImage(image.image, image.x, image.y)
+          image.image.close()
         } else {
           this._bufferCanvas.width = image.w
           this._bufferCanvas.height = image.h
-          this._bufferCtx.putImageData(new ImageData(this._fixAlpha(new Uint8ClampedArray(image.buffer)), image.w, image.h), 0, 0)
+          this._bufferCtx.putImageData(new ImageData(this._fixAlpha(new Uint8ClampedArray(image.image)), image.w, image.h), 0, 0)
           this._ctx.drawImage(this._bufferCanvas, image.x, image.y)
         }
       }
@@ -606,31 +606,33 @@ if (!('requestVideoFrameCallback' in HTMLVideoElement.prototype) && 'getVideoPla
   HTMLVideoElement.prototype._rvfcpolyfillmap = {}
   HTMLVideoElement.prototype.requestVideoFrameCallback = function (callback) {
     const quality = this.getVideoPlaybackQuality()
-    const baseline = this.mozPaintedFrames || quality.totalVideoFrames - quality.droppedVideoFrames
+    const baseline = this.mozPresentedFrames || quality.totalVideoFrames - quality.droppedVideoFrames
 
-    const check = () => {
+    const check = (old, now) => {
       const newquality = this.getVideoPlaybackQuality()
-      const current = this.mozPaintedFrames || newquality.totalVideoFrames - newquality.droppedVideoFrames
-      if (current > baseline) {
-        const now = performance.now()
+      const presentedFrames = this.mozPresentedFrames || newquality.totalVideoFrames - newquality.droppedVideoFrames
+      if (presentedFrames > baseline) {
+        const processingDuration = this.mozFrameDelay || (newquality.totalFrameDelay - quality.totalFrameDelay) || 0
+        const timediff = now - old // HighRes diff
         callback(now, {
-          presentationTime: now,
-          expectedDisplayTime: now + (this.mozFrameDelay / 1000 || 0),
+          presentationTime: now + processingDuration * 1000,
+          expectedDisplayTime: now + timediff,
           width: this.videoWidth,
           height: this.videoHeight,
-          mediaTime: this.currentTime,
-          presentedFrames: current,
-          processingDuration: this.mozFrameDelay || (newquality.totalFrameDelay - quality.totalFrameDelay) || 0
+          mediaTime: Math.max(0, this.currentTime - processingDuration),
+          presentedFrames,
+          processingDuration
         })
         delete this._rvfcpolyfillmap[handle]
       } else {
-        this._rvfcpolyfillmap[handle] = requestAnimationFrame(check)
+        this._rvfcpolyfillmap[handle] = requestAnimationFrame(newer => check(now, newer))
       }
     }
 
     const handle = Date.now()
-    this._rvfcpolyfillmap[handle] = requestAnimationFrame(check)
-    return handle
+    const now = performance.now()
+    this._rvfcpolyfillmap[handle] = requestAnimationFrame(newer => check(now, newer))
+    return handle // spec says long, not doube, so can't re-use performance.now
   }
 
   HTMLVideoElement.prototype.cancelVideoFrameCallback = function (handle) {

@@ -2,16 +2,16 @@ usage() {
     echo "$0 [-f] [-c con_name] [-i img_name] [commmand [command_args...]]"
     echo "  -f: Skip building the container and reuse existing (\"fast\")"
     echo "  -c: Name of the container to create/use;"
-    echo "      defaults to libass_javascriptsubtitlesoctopus-build"
+    echo "      defaults to thaunknown_jassub-build"
     echo "  -i: Name of the image to buld/use;"
-    echo "      defaults to libass/javascriptsubtitlesoctopus-build"
+    echo "      defaults to thaunknown/jassub-build"
     echo "If no command is given `make` without arguments will be executed"
     exit 2
 }
 
 OPTIND=1
-CONTAINER="libass_javascriptsubtitlesoctopus-build"
-IMAGE="libass/javascriptsubtitlesoctopus-build"
+CONTAINER="thaunknown_jassub-build"
+IMAGE="thaunknown/jassub-build"
 FAST=0
 while getopts "fc:s:" opt ; do
     case "$opt" in

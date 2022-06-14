@@ -1,4 +1,4 @@
-/* eslint-env browser */
+import 'rvfc-polyfill'
 
 let supportsWebAssembly = false
 try {
@@ -30,10 +30,10 @@ try {
   }
 })()
 /**
- * New SubtitlesOctopus instance.
+ * New JASSUB instance.
  * @class
  */
-export default class SubtitlesOctopus extends EventTarget {
+export default class JASSub extends EventTarget {
   /**
    * @param {Object} options Settings object.
    * @param {HTMLVideoElement} options.video Video to use as target for event listeners. Optional if canvas is specified instead.
@@ -49,7 +49,7 @@ export default class SubtitlesOctopus extends EventTarget {
    * @param {Number} [options.prescaleHeightLimit=1080] The height in pixels beyond which the subtitles canvas won't be prescaled.
    * @param {Number} [options.prescaleHeightLimit=0] The maximum rendering height in pixels of the subtitles canvas. Beyond this subtitles will be upscaled by the browser.
    * @param {Boolean} [options.dropAllAnimations] Attempt to discard all animated tags. Enabling this may severly mangle complex subtitles and should only be considered as an last ditch effort of uncertain success for hardware otherwise incapable of displaing anything. Will not reliably work with manually edited or allocated events.
-   * @param {String} [options.workerUrl='subtitles-octopus-worker.js'] The URL of the worker.
+   * @param {String} [options.workerUrl='jassub-worker.js'] The URL of the worker.
    * @param {String} [options.subUrl=options.subContent] The URL of the subtitle file to play.
    * @param {String} [options.subContent=options.subUrl] The content of the subtitle file to play.
    * @param {String[]} [options.fonts] An array of links to the fonts used in the subtitle.
@@ -59,7 +59,7 @@ export default class SubtitlesOctopus extends EventTarget {
    */
   constructor (options = {}) {
     super()
-    if (!window.Worker) {
+    if (!globalThis.Worker) {
       this.destroy('Worker not supported')
     }
     const _blendMode = options.blendMode || 'wasm'
@@ -72,7 +72,7 @@ export default class SubtitlesOctopus extends EventTarget {
     this._canvasParent = null
     if (this._video) {
       this._canvasParent = document.createElement('div')
-      this._canvasParent.className = 'subtitles-octopus'
+      this._canvasParent.className = 'JASSub'
       this._canvasParent.style.position = 'relative'
 
       if (this._video.nextSibling) {
@@ -103,7 +103,7 @@ export default class SubtitlesOctopus extends EventTarget {
     this.prescaleHeightLimit = options.prescaleHeightLimit || 1080
     this.maxRenderHeight = options.maxRenderHeight || 0 // 0 - no limit.
 
-    this._worker = new Worker(options.workerUrl || 'subtitles-octopus-worker.js')
+    this._worker = new Worker(options.workerUrl || 'jassub-worker.js')
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
 
@@ -129,7 +129,7 @@ export default class SubtitlesOctopus extends EventTarget {
       width: this._canvas.width,
       height: this._canvas.height,
       URL: document.URL,
-      currentScript: supportsWebAssembly ? options.workerUrl || 'subtitles-octopus-worker.js' : options.legacyWorkerUrl || 'subtitles-octopus-worker-legacy.js', // Link to WebAssembly worker
+      currentScript: supportsWebAssembly ? options.workerUrl || 'jassub-worker.js' : options.legacyWorkerUrl || 'jassub-worker-legacy.js', // Link to WebAssembly worker
       preMain: true,
       blendMode: _blendMode,
       subUrl: options.subUrl,
@@ -595,48 +595,5 @@ export default class SubtitlesOctopus extends EventTarget {
     this._removeListeners()
     this.sendMessage('destroy')
     this._worker.terminate()
-  }
-}
-
-if (typeof exports !== 'undefined' && typeof module !== 'undefined' && module.exports) {
-  exports = module.exports = SubtitlesOctopus
-}
-
-if (!('requestVideoFrameCallback' in HTMLVideoElement.prototype) && 'getVideoPlaybackQuality' in HTMLVideoElement.prototype) {
-  HTMLVideoElement.prototype._rvfcpolyfillmap = {}
-  HTMLVideoElement.prototype.requestVideoFrameCallback = function (callback) {
-    const quality = this.getVideoPlaybackQuality()
-    const baseline = this.mozPresentedFrames || quality.totalVideoFrames - quality.droppedVideoFrames
-
-    const check = (old, now) => {
-      const newquality = this.getVideoPlaybackQuality()
-      const presentedFrames = this.mozPresentedFrames || newquality.totalVideoFrames - newquality.droppedVideoFrames
-      if (presentedFrames > baseline) {
-        const processingDuration = this.mozFrameDelay || (newquality.totalFrameDelay - quality.totalFrameDelay) || 0
-        const timediff = now - old // HighRes diff
-        callback(now, {
-          presentationTime: now + processingDuration * 1000,
-          expectedDisplayTime: now + timediff,
-          width: this.videoWidth,
-          height: this.videoHeight,
-          mediaTime: Math.max(0, this.currentTime - processingDuration),
-          presentedFrames,
-          processingDuration
-        })
-        delete this._rvfcpolyfillmap[handle]
-      } else {
-        this._rvfcpolyfillmap[handle] = requestAnimationFrame(newer => check(now, newer))
-      }
-    }
-
-    const handle = Date.now()
-    const now = performance.now()
-    this._rvfcpolyfillmap[handle] = requestAnimationFrame(newer => check(now, newer))
-    return handle // spec says long, not doube, so can't re-use performance.now
-  }
-
-  HTMLVideoElement.prototype.cancelVideoFrameCallback = function (handle) {
-    cancelAnimationFrame(this._rvfcpolyfillmap[handle])
-    delete this._rvfcpolyfillmap[handle]
   }
 }

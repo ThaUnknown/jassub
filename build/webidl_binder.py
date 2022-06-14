@@ -1,4 +1,4 @@
-## JavascriptSubtitlesOctopus
+## JASSub
 ## Patched to: 
 ##   - add integer pointers (IntPtr)
 ##   - implement ByteString type

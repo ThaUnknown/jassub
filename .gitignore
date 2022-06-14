@@ -17,5 +17,5 @@ dist
 venv/
 node_modules/
 build/lib
-src/SubOctpInterface.cpp
-src/SubOctpInterface.js
+src/JASSubInterface.cpp
+src/JASSubInterface.js

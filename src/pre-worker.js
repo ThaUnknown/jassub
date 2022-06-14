@@ -99,7 +99,7 @@ Module.preRun.push(function () {
 })
 
 Module.onRuntimeInitialized = function () {
-  self.octObj = new Module.SubtitleOctopus()
+  self.octObj = new Module.JASSub()
 
   self.changed = Module._malloc(4)
   self.blendTime = Module._malloc(8)

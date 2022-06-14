@@ -1,6 +1,6 @@
-# SubtitleOctopus.js - Makefile
+# JASSub.js - Makefile
 
-# make - Build Dependencies and the SubtitleOctopus.js
+# make - Build Dependencies and the JASSub.js
 BASE_DIR:=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 DIST_DIR:=$(BASE_DIR)dist/libraries
 
@@ -8,9 +8,9 @@ GLOBAL_CFLAGS:=-O3
 GLOBAL_LDFLAGS:=-s ENVIRONMENT=web,webview,worker -s NO_EXIT_RUNTIME=1
 export LDFLAGS = $(GLOBAL_LDFLAGS)
 
-all: subtitleoctopus
+all: jassub
 
-subtitleoctopus: dist
+jassub: dist
 
 # Fribidi
 build/lib/fribidi/configure: lib/fribidi $(wildcard $(BASE_DIR)build/patches/fribidi/*.patch)
@@ -242,7 +242,7 @@ $(DIST_DIR)/lib/libass.a: $(DIST_DIR)/lib/libfontconfig.a $(DIST_DIR)/lib/libhar
 	emmake make -j8 && \
 	emmake make install
 
-# SubtitleOctopus.js
+# JASSub.js
 OCTP_DEPS = \
 	$(DIST_DIR)/lib/libfribidi.a \
 	$(DIST_DIR)/lib/libbrotlicommon.a \
@@ -253,7 +253,7 @@ OCTP_DEPS = \
 	$(DIST_DIR)/lib/libfontconfig.a \
 	$(DIST_DIR)/lib/libass.a
 
-src/subtitles-octopus-worker.bc: $(OCTP_DEPS) all-src
+src/jassub-worker.bc: $(OCTP_DEPS) all-src
 .PHONY: all-src
 all-src:
 	PKG_CONFIG_PATH=$(DIST_DIR)/lib/pkgconfig \
@@ -278,19 +278,19 @@ EMCC_COMMON_ARGS = \
 	#--memory-init-file 0
 
 
-dist: src/subtitles-octopus-worker.bc dist/js/subtitles-octopus-worker.js dist/js/subtitles-octopus.js
+dist: src/jassub-worker.bc dist/js/jassub-worker.js dist/js/jassub.js
 
-dist/js/subtitles-octopus-worker.js: src/subtitles-octopus-worker.bc src/pre-worker.js src/SubOctpInterface.js src/post-worker.js build/lib/brotli/js/decode.js
+dist/js/jassub-worker.js: src/jassub-worker.bc src/pre-worker.js src/JASSubInterface.js src/post-worker.js build/lib/brotli/js/decode.js
 	mkdir -p dist/js
-	emcc src/subtitles-octopus-worker.bc $(OCTP_DEPS) \
+	emcc src/jassub-worker.bc $(OCTP_DEPS) \
 		--pre-js src/pre-worker.js \
 		--pre-js build/lib/brotli/js/decode.js \
-		--post-js src/SubOctpInterface.js \
+		--post-js src/JASSubInterface.js \
 		--post-js src/post-worker.js \
 		-s WASM=1 \
 		$(EMCC_COMMON_ARGS)
 
-dist/js/subtitles-octopus.js: src/subtitles-octopus.js
+dist/js/jassub.js: src/jassub.js
 	mkdir -p dist/js
 
 LIB_LICENSES := brotli expat freetype fribidi fontconfig harfbuzz libass
@@ -305,17 +305,17 @@ $(addprefix dist/license/, $(LIB_LICENSES)): dist/license/%: .git/modules/lib/%/
 	(cd "lib/$*" && FINDOPTS="$(LIB_LICENSES_FINDOPT_$*)" \
 	 ../../build/license_extract.sh ../../build/license_defaults "$*"  .) > $@
 
-dist/license/subtitlesoctopus: .git/HEAD build/license_extract.sh
+dist/license/jassub: .git/HEAD build/license_extract.sh
 	@mkdir -p dist/license
-	build/license_extract.sh build/license_defaults subtitlesoctopus src > dist/license/subtitlesoctopus
+	build/license_extract.sh build/license_defaults jassub src > dist/license/jassub
 
-dist/license/all: dist/license/subtitlesoctopus $(addprefix dist/license/, $(LIB_LICENSES)) build/license_fullnotice build/license_lint.awk
+dist/license/all: dist/license/jassub $(addprefix dist/license/, $(LIB_LICENSES)) build/license_fullnotice build/license_lint.awk
 	@echo "# The following lists all copyright notices and licenses for the" >  dist/license/all
-	@echo "# work contained in JavascriptSubtitlesOctopus per project."      >> dist/license/all
+	@echo "# work contained in JASSub per project."      >> dist/license/all
 	@echo "" >> dist/license/all
 
 	@echo "Concatenate extracted license info..."
-	@$(foreach LIB_PROJ, subtitlesoctopus $(LIB_LICENSES), \
+	@$(foreach LIB_PROJ, jassub $(LIB_LICENSES), \
 		echo "# Project: $(LIB_PROJ)"  >> dist/license/all && \
 		cat  dist/license/$(LIB_PROJ)  >> dist/license/all && \
 	) :
@@ -329,7 +329,7 @@ dist/js/COPYRIGHT: dist/license/all
 
 # Clean Tasks
 
-clean: clean-dist clean-libs clean-octopus
+clean: clean-dist clean-libs clean-jassub
 
 clean-dist:
 	rm -frv dist/libraries/*
@@ -337,7 +337,7 @@ clean-dist:
 	rm -frv dist/license/*
 clean-libs:
 	rm -frv dist/libraries build/lib
-clean-octopus:
+clean-jassub:
 	cd src && git clean -fdX
 
 git-checkout:

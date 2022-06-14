@@ -2,7 +2,7 @@
   "name": "jassub",
   "version": "1.0.0",
   "description": "libass Subtitle Renderer and Parser library for browsers",
-  "main": "dist/js/subtitles-octopus.js",
+  "main": "dist/js/jassub.js",
   "files": [
     "dist/js/subtitles*",
     "dist/js/COPYRIGHT"
@@ -28,5 +28,8 @@
   "bugs": {
     "url": "https://github.com/ThaUnknown/jassub/issues"
   },
-  "homepage": "https://github.com/ThaUnknown/jassub"
+  "homepage": "https://github.com/ThaUnknown/jassub",
+  "dependencies": {
+    "rvfc-polyfill": "^1.0.1"
+  }
 }

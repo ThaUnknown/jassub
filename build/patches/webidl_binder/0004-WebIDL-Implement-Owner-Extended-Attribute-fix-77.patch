@@ -25,7 +25,7 @@ index d140f8f..4b967f0 100644
 --- a/build/WebIDL.py
 +++ b/build/WebIDL.py
 @@ -1,6 +1,7 @@
- ## JavascriptSubtitlesOctopus
+ ## JASSub
  ## Patched to:
  ##   - add integer pointers (IntPtr)
 +##   - add [Owner] Extended attribute

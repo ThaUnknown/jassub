@@ -166,8 +166,8 @@ interface RenderResult {
     attribute RenderResult next;
 };
 
-interface SubtitleOctopus {
-    void SubtitleOctopus();
+interface JASSub {
+    void JASSub();
     attribute ASS_Track track;
     attribute ASS_Renderer ass_renderer;
     attribute ASS_Library ass_library;

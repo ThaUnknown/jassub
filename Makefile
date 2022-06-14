@@ -259,7 +259,7 @@ all-src:
 	PKG_CONFIG_PATH=$(DIST_DIR)/lib/pkgconfig \
 	$(MAKE) -C src all
 
-# Dist Files
+# Dist Files https://github.com/emscripten-core/emscripten/blob/2.0.34/src/settings.js
 EMCC_COMMON_ARGS = \
 	$(GLOBAL_LDFLAGS) \
 	-s EXPORTED_FUNCTIONS="['_main', '_malloc']" \

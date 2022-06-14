@@ -76,8 +76,8 @@ self.setTrack = function ({ content }) {
   Module.FS.writeFile('/sub.ass', content)
 
   // Tell libass to render the new track
-  self.octObj.createTrack('/sub.ass')
-  self.ass_track = self.octObj.track
+  self.jassubObj.createTrack('/sub.ass')
+  self.ass_track = self.jassubObj.track
   self.renderLoop()
 }
 
@@ -85,7 +85,7 @@ self.setTrack = function ({ content }) {
  * Remove subtitle track.
  */
 self.freeTrack = function () {
-  self.octObj.removeTrack()
+  self.jassubObj.removeTrack()
   self.renderLoop()
 }
 
@@ -110,7 +110,7 @@ self.resize = (width, height) => {
     self.offscreenCanvas.width = width
     self.offscreenCanvas.height = height
   }
-  self.octObj.resizeCanvas(width, height)
+  self.jassubObj.resizeCanvas(width, height)
 }
 
 self.getCurrentTime = function () {
@@ -165,13 +165,13 @@ self.renderImageData = (time, force) => {
   const renderStartTime = Date.now()
   let result = null
   if (self.blendMode === 'wasm') {
-    result = self.octObj.renderBlend(time, force)
+    result = self.jassubObj.renderBlend(time, force)
     result.times = {
       renderTime: Date.now() - renderStartTime - result.time | 0,
       blendTime: result.time | 0
     }
   } else {
-    result = self.octObj.renderImage(time, force)
+    result = self.jassubObj.renderImage(time, force)
     result.times = {
       renderTime: Date.now() - renderStartTime - result.time | 0,
       cppDecodeTime: result.time | 0
@@ -479,17 +479,17 @@ self.offscreenCanvas = data => {
 }
 
 self.destroy = () => {
-  self.octObj.quitLibrary()
+  self.jassubObj.quitLibrary()
 }
 
 self.createEvent = data => {
-  _applyKeys(data.event, self.octObj.track.get_events(self.octObj.allocEvent()))
+  _applyKeys(data.event, self.jassubObj.track.get_events(self.jassubObj.allocEvent()))
 }
 
 self.getEvents = () => {
   const events = []
-  for (let i = 0; i < self.octObj.getEventCount(); i++) {
-    const evntPtr = self.octObj.track.get_events(i)
+  for (let i = 0; i < self.jassubObj.getEventCount(); i++) {
+    const evntPtr = self.jassubObj.track.get_events(i)
     events.push({
       Start: evntPtr.get_Start(),
       Duration: evntPtr.get_Duration(),
@@ -511,21 +511,21 @@ self.getEvents = () => {
 }
 
 self.setEvent = data => {
-  _applyKeys(data.event, self.octObj.track.get_events(data.index))
+  _applyKeys(data.event, self.jassubObj.track.get_events(data.index))
 }
 
 self.removeEvent = data => {
-  self.octObj.removeEvent(data.index)
+  self.jassubObj.removeEvent(data.index)
 }
 
 self.createStyle = data => {
-  _applyKeys(data.style, self.octObj.track.get_styles(self.octObj.allocStyle()))
+  _applyKeys(data.style, self.jassubObj.track.get_styles(self.jassubObj.allocStyle()))
 }
 
 self.getStyles = () => {
   const styles = []
-  for (let i = 0; i < self.octObj.getStyleCount(); i++) {
-    const stylPtr = self.octObj.track.get_styles(i)
+  for (let i = 0; i < self.jassubObj.getStyleCount(); i++) {
+    const stylPtr = self.jassubObj.track.get_styles(i)
     styles.push({
       Name: stylPtr.get_Name(),
       FontName: stylPtr.get_FontName(),
@@ -563,11 +563,11 @@ self.getStyles = () => {
 }
 
 self.setStyle = data => {
-  _applyKeys(data.style, self.octObj.track.get_styles(data.index))
+  _applyKeys(data.style, self.jassubObj.track.get_styles(data.index))
 }
 
 self.removeStyle = data => {
-  self.octObj.removeStyle(data.index)
+  self.jassubObj.removeStyle(data.index)
 }
 
 self.setimmediate = () => {

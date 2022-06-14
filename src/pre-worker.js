@@ -99,7 +99,7 @@ Module.preRun.push(function () {
 })
 
 Module.onRuntimeInitialized = function () {
-  self.octObj = new Module.JASSub()
+  self.jassubObj = new Module.JASSub()
 
   self.changed = Module._malloc(4)
   self.blendTime = Module._malloc(8)
@@ -108,15 +108,15 @@ Module.onRuntimeInitialized = function () {
   self.blendW = Module._malloc(4)
   self.blendH = Module._malloc(4)
 
-  self.octObj.initLibrary(screen.width, screen.height)
-  self.octObj.createTrack('/sub.ass')
-  self.octObj.setDropAnimations(self.dropAllAnimations)
-  self.ass_track = self.octObj.track
-  self.ass_library = self.octObj.ass_library
-  self.ass_renderer = self.octObj.ass_renderer
+  self.jassubObj.initLibrary(screen.width, screen.height)
+  self.jassubObj.createTrack('/sub.ass')
+  self.jassubObj.setDropAnimations(self.dropAllAnimations)
+  self.ass_track = self.jassubObj.track
+  self.ass_library = self.jassubObj.ass_library
+  self.ass_renderer = self.jassubObj.ass_renderer
 
   if (self.libassMemoryLimit > 0 || self.libassGlyphLimit > 0) {
-    self.octObj.setMemoryLimits(self.libassGlyphLimit, self.libassMemoryLimit)
+    self.jassubObj.setMemoryLimits(self.libassGlyphLimit, self.libassMemoryLimit)
   }
 }
 

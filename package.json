@@ -2,10 +2,11 @@
   "name": "jassub",
   "version": "1.0.0",
   "description": "libass Subtitle Renderer and Parser library for browsers",
-  "main": "dist/js/jassub.js",
+  "main": "src/jassub.js",
   "files": [
-    "dist/js/subtitles*",
-    "dist/js/COPYRIGHT"
+    "dist/js/jassub*",
+    "dist/js/COPYRIGHT",
+    "src/jassub.js"
   ],
   "scripts": {
     "prepare": "./run-docker-build.sh"

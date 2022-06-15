@@ -44,33 +44,6 @@ interface ASS_Event {
 };
 
 [NoDelete]
-interface ASS_Track {
-    attribute long n_styles;
-    attribute long max_styles;
-    attribute long n_events;
-    attribute long max_events;
-    [Value] attribute ASS_Style[] styles;
-    [Value] attribute ASS_Event[] events;
-    [Owner] attribute DOMString style_format;
-    [Owner] attribute DOMString event_format;
-    attribute long PlayResX;
-    attribute long PlayResY;
-    attribute double Timer;
-    attribute long WrapStyle;
-    attribute long ScaledBorderAndShadow;
-    attribute long Kerning;
-    [Owner] attribute DOMString Language;
-    attribute long default_style;
-    [Owner] attribute DOMString name;
-};
-
-
-[NoDelete]
-interface ASS_Library {};
-[NoDelete]
-interface ASS_Renderer {};
-
-[NoDelete]
 interface RenderResult {
     attribute long changed;
     attribute double time;
@@ -84,13 +57,9 @@ interface RenderResult {
 
 interface JASSub {
     void JASSub();
-    attribute ASS_Track track;
-    attribute ASS_Renderer ass_renderer;
-    attribute ASS_Library ass_library;
     void setLogLevel(long level);
     void setDropAnimations(long value);
-    void initLibrary(long frame_w, long frame_h);
-    void createTrack(DOMString subfile);
+    void initLibrary(long frame_w, long frame_h, DOMString default_font);
     void createTrackMem(DOMString buf, unsigned long bufsize);
     void removeTrack();
     void resizeCanvas(long frame_w, long frame_h);

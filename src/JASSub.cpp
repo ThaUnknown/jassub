@@ -236,7 +236,6 @@ private:
   RenderResult m_renderResult;
   bool drop_animations;
   int scanned_events; // next unscanned event index
-public:
   ASS_Library *ass_library;
   ASS_Renderer *ass_renderer;
   ASS_Track *track;
@@ -246,6 +245,9 @@ public:
 
   int status;
 
+  char m_defaultFont[256];
+
+public:
   JASSub() {
     status = 0;
     ass_library = NULL;
@@ -280,7 +282,12 @@ public:
     scanned_events = i;
   }
 
-  void initLibrary(int frame_w, int frame_h) {
+  void initLibrary(int frame_w, int frame_h, char *defaultFont) {
+    if (strlen(defaultFont) >= sizeof(m_defaultFont)) {
+      printf("defaultFont is too large!\n");
+      exit(4);
+    }
+    strcpy(m_defaultFont, defaultFont);
     ass_library = ass_library_init();
     if (!ass_library) {
       fprintf(stderr, "jso: ass_library_init failed!\n");
@@ -303,16 +310,6 @@ public:
   }
 
   /* TRACK */
-  void createTrack(char *subfile) {
-    removeTrack();
-    track = ass_read_file(ass_library, subfile, NULL);
-    if (!track) {
-      fprintf(stderr, "jso: Failed to start a track\n");
-      exit(4);
-    }
-    scanAnimations(0);
-  }
-
   void createTrackMem(char *buf, unsigned long bufsize) {
     removeTrack();
     track = ass_read_memory(ass_library, buf, (size_t)bufsize, NULL);
@@ -415,11 +412,11 @@ public:
   void reloadLibrary() {
     quitLibrary();
 
-    initLibrary(canvas_w, canvas_h);
+    initLibrary(canvas_w, canvas_h, m_defaultFont);
   }
 
   void reloadFonts() {
-    ass_set_fonts(ass_renderer, "/assets/default.woff2", NULL, ASS_FONTPROVIDER_FONTCONFIG, "/assets/fonts.conf", 1);
+    ass_set_fonts(ass_renderer, m_defaultFont, NULL, ASS_FONTPROVIDER_FONTCONFIG, "/assets/fonts.conf", 1);
   }
 
   void setMargin(int top, int bottom, int left, int right) {

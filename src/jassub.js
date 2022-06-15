@@ -25,6 +25,7 @@ export default class JASSub extends EventTarget {
    * @param {String} [options.subContent=options.subUrl] The content of the subtitle file to play.
    * @param {String[]} [options.fonts] An array of links to the fonts used in the subtitle.
    * @param {Object} [options.availableFonts] Object with all available fonts - Key is font name in lower case, value is link: { arial: '/font1.ttf' }.
+   * @param {String} [options.fallbackFont] Fallback font to use.
    * @param {Number} [options.libassMemoryLimit] libass bitmap cache memory limit in MiB (approximate).
    * @param {Number} [options.libassGlyphLimit] libass glyph cache memory limit in MiB (approximate).
    */
@@ -91,6 +92,7 @@ export default class JASSub extends EventTarget {
       subContent: options.subContent || null,
       fonts: options.fonts || [],
       availableFonts: options.availableFonts || [],
+      fallbackFont: options.fallbackFont || './default.woff2',
       debug: this.debug,
       targetFps: options.targetFps || 24,
       dropAllAnimations: options.dropAllAnimations,
@@ -114,24 +116,24 @@ export default class JASSub extends EventTarget {
     // check if ran previously
     if (JASSub._supportsWebAssembly !== null) return null
 
+    const canvas1 = document.createElement('canvas')
+    const ctx1 = canvas1.getContext('2d')
     // test ImageData constructor
     if (typeof ImageData.prototype.constructor === 'function') {
       try {
         // try actually calling ImageData, as on some browsers it's reported
         // as existing but calling it errors out as "TypeError: Illegal constructor"
-        return new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1)
+        // eslint-disable-next-line no-new
+        new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1)
       } catch (e) {
         console.log('detected that ImageData is not constructable despite browser saying so')
+
+        window.ImageData = function (data, width, height) {
+          const imageData = ctx1.createImageData(width, height)
+          if (data) imageData.data.set(data)
+          return imageData
+        }
       }
-    }
-
-    const canvas1 = document.createElement('canvas')
-    const ctx1 = canvas1.getContext('2d')
-
-    window.ImageData = (data, width, height) => {
-      const imageData = ctx1.createImageData(width, height)
-      if (data) imageData.data.set(data)
-      return imageData
     }
 
     try {

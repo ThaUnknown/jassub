@@ -85,10 +85,11 @@ Module.preRun.push(function () {
     }
   }
 
-  // Module["FS"].mount(Module["FS"].filesystems.IDBFS, {}, '/fonts');
+  Module.FS_createLazyFile('/fonts', '.fallback.' + self.fallbackFont.match(/(?:\.([^.]+))?$/)[1].toLowerCase(), self.fallbackFont, true, false)
+
   const fontFiles = self.fontFiles || []
   for (let i = 0; i < fontFiles.length; i++) {
-    Module.FS_createPreloadedFile('/fonts', 'font' + i + '-' + fontFiles[i].split('/').pop(), fontFiles[i], true, true)
+    Module.FS_createLazyFile('/fonts', 'font' + i + '-' + fontFiles[i].split('/').pop(), fontFiles[i], true, false)
   }
 })
 
@@ -97,13 +98,10 @@ const textByteLength = (input) => new TextEncoder().encode(input).buffer.byteLen
 Module.onRuntimeInitialized = function () {
   self.jassubObj = new Module.JASSub()
 
-  self.jassubObj.initLibrary(screen.width, screen.height)
+  self.jassubObj.initLibrary(screen.width, screen.height, '/fonts/.fallback.' + self.fallbackFont.match(/(?:\.([^.]+))?$/)[1].toLowerCase())
 
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
   self.jassubObj.setDropAnimations(self.dropAllAnimations)
-  self.ass_track = self.jassubObj.track
-  self.ass_library = self.jassubObj.ass_library
-  self.ass_renderer = self.jassubObj.ass_renderer
 
   if (self.libassMemoryLimit > 0 || self.libassGlyphLimit > 0) {
     self.jassubObj.setMemoryLimits(self.libassGlyphLimit, self.libassMemoryLimit)

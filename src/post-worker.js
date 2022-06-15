@@ -392,6 +392,7 @@ self.init = data => {
   self.subUrl = data.subUrl
   self.subContent = data.subContent
   self.fontFiles = data.fonts
+  self.fallbackFont = data.fallbackFont
   self.blendMode = data.blendMode
   self.asyncRender = data.asyncRender
   self.dropAllAnimations = !!data.dropAllAnimations || self.dropAllAnimations

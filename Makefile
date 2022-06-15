@@ -262,9 +262,7 @@ all-src:
 # Dist Files https://github.com/emscripten-core/emscripten/blob/2.0.34/src/settings.js
 EMCC_COMMON_ARGS = \
 	$(GLOBAL_LDFLAGS) \
-	-s EXPORTED_RUNTIME_METHODS="['FS_createPreloadedFile', 'FS_createPath']" \
-	--use-preload-plugins \
-	--preload-file assets/default.woff2 \
+	-s EXPORTED_RUNTIME_METHODS="['FS_createLazyFile', 'FS_createPath']" \
 	--preload-file assets/fonts.conf \
 	-s ALLOW_MEMORY_GROWTH=1 \
 	-s NO_FILESYSTEM=0 \

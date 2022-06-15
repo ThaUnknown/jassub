@@ -274,8 +274,7 @@ EMCC_COMMON_ARGS = \
 	--no-heap-copy \
 	-o $@
 	# -O3
-	# TODO: remove use-preload-plugins when fs is gone
-	# test mimimal runtime when fs is gone
+	# TODO: fix minimal runtime errors
 	# -s MINIMAL_RUNTIME=1 \
 	# -s MINIMAL_RUNTIME_STREAMING_WASM_COMPILATION=1 \
   #--js-opts 0 -O0 -gsource-map 

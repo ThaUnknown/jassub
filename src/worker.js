@@ -156,6 +156,8 @@ self.height = 0
 self.fontMap_ = {}
 self.fontId = 0
 
+let asyncRender = false
+
 /**
  * Make the font accessible by libass by writing it to the virtual FS.
  * @param {!string} font the font name.
@@ -320,12 +322,12 @@ self.processRender = (result) => {
   let buffers = []
   const decodeStartTime = Date.now()
   // use callback to not rely on async/await
-  if (self.asyncRender) {
+  if (asyncRender) {
     const promises = []
     for (let image = result; image.ptr !== 0; image = image.next) {
       if (image.image) {
-        images.unshift({ w: image.w, h: image.h, x: image.x, y: image.y })
-        promises.unshift(createImageBitmap(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
+        images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
+        promises.push(createImageBitmap(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
       }
     }
     Promise.all(promises).then(bitmaps => {
@@ -338,8 +340,8 @@ self.processRender = (result) => {
   } else {
     for (let image = result; image.ptr !== 0; image = image.next) {
       if (image.image) {
-        images.unshift({ w: image.w, h: image.h, x: image.x, y: image.y })
-        buffers.unshift(buffer.slice(image.image, image.image + image.w * image.h * 4))
+        images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
+        buffers.push(buffer.slice(image.image, image.image + image.w * image.h * 4))
       }
     }
     self.paintImages({ images, buffers, times: result.times, decodeStartTime })
@@ -378,7 +380,7 @@ self.paintImages = ({ images, buffers, decodeStartTime, times }) => {
     self.offscreenCanvasCtx.clearRect(0, 0, self.offscreenCanvas.width, self.offscreenCanvas.height)
     for (const image of images) {
       if (image.image) {
-        if (self.asyncRender) {
+        if (asyncRender) {
           self.offscreenCanvasCtx.drawImage(image.image, image.x, image.y)
           image.image.close()
         } else {
@@ -398,7 +400,7 @@ self.paintImages = ({ images, buffers, decodeStartTime, times }) => {
   } else {
     postMessage({
       target: 'render',
-      async: self.asyncRender,
+      async: asyncRender,
       images,
       times
     }, buffers)
@@ -533,13 +535,13 @@ self.init = data => {
   self.fontFiles = data.fonts
   self.fallbackFont = data.fallbackFont
   self.blendMode = data.blendMode
-  self.asyncRender = data.asyncRender
+  asyncRender = data.asyncRender
   self.dropAllAnimations = !!data.dropAllAnimations || self.dropAllAnimations
   // Force fallback if engine does not support 'lossy' mode.
   // We only use createImageBitmap in the worker and historic WebKit versions supported
   // the API in the normal but not the worker scope, so we can't check this earlier.
-  if (self.asyncRender && typeof createImageBitmap === 'undefined') {
-    self.asyncRender = false
+  if (asyncRender && typeof createImageBitmap === 'undefined') {
+    asyncRender = false
     console.error("'createImageBitmap' needed for 'asyncRender' unsupported!")
   }
 

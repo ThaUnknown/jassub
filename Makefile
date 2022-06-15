@@ -286,13 +286,12 @@ EMCC_COMMON_ARGS = \
 
 dist: src/jassub-worker.bc dist/js/jassub-worker.js dist/js/jassub.js
 
-dist/js/jassub-worker.js: src/jassub-worker.bc src/pre-worker.js src/JASSubInterface.js src/post-worker.js build/lib/brotli/js/decode.js
+dist/js/jassub-worker.js: src/jassub-worker.bc src/worker.js src/JASSubInterface.js build/lib/brotli/js/decode.js
 	mkdir -p dist/js
 	emcc src/jassub-worker.bc $(OCTP_DEPS) \
-		--pre-js src/pre-worker.js \
 		--pre-js build/lib/brotli/js/decode.js \
 		--post-js src/JASSubInterface.js \
-		--post-js src/post-worker.js \
+		--post-js src/worker.js \
 		-s WASM=1 \
 		$(EMCC_COMMON_ARGS)
 

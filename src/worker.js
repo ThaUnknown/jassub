@@ -1,4 +1,143 @@
-/* global Module, HEAPU8, FS, textByteLength */
+/* global Module, FS, readBinary, read_, calledMain, addRunDependency, removeRunDependency, buffer */
+const hasNativeConsole = typeof console !== 'undefined'
+
+// implement console methods if they're missing
+function makeCustomConsole () {
+  const console = (function () {
+    function postConsoleMessage (command, args) {
+      postMessage({
+        target: 'console',
+        command,
+        content: JSON.stringify(Array.prototype.slice.call(args))
+      })
+    }
+
+    return {
+      log: function () {
+        postConsoleMessage('log', arguments)
+      },
+      debug: function () {
+        postConsoleMessage('debug', arguments)
+      },
+      info: function () {
+        postConsoleMessage('info', arguments)
+      },
+      warn: function () {
+        postConsoleMessage('warn', arguments)
+      },
+      error: function () {
+        postConsoleMessage('error', arguments)
+      }
+    }
+  })()
+
+  return console
+}
+
+/**
+ * Test the subtitle file for Brotli compression.
+ * @param {!string} url the URL of the subtitle file.
+ * @returns {boolean} Brotli compression found or not.
+ */
+function isBrotliFile (url) {
+  // Search for parameters
+  let len = url.indexOf('?')
+
+  if (len === -1) {
+    len = url.length
+  }
+
+  return url.endsWith('.br', len)
+}
+
+Module = Module || {}
+
+Module.preRun = Module.preRun || []
+
+Module.preRun.push(function () {
+  Module.FS_createPath('/', 'fonts', true, true)
+  Module.FS_createPath('/', 'fontconfig', true, true)
+
+  if (!self.subContent) {
+    // We can use sync xhr cause we're inside Web Worker
+    if (isBrotliFile(self.subUrl)) {
+      self.subContent = Module.BrotliDecode(readBinary(self.subUrl))
+    } else {
+      self.subContent = read_(self.subUrl)
+    }
+  }
+
+  if (self.availableFonts && self.availableFonts.length !== 0) {
+    const sections = parseAss(self.subContent)
+    for (let i = 0; i < sections.length; i++) {
+      for (let j = 0; j < sections[i].body.length; j++) {
+        if (sections[i].body[j].key === 'Style') {
+          self.writeFontToFS(sections[i].body[j].value.Fontname)
+        }
+      }
+    }
+
+    const regex = /\\fn([^\\}]*?)[\\}]/g
+    let matches
+    while (matches = regex.exec(self.subContent)) {
+      self.writeFontToFS(matches[1])
+    }
+  }
+
+  Module.FS_createLazyFile('/fonts', '.fallback.' + self.fallbackFont.match(/(?:\.([^.]+))?$/)[1].toLowerCase(), self.fallbackFont, true, false)
+
+  const fontFiles = self.fontFiles || []
+  for (let i = 0; i < fontFiles.length; i++) {
+    Module.FS_createLazyFile('/fonts', 'font' + i + '-' + fontFiles[i].split('/').pop(), fontFiles[i], true, false)
+  }
+})
+
+const textByteLength = (input) => new TextEncoder().encode(input).buffer.byteLength
+
+Module.onRuntimeInitialized = function () {
+  self.jassubObj = new Module.JASSub()
+
+  self.jassubObj.initLibrary(screen.width, screen.height, '/fonts/.fallback.' + self.fallbackFont.match(/(?:\.([^.]+))?$/)[1].toLowerCase())
+
+  self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
+  self.jassubObj.setDropAnimations(self.dropAllAnimations)
+
+  if (self.libassMemoryLimit > 0 || self.libassGlyphLimit > 0) {
+    self.jassubObj.setMemoryLimits(self.libassGlyphLimit, self.libassMemoryLimit)
+  }
+}
+
+Module.print = function (text) {
+  if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ')
+  console.log(text)
+}
+Module.printErr = function (text) {
+  if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ')
+  console.error(text)
+}
+
+// Modified from https://github.com/kripken/emscripten/blob/6dc4ac5f9e4d8484e273e4dcc554f809738cedd6/src/proxyWorker.js
+if (!hasNativeConsole) {
+  // we can't call Module.printErr because that might be circular
+  console = {
+    log: function (x) {
+      if (typeof dump === 'function') dump('log: ' + x + '\n')
+    },
+    debug: function (x) {
+      if (typeof dump === 'function') dump('debug: ' + x + '\n')
+    },
+    info: function (x) {
+      if (typeof dump === 'function') dump('info: ' + x + '\n')
+    },
+    warn: function (x) {
+      if (typeof dump === 'function') dump('warn: ' + x + '\n')
+    },
+    error: function (x) {
+      if (typeof dump === 'function') dump('error: ' + x + '\n')
+    }
+  }
+}
+
 Module.FS = FS
 
 self.delay = 0 // approximate delay (time of render + postMessage + drawImage), for example 1/60 or 0
@@ -186,7 +325,7 @@ self.processRender = (result) => {
     for (let image = result; image.ptr !== 0; image = image.next) {
       if (image.image) {
         images.unshift({ w: image.w, h: image.h, x: image.x, y: image.y })
-        promises.unshift(createImageBitmap(new ImageData(new Uint8ClampedArray(HEAPU8.subarray(image.image, image.image + image.w * image.h * 4)), image.w, image.h)))
+        promises.unshift(createImageBitmap(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
       }
     }
     Promise.all(promises).then(bitmaps => {
@@ -200,7 +339,7 @@ self.processRender = (result) => {
     for (let image = result; image.ptr !== 0; image = image.next) {
       if (image.image) {
         images.unshift({ w: image.w, h: image.h, x: image.x, y: image.y })
-        buffers.unshift(HEAPU8.buffer.slice(image.image, image.image + image.w * image.h * 4))
+        buffers.unshift(buffer.slice(image.image, image.image + image.w * image.h * 4))
       }
     }
     self.paintImages({ images, buffers, times: result.times, decodeStartTime })
@@ -245,7 +384,7 @@ self.paintImages = ({ images, buffers, decodeStartTime, times }) => {
         } else {
           self.bufferCanvas.width = image.w
           self.bufferCanvas.height = image.h
-          self.bufferCtx.putImageData(new ImageData(new Uint8ClampedArray(HEAPU8.subarray(image.image, image.image + image.w * image.h * 4)), image.w, image.h), 0, 0)
+          self.bufferCtx.putImageData(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h), 0, 0)
           self.offscreenCanvasCtx.drawImage(self.bufferCanvas, image.x, image.y)
         }
       }
@@ -551,49 +690,17 @@ onmessage = message => {
   }
 }
 
-self.runBenchmark = function (seconds, pos, async) {
-  let totalTime = 0
-  let i = 0
-  pos = pos || 0
-  seconds = seconds || 60
-  const count = seconds * self.targetFps
-  const start = Date.now()
-  let longestFrame = 0
-  const run = function () {
-    const t0 = Date.now()
+let HEAPU8C = null
 
-    pos += 1 / self.targetFps
-    self.setCurrentTime(pos)
-
-    const t1 = Date.now()
-    const diff = t1 - t0
-    totalTime += diff
-    if (diff > longestFrame) {
-      longestFrame = diff
-    }
-
-    if (i < count) {
-      i++
-
-      if (async) {
-        self.requestAnimationFrame(run)
-        return false
-      } else {
-        return true
-      }
-    } else {
-      console.log('Performance fps: ' + Math.round(1000 / (totalTime / count)) + '')
-      console.log('Real fps: ' + Math.round(1000 / ((t1 - start) / count)) + '')
-      console.log('Total time: ' + totalTime)
-      console.log('Longest frame: ' + Math.ceil(longestFrame) + 'ms (' + Math.floor(1000 / longestFrame) + ' fps)')
-
-      return false
-    }
-  }
-
-  while (true) {
-    if (!run()) {
-      break
-    }
-  }
+function updateGlobalBufferAndViews (buf) {
+  buffer = buf
+  HEAPU8C = new Uint8ClampedArray(buf)
+  Module.HEAP8 = HEAP8 = new Int8Array(buf)
+  Module.HEAP16 = HEAP16 = new Int16Array(buf)
+  Module.HEAP32 = HEAP32 = new Int32Array(buf)
+  Module.HEAPU8 = HEAPU8 = new Uint8Array(buf)
+  Module.HEAPU16 = HEAPU16 = new Uint16Array(buf)
+  Module.HEAPU32 = HEAPU32 = new Uint32Array(buf)
+  Module.HEAPF32 = HEAPF32 = new Float32Array(buf)
+  Module.HEAPF64 = HEAPF64 = new Float64Array(buf)
 }

@@ -11,7 +11,7 @@ JASSubInterface.cpp: JASSub.idl ../build/webidl_binder.py
 	@# Our version of WebIDL contains JSO-specific patches
 	python3 ../build/webidl_binder.py JASSub.idl JASSubInterface
 
-jassub-worker.bc: JASSub.cpp libass.cpp JASSubInterface.cpp
+jassub-worker.bc: JASSub.cpp JASSubInterface.cpp
 	@# All later dependencies are already included into the first by CPP
 	$(CXX) $(LOCAL_CXXFLAGS) $(CXXFLAGS) -o $@ $<
 

@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "libass.cpp"
-
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #else
@@ -296,6 +294,7 @@ public:
       fprintf(stderr, "jso: ass_renderer_init failed!\n");
       exit(3);
     }
+    ass_set_extract_fonts(ass_library, true);
 
     resizeCanvas(frame_w, frame_h);
 

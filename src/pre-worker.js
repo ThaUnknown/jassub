@@ -101,13 +101,6 @@ Module.preRun.push(function () {
 Module.onRuntimeInitialized = function () {
   self.jassubObj = new Module.JASSub()
 
-  self.changed = Module._malloc(4)
-  self.blendTime = Module._malloc(8)
-  self.blendX = Module._malloc(4)
-  self.blendY = Module._malloc(4)
-  self.blendW = Module._malloc(4)
-  self.blendH = Module._malloc(4)
-
   self.jassubObj.initLibrary(screen.width, screen.height)
   self.jassubObj.createTrack('/sub.ass')
   self.jassubObj.setDropAnimations(self.dropAllAnimations)

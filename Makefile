@@ -5,7 +5,7 @@ BASE_DIR:=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 DIST_DIR:=$(BASE_DIR)dist/libraries
 
 GLOBAL_CFLAGS:=-O3
-GLOBAL_LDFLAGS:=-s ENVIRONMENT=web,webview,worker -s NO_EXIT_RUNTIME=1
+GLOBAL_LDFLAGS:=-s ENVIRONMENT=worker -s NO_EXIT_RUNTIME=1
 export LDFLAGS = $(GLOBAL_LDFLAGS)
 
 all: jassub
@@ -262,16 +262,24 @@ all-src:
 # Dist Files https://github.com/emscripten-core/emscripten/blob/2.0.34/src/settings.js
 EMCC_COMMON_ARGS = \
 	$(GLOBAL_LDFLAGS) \
-	-s EXPORTED_FUNCTIONS="['_main', '_malloc']" \
-	-s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'getValue', 'FS_createPreloadedFile', 'FS_createPath']" \
+	-s EXPORTED_RUNTIME_METHODS="['FS_createPreloadedFile', 'FS_createPath']" \
 	--use-preload-plugins \
 	--preload-file assets/default.woff2 \
 	--preload-file assets/fonts.conf \
 	-s ALLOW_MEMORY_GROWTH=1 \
 	-s NO_FILESYSTEM=0 \
+	-s AUTO_JS_LIBRARIES=0 \
+	-s AUTO_NATIVE_LIBRARIES=0 \
+	-s HTML5_SUPPORT_DEFERRING_USER_SENSITIVE_REQUESTS=0 \
+	-s USE_SDL=0 \
+	-s INCOMING_MODULE_JS_API="['onRuntimeInitialized','preRun','print','printErr']" \
 	--no-heap-copy \
-	-o $@ \
-	-03
+	-o $@
+	# -O3
+	# TODO: remove use-preload-plugins when fs is gone
+	# test mimimal runtime when fs is gone
+	# -s MINIMAL_RUNTIME=1 \
+	# -s MINIMAL_RUNTIME_STREAMING_WASM_COMPILATION=1 \
   #--js-opts 0 -O0 -gsource-map 
 	#--js-opts 0 -O0 -g3 
 	#--closure 1 

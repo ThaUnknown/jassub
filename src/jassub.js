@@ -1,34 +1,5 @@
 import 'rvfc-polyfill'
 
-let supportsWebAssembly = false
-try {
-  if (typeof WebAssembly === 'object' &&
-    typeof WebAssembly.instantiate === 'function') {
-    const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
-    if (module instanceof WebAssembly.Module) { supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance) }
-  }
-} catch (e) {}
-
-// test ImageData constructor
-; (() => {
-  if (typeof ImageData.prototype.constructor === 'function') {
-    try {
-      // try actually calling ImageData, as on some browsers it's reported
-      // as existing but calling it errors out as "TypeError: Illegal constructor"
-      return new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1)
-    } catch (e) {
-      console.log('detected that ImageData is not constructable despite browser saying so')
-    }
-  }
-
-  const ctx = document.createElement('canvas').getContext('2d')
-
-  window.ImageData = (data, width, height) => {
-    const imageData = ctx.createImageData(width, height)
-    if (data) imageData.data.set(data)
-    return imageData
-  }
-})()
 /**
  * New JASSUB instance.
  * @class
@@ -62,6 +33,7 @@ export default class JASSub extends EventTarget {
     if (!globalThis.Worker) {
       this.destroy('Worker not supported')
     }
+    JASSub._test()
     const _blendMode = options.blendMode || 'wasm'
     const _asyncRender = typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true)
     const _offscreenRender = typeof OffscreenCanvas !== 'undefined' && (options.offscreenRender ?? true)
@@ -103,33 +75,16 @@ export default class JASSub extends EventTarget {
     this.prescaleHeightLimit = options.prescaleHeightLimit || 1080
     this.maxRenderHeight = options.maxRenderHeight || 0 // 0 - no limit.
 
-    this._worker = new Worker(options.workerUrl || 'jassub-worker.js')
+    this._worker = new Worker(JASSub._supportsWebAssembly ? options.workerUrl || 'jassub-worker.js' : options.legacyWorkerUrl || 'jassub-worker-legacy.js')
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
 
-    const canvas2 = document.createElement('canvas')
-    const ctx2 = canvas2.getContext('2d')
-
-    // Test for alpha bug, where e.g. WebKit can render a transparent pixel
-    // (with alpha == 0) as non-black which then leads to visual artifacts.
-    this._bufferCanvas.width = 1
-    this._bufferCanvas.height = 1
-    this._bufferCtx.clearRect(0, 0, 1, 1)
-    ctx2.clearRect(0, 0, 1, 1)
-    const prePut = ctx2.getImageData(0, 0, 1, 1).data
-    this._bufferCtx.putImageData(new ImageData(new Uint8ClampedArray([0, 255, 0, 0]), 1, 1), 0, 0)
-    ctx2.drawImage(this._bufferCanvas, 0, 0)
-    const postPut = ctx2.getImageData(0, 0, 1, 1).data
-    this.hasAlphaBug = prePut[1] !== postPut[1]
-    if (this.hasAlphaBug) console.log('Detected a browser having issue with transparent pixels, applying workaround')
 
     this._worker.postMessage({
       target: 'init',
       asyncRender: _asyncRender,
       width: this._canvas.width,
       height: this._canvas.height,
-      URL: document.URL,
-      currentScript: supportsWebAssembly ? options.workerUrl || 'jassub-worker.js' : options.legacyWorkerUrl || 'jassub-worker-legacy.js', // Link to WebAssembly worker
       preMain: true,
       blendMode: _blendMode,
       subUrl: options.subUrl,
@@ -137,11 +92,11 @@ export default class JASSub extends EventTarget {
       fonts: options.fonts || [],
       availableFonts: options.availableFonts || [],
       debug: this.debug,
-      targetFps: options.targetFps,
+      targetFps: options.targetFps || 24,
       dropAllAnimations: options.dropAllAnimations,
       libassMemoryLimit: options.libassMemoryLimit || 0,
       libassGlyphLimit: options.libassGlyphLimit || 0,
-      hasAlphaBug: this.hasAlphaBug
+      hasAlphaBug: JASSub._hasAlphaBug
     })
     if (_offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
     this.setVideo(options.video)
@@ -149,6 +104,61 @@ export default class JASSub extends EventTarget {
       this.busy = false
       this._video.requestVideoFrameCallback(this._demandRender.bind(this))
     }
+  }
+
+  // test support for WASM, ImageData, alphaBug, but only once, on init so it doesn't run when first running the page
+  static _supportsWebAssembly = null
+  static _hasAlphaBug = null
+
+  static _test () {
+    // check if ran previously
+    if (JASSub._supportsWebAssembly !== null) return null
+
+    // test ImageData constructor
+    if (typeof ImageData.prototype.constructor === 'function') {
+      try {
+        // try actually calling ImageData, as on some browsers it's reported
+        // as existing but calling it errors out as "TypeError: Illegal constructor"
+        return new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1)
+      } catch (e) {
+        console.log('detected that ImageData is not constructable despite browser saying so')
+      }
+    }
+
+    const canvas1 = document.createElement('canvas')
+    const ctx1 = canvas1.getContext('2d')
+
+    window.ImageData = (data, width, height) => {
+      const imageData = ctx1.createImageData(width, height)
+      if (data) imageData.data.set(data)
+      return imageData
+    }
+
+    try {
+      if (typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function') {
+        const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
+        if (module instanceof WebAssembly.Module) { JASSub._supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance) }
+      }
+    } catch (e) {
+      JASSub._supportsWebAssembly = false
+    }
+
+    // Test for alpha bug, where e.g. WebKit can render a transparent pixel
+    // (with alpha == 0) as non-black which then leads to visual artifacts.
+    const canvas2 = document.createElement('canvas')
+    const ctx2 = canvas2.getContext('2d')
+
+    canvas1.width = canvas2.width = 1
+    canvas1.height = canvas2.height = 1
+    ctx1.clearRect(0, 0, 1, 1)
+    ctx2.clearRect(0, 0, 1, 1)
+    const prePut = ctx2.getImageData(0, 0, 1, 1).data
+    ctx1.putImageData(new ImageData(new Uint8ClampedArray([0, 255, 0, 0]), 1, 1), 0, 0)
+    ctx2.drawImage(canvas1, 0, 0)
+    const postPut = ctx2.getImageData(0, 0, 1, 1).data
+    JASSub._hasAlphaBug = prePut[1] !== postPut[1]
+    if (JASSub._hasAlphaBug) console.log('Detected a browser having issue with transparent pixels, applying workaround')
+    canvas2.remove()
   }
 
   /**
@@ -493,7 +503,7 @@ export default class JASSub extends EventTarget {
   }
 
   _fixAlpha (uint8) {
-    if (this.hasAlphaBug) {
+    if (JASSub._hasAlphaBug) {
       for (let j = 3; j < uint8.length; j += 4) {
         uint8[j] = uint8[j] > 1 ? uint8[j] : 1
       }

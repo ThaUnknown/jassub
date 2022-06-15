@@ -1,4 +1,4 @@
-/* global Module, HEAPU8, FS, SDL */
+/* global Module, HEAPU8, FS */
 /* eslint-env browser, worker */
 Module.FS = FS
 
@@ -273,12 +273,6 @@ self.paintImages = ({ images, buffers, decodeStartTime, times }) => {
   })
 }
 
-if (typeof SDL !== 'undefined') {
-  SDL.defaults.copyOnLock = false
-  SDL.defaults.discardOnLock = false
-  SDL.defaults.opaqueFrontBuffer = false
-}
-
 /**
  * Parse the content of an .ass file.
  * @param {!string} content the content of the file
@@ -365,30 +359,9 @@ let screen = {
   height: 0
 }
 
-Module.print = function Module_print (x) {
-  // dump('OUT: ' + x + '\n');
-  postMessage({ target: 'stdout', content: x })
-}
-Module.printErr = function Module_printErr (x) {
-  // dump('ERR: ' + x + '\n');
-  postMessage({ target: 'stderr', content: x })
-}
-
 // Frame throttling
 
-let frameId = 0
-let commandBuffer = []
-
-const postMainLoop = Module.postMainLoop
-Module.postMainLoop = function () {
-  if (postMainLoop) postMainLoop()
-  // frame complete, send a frame id
-  postMessage({ target: 'tick', id: frameId++ })
-  commandBuffer = []
-}
-
 // Wait to start running until we receive some info from the client
-// addRunDependency('gl-prefetch');
 addRunDependency('worker-init')
 
 // buffer messages until the program starts to run
@@ -440,13 +413,6 @@ self.init = data => {
     console = makeCustomConsole()
     console.log('overridden console')
   }
-  if (Module.canvas) {
-    Module.canvas.width_ = data.width
-    Module.canvas.height_ = data.height
-    if (data.boundingClientRect) {
-      Module.canvas.boundingClientRect = data.boundingClientRect
-    }
-  }
   self.targetFps = data.targetFps || self.targetFps
   self.libassMemoryLimit = data.libassMemoryLimit || self.libassMemoryLimit
   self.libassGlyphLimit = data.libassGlyphLimit || 0
@@ -458,9 +424,6 @@ self.init = data => {
 
 self.canvas = data => {
   if (data.width == null) throw new Error('Invalid canvas size specified')
-  if (Module.canvas && data.boundingClientRect) {
-    Module.canvas.boundingClientRect = data.boundingClientRect
-  }
   self.resize(data.width, data.height)
   self.renderLoop()
 }
@@ -568,10 +531,6 @@ self.setStyle = data => {
 
 self.removeStyle = data => {
   self.jassubObj.removeStyle(data.index)
-}
-
-self.setimmediate = () => {
-  if (Module.setImmediates) Module.setImmediates.shift()()
 }
 
 onmessage = message => {

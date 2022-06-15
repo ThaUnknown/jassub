@@ -85,12 +85,6 @@ Module.preRun.push(function () {
     }
   }
 
-  if (self.subContent) {
-    Module.FS.writeFile('/sub.ass', self.subContent)
-  }
-
-  self.subContent = null
-
   // Module["FS"].mount(Module["FS"].filesystems.IDBFS, {}, '/fonts');
   const fontFiles = self.fontFiles || []
   for (let i = 0; i < fontFiles.length; i++) {
@@ -98,11 +92,14 @@ Module.preRun.push(function () {
   }
 })
 
+const textByteLength = (input) => new TextEncoder().encode(input).buffer.byteLength
+
 Module.onRuntimeInitialized = function () {
   self.jassubObj = new Module.JASSub()
 
   self.jassubObj.initLibrary(screen.width, screen.height)
-  self.jassubObj.createTrack('/sub.ass')
+
+  self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
   self.jassubObj.setDropAnimations(self.dropAllAnimations)
   self.ass_track = self.jassubObj.track
   self.ass_library = self.jassubObj.ass_library

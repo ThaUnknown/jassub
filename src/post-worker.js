@@ -1,5 +1,4 @@
-/* global Module, HEAPU8, FS */
-/* eslint-env browser, worker */
+/* global Module, HEAPU8, FS, textByteLength */
 Module.FS = FS
 
 self.delay = 0 // approximate delay (time of render + postMessage + drawImage), for example 1/60 or 0
@@ -72,11 +71,8 @@ self.setTrack = function ({ content }) {
   // Make sure that the fonts are loaded
   self.writeAvailableFontsToFS(content)
 
-  // Write the subtitle file to the virtual FS.
-  Module.FS.writeFile('/sub.ass', content)
-
   // Tell libass to render the new track
-  self.jassubObj.createTrack('/sub.ass')
+  self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
   self.ass_track = self.jassubObj.track
   self.renderLoop()
 }

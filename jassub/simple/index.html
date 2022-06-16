@@ -14,27 +14,23 @@
   <div class="page-wrapper">
     <div class="content-wrapper">
       <div class="content">
-        <h1 class="content-title">
-          JASSUB
-        </h1>
-        <p>
-          View the <a href="https://github.com/ThaUnknown/jassub#readme" target="_blank">Readme</a> for usage details.
-        </p>
         <h2 class="card-title">
-          Performance Info
+          Simple ASS subtitle example
         </h2>
         Video Render FPS: <span id="fpsC">0</span><br>
         Presented frames: <span id="presC">0</span><br>
         Dropped frames: <span id="dropC">0</span><br>
-          <video
-            src="https://cdn.glitch.com/c162fc32-0a96-4954-83c2-90d4cdb149fc%2FBig_Buck_Bunny_360_10s_20MB.mp4?v=1587545460302"
-            class="w-800" controls></video>
+        <button class="btn btn-primary my-10" type="button" id="playC">PlayPause</button><button class="btn btn-primary ml-10 my-10" type="button" id="fullC">Fullscreen</button><br>
+        <div class="w-600" id="containerC">
+          <video src="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" 
+            muted loop class="w-full"></video>
+        </div>
       </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/halfmoon@1.1.1/js/halfmoon.min.js"></script>
+  <script src="../jassub.umd.js"></script>
   <script src="../../js/perf.js"></script>
-  <script src="../jassub.js"></script>
   <script src="./simple.js"></script>
 </body>
 

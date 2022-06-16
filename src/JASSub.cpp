@@ -1,5 +1,5 @@
 /*
-    JASSub.js
+    JASSUB.js
 */
 
 #include "../lib/libass/libass/ass.h"
@@ -230,7 +230,7 @@ static bool _is_event_animated(ASS_Event *event, bool drop_animations) {
   return false;
 }
 
-class JASSub {
+class JASSUB {
 private:
   ReusableBuffer2D m_buffer;
   RenderResult m_renderResult;
@@ -248,7 +248,7 @@ private:
   char m_defaultFont[256];
 
 public:
-  JASSub() {
+  JASSUB() {
     status = 0;
     ass_library = NULL;
     ass_renderer = NULL;
@@ -590,5 +590,5 @@ int main(int argc, char *argv[]) {
 }
 
 #ifdef __EMSCRIPTEN__
-#include "./JASSubInterface.cpp"
+#include "./JASSUBInterface.cpp"
 #endif

@@ -95,7 +95,7 @@ Module.preRun.push(function () {
 const textByteLength = (input) => new TextEncoder().encode(input).buffer.byteLength
 
 Module.onRuntimeInitialized = function () {
-  self.jassubObj = new Module.JASSub()
+  self.jassubObj = new Module.JASSUB()
 
   self.jassubObj.initLibrary(self.width, self.height, '/fonts/.fallback.' + self.fallbackFont.match(/(?:\.([^.]+))?$/)[1].toLowerCase())
 

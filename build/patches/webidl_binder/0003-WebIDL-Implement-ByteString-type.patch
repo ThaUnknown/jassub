@@ -14,7 +14,7 @@ index e9a56e5..faedf10 100644
 --- a/build/webidl_binder.py
 +++ b/build/webidl_binder.py
 @@ -1,6 +1,7 @@
- ## JASSub
+ ## JASSUB
  ## Patched to: 
  ##   - add integer pointers (IntPtr)
 +##   - implement ByteString type

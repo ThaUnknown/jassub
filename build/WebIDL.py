@@ -1,4 +1,4 @@
-## JASSub
+## JASSUB
 ## Patched to:
 ##   - add integer pointers (IntPtr)
 ##   - add [Owner] Extended attribute

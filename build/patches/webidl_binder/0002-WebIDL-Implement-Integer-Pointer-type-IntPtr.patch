@@ -15,7 +15,7 @@ index 8892616..d140f8f 100644
 --- a/build/WebIDL.py
 +++ b/build/WebIDL.py
 @@ -1,4 +1,6 @@
- ## JASSub
+ ## JASSUB
 +## Patched to:
 +##   - add integer pointers (IntPtr)
  ## From https://github.com/emscripten-core/emscripten/blob/f36f9fcaf83db93e6a6d0f0cdc47ab6379ade139/third_party/WebIDL.py
@@ -81,7 +81,7 @@ index 687a5ba..e9a56e5 100644
 --- a/build/webidl_binder.py
 +++ b/build/webidl_binder.py
 @@ -1,4 +1,6 @@
- ## JASSub
+ ## JASSUB
 +## Patched to: 
 +##   - add integer pointers (IntPtr)
  ## From https://github.com/emscripten-core/emscripten/blob/f36f9fcaf83db93e6a6d0f0cdc47ab6379ade139/tools/webidl_binder.py

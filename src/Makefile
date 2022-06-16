@@ -7,16 +7,16 @@ LOCAL_CXXFLAGS  = -Wall -Wno-deprecated $(LIBASS_CXXFLAGS)
 
 all: jassub-worker.bc
 
-JASSubInterface.cpp: JASSub.idl ../build/webidl_binder.py
+JASSUBInterface.cpp: JASSUB.idl ../build/webidl_binder.py
 	@# Our version of WebIDL contains JSO-specific patches
-	python3 ../build/webidl_binder.py JASSub.idl JASSubInterface
+	python3 ../build/webidl_binder.py JASSUB.idl JASSUBInterface
 
-jassub-worker.bc: JASSub.cpp JASSubInterface.cpp
+jassub-worker.bc: JASSUB.cpp JASSUBInterface.cpp
 	@# All later dependencies are already included into the first by CPP
 	$(CXX) $(LOCAL_CXXFLAGS) $(CXXFLAGS) -o $@ $<
 
 clean:
 	rm -f jassub-worker.bc
-	rm -f JASSubInterface.cpp WebIDLGrammar.pkl parser.out
+	rm -f JASSUBInterface.cpp WebIDLGrammar.pkl parser.out
 
 .PHONY: all clean

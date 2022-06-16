@@ -1,4 +1,4 @@
-## JASSub
+## JASSUB
 ## From https://github.com/emscripten-core/emscripten/blob/c834ef7d69ccb4100239eeba0b0f6573fed063bc/tools/tempfiles.py
 
 # Copyright 2013 The Emscripten Authors.  All rights reserved.

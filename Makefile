@@ -1,6 +1,6 @@
-# JASSub.js - Makefile
+# JASSUB.js - Makefile
 
-# make - Build Dependencies and the JASSub.js
+# make - Build Dependencies and the JASSUB.js
 BASE_DIR:=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 DIST_DIR:=$(BASE_DIR)dist/libraries
 
@@ -242,7 +242,7 @@ $(DIST_DIR)/lib/libass.a: $(DIST_DIR)/lib/libfontconfig.a $(DIST_DIR)/lib/libhar
 	emmake make -j8 && \
 	emmake make install
 
-# JASSub.js
+# JASSUB.js
 OCTP_DEPS = \
 	$(DIST_DIR)/lib/libfribidi.a \
 	$(DIST_DIR)/lib/libbrotlicommon.a \
@@ -287,11 +287,11 @@ EMCC_COMMON_ARGS = \
 
 dist: src/jassub-worker.bc dist/js/jassub-worker.js dist/js/jassub.js
 
-dist/js/jassub-worker.js: src/jassub-worker.bc src/worker.js src/JASSubInterface.js build/lib/brotli/js/decode.js
+dist/js/jassub-worker.js: src/jassub-worker.bc src/worker.js src/JASSUBInterface.js build/lib/brotli/js/decode.js
 	mkdir -p dist/js
 	emcc src/jassub-worker.bc $(OCTP_DEPS) \
 		--pre-js build/lib/brotli/js/decode.js \
-		--post-js src/JASSubInterface.js \
+		--post-js src/JASSUBInterface.js \
 		--post-js src/worker.js \
 		-s WASM=1 \
 		$(EMCC_COMMON_ARGS)
@@ -317,7 +317,7 @@ dist/license/jassub: .git/HEAD build/license_extract.sh
 
 dist/license/all: dist/license/jassub $(addprefix dist/license/, $(LIB_LICENSES)) build/license_fullnotice build/license_lint.awk
 	@echo "# The following lists all copyright notices and licenses for the" >  dist/license/all
-	@echo "# work contained in JASSub per project."      >> dist/license/all
+	@echo "# work contained in JASSUB per project."      >> dist/license/all
 	@echo "" >> dist/license/all
 
 	@echo "Concatenate extracted license info..."

@@ -6,7 +6,6 @@ a.wasm
 src/WebIDLGrammar.pkl
 src/parser.out
 lib/expat/xmlwf/xmlwf
-dist
 .libs/
 *.bc
 *.lo
@@ -17,5 +16,5 @@ dist
 venv/
 node_modules/
 build/lib
-src/JASSubInterface.cpp
-src/JASSubInterface.js
+src/JASSUBInterface.cpp
+src/JASSUBInterface.js

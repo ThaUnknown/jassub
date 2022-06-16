@@ -4,12 +4,12 @@
   "description": "libass Subtitle Renderer and Parser library for browsers",
   "main": "src/jassub.js",
   "files": [
-    "dist/js/jassub*",
-    "dist/js/COPYRIGHT",
+    "dist/*",
     "src/jassub.js"
   ],
   "scripts": {
-    "prepare": "./run-docker-build.sh"
+    "prepare": "./run-docker-build.sh",
+    "bundle": "vite build"
   },
   "repository": {
     "type": "git",
@@ -32,5 +32,8 @@
   "homepage": "https://github.com/ThaUnknown/jassub",
   "dependencies": {
     "rvfc-polyfill": "^1.0.1"
+  },
+  "devDependencies": {
+    "vite": "^2.9.12"
   }
 }

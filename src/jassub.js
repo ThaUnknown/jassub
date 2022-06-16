@@ -4,28 +4,29 @@ import 'rvfc-polyfill'
  * New JASSUB instance.
  * @class
  */
-export default class JASSub extends EventTarget {
+export default class JASSUB extends EventTarget {
   /**
    * @param {Object} options Settings object.
-   * @param {HTMLVideoElement} options.video Video to use as target for event listeners. Optional if canvas is specified instead.
+   * @param {HTMLVideoElement} options.video Video to use as target for rendering and event listeners. Optional if canvas is specified instead.
    * @param {HTMLCanvasElement} [options.canvas=HTMLCanvasElement] Canvas to use for manual handling. Not required if video is specified.
-   * @param {'js'|'wasm'} [options.blendMode='wasm'] Which color blending mode to use. WASM will perform better on lower end devices, JS can perform better if the device and browser supports hardware acceleration.
-   * @param {Boolean} [options.asyncRender=true] Whether or not to use async rendering, which can skip rendering frames when resources aren't available.
+   * @param {'js'|'wasm'} [options.blendMode='js'] Which image blending mode to use. WASM will perform better on lower end devices, JS will perform better if the device and browser supports hardware acceleration.
+   * @param {Boolean} [options.asyncRender=true] Whether or not to use async rendering, which offloads the CPU by creating image bitmaps on the GPU.
    * @param {Boolean} [options.offscreenRender=true] Whether or not to render things fully on the worker, greatly reduces CPU usage.
-   * @param {Boolean} [options.onDemandRender=true] Whether or not to render subtitles as the video player decodes frames, rather than predicting which frame the player is on using events.
-   * @param {Number} [options.targetFps=24] Target FPS to render subtitles at.
+   * @param {Boolean} [options.onDemandRender=true] Whether or not to render subtitles as the video player decodes renders, rather than predicting which frame the player is on using events.
+   * @param {Number} [options.targetFps=24] Target FPS to render subtitles at. Ignored when onDemandRender is enabled.
    * @param {Number} [options.timeOffset=0] Subtitle time offset in seconds.
    * @param {Boolean} [options.debug=false] Whether or not to print debug information.
    * @param {Number} [options.prescaleFactor=1.0] Scale down (< 1.0) the subtitles canvas to improve performance at the expense of quality, or scale it up (> 1.0).
    * @param {Number} [options.prescaleHeightLimit=1080] The height in pixels beyond which the subtitles canvas won't be prescaled.
-   * @param {Number} [options.prescaleHeightLimit=0] The maximum rendering height in pixels of the subtitles canvas. Beyond this subtitles will be upscaled by the browser.
-   * @param {Boolean} [options.dropAllAnimations] Attempt to discard all animated tags. Enabling this may severly mangle complex subtitles and should only be considered as an last ditch effort of uncertain success for hardware otherwise incapable of displaing anything. Will not reliably work with manually edited or allocated events.
+   * @param {Number} [options.maxRenderHeight=0] The maximum rendering height in pixels of the subtitles canvas. Beyond this subtitles will be upscaled by the browser.
+   * @param {Boolean} [options.dropAllAnimations=false] Attempt to discard all animated tags. Enabling this may severly mangle complex subtitles and should only be considered as an last ditch effort of uncertain success for hardware otherwise incapable of displaing anything. Will not reliably work with manually edited or allocated events.
    * @param {String} [options.workerUrl='jassub-worker.js'] The URL of the worker.
+   * @param {String} [options.legacyWorkerUrl='jassub-worker-legacy.js'] The URL of the legacy worker. Only loaded if the browser doesn't support WASM.
    * @param {String} [options.subUrl=options.subContent] The URL of the subtitle file to play.
    * @param {String} [options.subContent=options.subUrl] The content of the subtitle file to play.
-   * @param {String[]} [options.fonts] An array of links to the fonts used in the subtitle.
-   * @param {Object} [options.availableFonts] Object with all available fonts - Key is font name in lower case, value is link: { arial: '/font1.ttf' }.
-   * @param {String} [options.fallbackFont] Fallback font to use.
+   * @param {String[]} [options.fonts] An array of links to the fonts used in the subtitle. This forces all the fonts in this array to be loaded by the renderer, regardless of if they are used.
+   * @param {Object} [options.availableFonts] Object with all available fonts - Key is font name in lower case, value is link: { arial: '/font1.ttf' }. These fonts are selectively loaded if detected as used in the current subtitle track.
+   * @param {String} [options.fallbackFont='default.woff2'] The URL of the fallback font to use.
    * @param {Number} [options.libassMemoryLimit] libass bitmap cache memory limit in MiB (approximate).
    * @param {Number} [options.libassGlyphLimit] libass glyph cache memory limit in MiB (approximate).
    */
@@ -34,8 +35,8 @@ export default class JASSub extends EventTarget {
     if (!globalThis.Worker) {
       this.destroy('Worker not supported')
     }
-    JASSub._test()
-    const _blendMode = options.blendMode || 'wasm'
+    JASSUB._test()
+    const _blendMode = options.blendMode || 'js'
     const _asyncRender = typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true)
     const _offscreenRender = typeof OffscreenCanvas !== 'undefined' && (options.offscreenRender ?? true)
     this._onDemandRender = 'requestVideoFrameCallback' in HTMLVideoElement.prototype && (options.onDemandRender ?? true)
@@ -45,7 +46,7 @@ export default class JASSub extends EventTarget {
     this._canvasParent = null
     if (this._video) {
       this._canvasParent = document.createElement('div')
-      this._canvasParent.className = 'JASSub'
+      this._canvasParent.className = 'JASSUB'
       this._canvasParent.style.position = 'relative'
 
       if (this._video.nextSibling) {
@@ -76,7 +77,7 @@ export default class JASSub extends EventTarget {
     this.prescaleHeightLimit = options.prescaleHeightLimit || 1080
     this.maxRenderHeight = options.maxRenderHeight || 0 // 0 - no limit.
 
-    this._worker = new Worker(JASSub._supportsWebAssembly ? options.workerUrl || 'jassub-worker.js' : options.legacyWorkerUrl || 'jassub-worker-legacy.js')
+    this._worker = new Worker(JASSUB._supportsWebAssembly ? options.workerUrl || 'jassub-worker.js' : options.legacyWorkerUrl || 'jassub-worker-legacy.js')
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
 
@@ -98,7 +99,7 @@ export default class JASSub extends EventTarget {
       dropAllAnimations: options.dropAllAnimations,
       libassMemoryLimit: options.libassMemoryLimit || 0,
       libassGlyphLimit: options.libassGlyphLimit || 0,
-      hasAlphaBug: JASSub._hasAlphaBug
+      hasAlphaBug: JASSUB._hasAlphaBug
     })
     if (_offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
     this.setVideo(options.video)
@@ -114,7 +115,7 @@ export default class JASSub extends EventTarget {
 
   static _test () {
     // check if ran previously
-    if (JASSub._supportsWebAssembly !== null) return null
+    if (JASSUB._supportsWebAssembly !== null) return null
 
     const canvas1 = document.createElement('canvas')
     const ctx1 = canvas1.getContext('2d')
@@ -139,10 +140,10 @@ export default class JASSub extends EventTarget {
     try {
       if (typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function') {
         const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
-        if (module instanceof WebAssembly.Module) { JASSub._supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance) }
+        if (module instanceof WebAssembly.Module) { JASSUB._supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance) }
       }
     } catch (e) {
-      JASSub._supportsWebAssembly = false
+      JASSUB._supportsWebAssembly = false
     }
 
     // Test for alpha bug, where e.g. WebKit can render a transparent pixel
@@ -158,8 +159,8 @@ export default class JASSub extends EventTarget {
     ctx1.putImageData(new ImageData(new Uint8ClampedArray([0, 255, 0, 0]), 1, 1), 0, 0)
     ctx2.drawImage(canvas1, 0, 0)
     const postPut = ctx2.getImageData(0, 0, 1, 1).data
-    JASSub._hasAlphaBug = prePut[1] !== postPut[1]
-    if (JASSub._hasAlphaBug) console.log('Detected a browser having issue with transparent pixels, applying workaround')
+    JASSUB._hasAlphaBug = prePut[1] !== postPut[1]
+    if (JASSUB._hasAlphaBug) console.log('Detected a browser having issue with transparent pixels, applying workaround')
     canvas2.remove()
   }
 
@@ -317,6 +318,9 @@ export default class JASSub extends EventTarget {
     this.sendMessage('setTrack', { content })
   }
 
+  /**
+   * Free currently used subtitle track.
+   */
   freeTrack () {
     this.sendMessage('freeTrack')
   }
@@ -505,7 +509,7 @@ export default class JASSub extends EventTarget {
   }
 
   _fixAlpha (uint8) {
-    if (JASSub._hasAlphaBug) {
+    if (JASSUB._hasAlphaBug) {
       for (let j = 3; j < uint8.length; j += 4) {
         uint8[j] = uint8[j] > 1 ? uint8[j] : 1
       }

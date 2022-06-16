@@ -55,8 +55,8 @@ interface RenderResult {
     attribute RenderResult next;
 };
 
-interface JASSub {
-    void JASSub();
+interface JASSUB {
+    void JASSUB();
     void setLogLevel(long level);
     void setDropAnimations(long value);
     void initLibrary(long frame_w, long frame_h, DOMString default_font);

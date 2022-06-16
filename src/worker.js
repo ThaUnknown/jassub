@@ -97,7 +97,7 @@ const textByteLength = (input) => new TextEncoder().encode(input).buffer.byteLen
 Module.onRuntimeInitialized = function () {
   self.jassubObj = new Module.JASSub()
 
-  self.jassubObj.initLibrary(screen.width, screen.height, '/fonts/.fallback.' + self.fallbackFont.match(/(?:\.([^.]+))?$/)[1].toLowerCase())
+  self.jassubObj.initLibrary(self.width, self.height, '/fonts/.fallback.' + self.fallbackFont.match(/(?:\.([^.]+))?$/)[1].toLowerCase())
 
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
   self.jassubObj.setDropAnimations(self.dropAllAnimations)
@@ -208,9 +208,9 @@ self.writeAvailableFontsToFS = function (content) {
  * Set the subtitle track.
  * @param {!string} content the content of the subtitle file.
  */
-self.setTrack = function ({ content }) {
+self.setTrack = function (data) {
   // Make sure that the fonts are loaded
-  self.writeAvailableFontsToFS(content)
+  self.writeAvailableFontsToFS(data.content)
 
   // Tell libass to render the new track
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
@@ -230,12 +230,12 @@ self.freeTrack = function () {
  * Set the subtitle track.
  * @param {!string} url the URL of the subtitle file.
  */
-self.setTrackByUrl = function ({ url }) {
+self.setTrackByUrl = function (data) {
   let content = ''
-  if (isBrotliFile(url)) {
-    content = Module.BrotliDecode(readBinary(url))
+  if (isBrotliFile(data.url)) {
+    content = Module.BrotliDecode(readBinary(data.url))
   } else {
-    content = read_(url)
+    content = read_(data.url)
   }
   self.setTrack({ content })
 }
@@ -373,12 +373,12 @@ self.renderLoop = (force) => {
   }
 }
 
-self.paintImages = ({ images, buffers, decodeStartTime, times }) => {
-  times.decodeTime = Date.now() - decodeStartTime
+self.paintImages = (data) => {
+  data.times.decodeTime = Date.now() - data.decodeStartTime
   if (self.offscreenCanvasCtx) {
     const drawStartTime = Date.now()
     self.offscreenCanvasCtx.clearRect(0, 0, self.offscreenCanvas.width, self.offscreenCanvas.height)
-    for (const image of images) {
+    for (const image of data.images) {
       if (image.image) {
         if (asyncRender) {
           self.offscreenCanvasCtx.drawImage(image.image, image.x, image.y)
@@ -392,18 +392,18 @@ self.paintImages = ({ images, buffers, decodeStartTime, times }) => {
       }
     }
     if (self.debug) {
-      times.drawTime = Date.now() - drawStartTime
+      data.times.drawTime = Date.now() - drawStartTime
       let total = 0
-      for (const key in times) total += times[key]
-      console.log('Bitmaps: ' + images.length + ' Total: ' + Math.round(total) + 'ms', times)
+      for (const key in data.times) total += data.times[key]
+      console.log('Bitmaps: ' + data.images.length + ' Total: ' + Math.round(total) + 'ms', data.times)
     }
   } else {
     postMessage({
       target: 'render',
       async: asyncRender,
-      images,
-      times
-    }, buffers)
+      images: data.images,
+      times: data.times
+    }, data.buffers)
   }
   postMessage({
     target: 'unbusy'
@@ -490,11 +490,6 @@ self.requestAnimationFrame = (function () {
   }
 })()
 
-// eslint-disable-next-line
-let screen = {
-  width: 0,
-  height: 0
-}
 
 // Frame throttling
 
@@ -528,8 +523,8 @@ function _applyKeys (input, output) {
 }
 
 self.init = data => {
-  screen.width = self.width = data.width
-  screen.height = self.height = data.height
+  self.width = data.width
+  self.height = data.height
   self.subUrl = data.subUrl
   self.subContent = data.subContent
   self.fontFiles = data.fonts

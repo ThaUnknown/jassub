@@ -272,14 +272,16 @@ EMCC_COMMON_ARGS = \
 	-s USE_SDL=0 \
 	-s INCOMING_MODULE_JS_API="['onRuntimeInitialized','preRun','print','printErr']" \
 	--no-heap-copy \
-	-o $@
-	# -O3
+	-o $@ \
+  -O3
 	# TODO: fix minimal runtime errors
 	# -s MINIMAL_RUNTIME=1 \
 	# -s MINIMAL_RUNTIME_STREAMING_WASM_COMPILATION=1 \
   #--js-opts 0 -O0 -gsource-map 
 	#--js-opts 0 -O0 -g3 
-	#--closure 1 
+	#--closure 1 \
+	#-s USE_CLOSURE_COMPILER=1 \
+	#-s IGNORE_CLOSURE_COMPILER_ERRORS=1 \
 	#--memory-init-file 0
 
 

@@ -344,8 +344,8 @@ public:
     }
     return size;
   }
-  void processImages(RenderResult *renderResult, ASS_Image *img, char *rawbuffer) {
-    for (; img; img = img->next) {
+  void processImages(RenderResult *&renderResult, ASS_Image *img, char *rawbuffer) {
+    for (RenderResult *tmp = renderResult; img; img = img->next) {
       int w = img->w, h = img->h;
       if (w == 0 || h == 0) {
         continue;
@@ -363,10 +363,12 @@ public:
       result->x = img->dst_x;
       result->y = img->dst_y;
       result->image = (uint8_t *)data;
-      if (renderResult) {
-        renderResult->next = result;
+      if (tmp) {
+        tmp->next = result;
+      } else {
+        renderResult = result;
       }
-      renderResult = result;
+      tmp = result;
       rawbuffer += datasize + sizeof(RenderResult);
     }
   }
@@ -384,11 +386,13 @@ public:
   }
 
   RenderResult *renderImage(double time, int force) {
+    m_renderResult.time = 0.0;
+    m_renderResult.image = NULL;
     ASS_Image *img = ass_render_frame(ass_renderer, track, (int)(time * 1000), &m_renderResult.changed);
 
     RenderResult *renderResult = NULL;
     if (img == NULL || (m_renderResult.changed == 0 && !force)) {
-      return renderResult;
+      return &m_renderResult;
     }
     double start_decode_time = emscripten_get_now();
     int size = getBufferSize(img);

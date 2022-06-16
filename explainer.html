@@ -6,7 +6,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
   <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport" />
   <meta name="viewport" content="width=device-width" />
-  <title>JASSUB Home Page</title>
+  <title>JASSUB JSSO Explainer</title>
   <link href="https://cdn.jsdelivr.net/npm/halfmoon@1.1.1/css/halfmoon-variables.min.css" rel="stylesheet" />
 </head>
 
@@ -14,19 +14,46 @@
   <div class="page-wrapper">
     <div class="content-wrapper">
       <div class="content">
-        <h1 class="content-title">
-          JASSUB
-        </h1>
         <p>
           View the <a href="https://github.com/ThaUnknown/jassub#readme" target="_blank">Readme</a> for usage details.
+        </p>
+        <h1 class="content-title">Isn't this just the same thing as JavascriptSubtitlesOctopus?</h1>
+        <p>No, here's why:</p>
+        <ul>
+          <li>This is smaller, 200kb smaller</li>
+          <ul>
+            <li>This version removes a LOT of dead code, unused dependencies and misused functionality, a whole 60kb of it</li>
+            <li>This version doesn't force default assets by default, instead they can easily be loaded at runtime, but only if needed</li>
+          </ul>
+          <li>This is faster, a LOT faster</li>
+          <ul>
+            <li>Includes a few C++ decoding optimisations</li>
+            <li>Uses new modern browser API's allowing it to benefit from proper threading and hardware acceleration, and auto-detects lack of support for those API's and automatically fallbacks to next best settings</li>
+            <li>Includes a LOT of JS optimisations</li>
+            <li>Fixes a few flat out stupid performance bugs</li>
+            <li>Uses less memory as it references data instead of copying it multiple times</li>
+            <li>Can run fully in the worker, thanks to offscreen canvases, making sure the rest of the website/webapp doesn't lag</li>
+          </ul>
+          <li>This fixes a LOT of bugs</li>
+          <ul>
+            <li>Your browser will no longer crash when resizing video with animations</li>
+            <li>Your browser wont leak 10's of MB's of RAM when resizing video with animations</li>
+            <li>Your browser will free up memory quicker</li>
+            <li>The subtitles will no longer randomly dissappear</li>
+            <li>The subtitles will no longer dissapear when moving the video</li>
+          </ul>
+          <li>All of this is with up to date with upstream</li>
+        </ul>
+        <p>
+          But what's a list good for? Here are some live examples [another list :P]:
         </p>
         <ul>
           <li></li>
           <li></li>
-          <li></li>
-          <li></li>
-          <li></li>
         </ul>
+        <p>
+          But why won't you contribute to the original? The simple reason is because libass is to slow to merge even the tinest changes, and the way they treat outside contributors is unpleasant. Merging a full re-write of this scale would take years at their pace.
+        </p>
       </div>
     </div>
   </div>

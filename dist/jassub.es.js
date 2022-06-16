@@ -34,7 +34,7 @@ if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPla
           expectedDisplayTime: now2 + timediff,
           width: this.videoWidth,
           height: this.videoHeight,
-          mediaTime: Math.max(0, this.currentTime || 0) + timediff,
+          mediaTime: Math.max(0, this.currentTime || 0) + timediff / 1e3,
           presentedFrames,
           processingDuration
         });

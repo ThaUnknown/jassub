@@ -34,7 +34,7 @@ if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPla
           expectedDisplayTime: now2 + timediff,
           width: this.videoWidth,
           height: this.videoHeight,
-          mediaTime: Math.max(0, this.currentTime - processingDuration),
+          mediaTime: Math.max(0, this.currentTime || 0) + timediff,
           presentedFrames,
           processingDuration
         });
@@ -61,7 +61,7 @@ const _JASSUB = class extends EventTarget {
       this.destroy("Worker not supported");
     }
     _JASSUB._test();
-    const _blendMode = options.blendMode || "wasm";
+    const _blendMode = options.blendMode || "js";
     const _asyncRender = typeof createImageBitmap !== "undefined" && ((_a = options.asyncRender) != null ? _a : true);
     const _offscreenRender = typeof OffscreenCanvas !== "undefined" && ((_b = options.offscreenRender) != null ? _b : true);
     this._onDemandRender = "requestVideoFrameCallback" in HTMLVideoElement.prototype && ((_c = options.onDemandRender) != null ? _c : true);

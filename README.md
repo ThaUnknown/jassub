@@ -6,7 +6,9 @@
 </p>
 JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>, which renders <a href="https://en.wikipedia.org/wiki/SubStation_Alpha">SSA/ASS subtitles</a> directly in your browser. It uses Emscripten to compile libass' C++ code to WASM.
 
-ONLINE DEMOS // todo
+<p align="center">
+  <a href="https://thaunknown.github.io/jassub/">Online Demos</a>
+</p>
 
 ## Features
 - Supports most SSA/ASS features (everything libass supports)
@@ -20,7 +22,7 @@ ONLINE DEMOS // todo
 - Easy to use - just connect it to video element
 
 ## Isn't this just the same thing as JavascriptSubtitlesOctopus?
-No. See `this` comparison. // todo
+No. See <a href="https://thaunknown.github.io/jassub/explainer.html">this</a> comparison.
 
 ## Usage
 By default all you need to do is copy the files from the `dist/` folder of the repository into the same folder as where your JS runs, then do:

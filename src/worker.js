@@ -84,11 +84,11 @@ Module.preRun.push(function () {
     }
   }
 
-  Module.FS_createLazyFile('/fonts', '.fallback.' + self.fallbackFont.match(/(?:\.([^.]+))?$/)[1].toLowerCase(), self.fallbackFont, true, false)
+  Module.FS.writeFile('/fonts', '.fallback.' + self.fallbackFont.match(/(?:\.([^.]+))?$/)[1].toLowerCase(), read_(self.fallbackFont), { encoding: 'binary' })
 
   const fontFiles = self.fontFiles || []
   for (let i = 0; i < fontFiles.length; i++) {
-    Module.FS_createLazyFile('/fonts', 'font' + i + '-' + fontFiles[i].split('/').pop(), fontFiles[i], true, false)
+    Module.FS.writeFile('/fonts', 'font' + i + '-' + fontFiles[i].split('/').pop(), read_(fontFiles[i]), { encoding: 'binary' })
   }
 })
 
@@ -214,7 +214,6 @@ self.setTrack = function (data) {
 
   // Tell libass to render the new track
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
-  self.ass_track = self.jassubObj.track
   self.renderLoop()
 }
 

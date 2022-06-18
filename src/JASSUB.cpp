@@ -238,7 +238,6 @@ private:
   int scanned_events; // next unscanned event index
   ASS_Library *ass_library;
   ASS_Renderer *ass_renderer;
-  ASS_Track *track;
 
   int canvas_w;
   int canvas_h;
@@ -248,6 +247,7 @@ private:
   char m_defaultFont[256];
 
 public:
+  ASS_Track *track;
   JASSUB() {
     status = 0;
     ass_library = NULL;

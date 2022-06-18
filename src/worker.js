@@ -1,4 +1,5 @@
-/* global Module, FS, readBinary, read_, calledMain, addRunDependency, removeRunDependency, buffer */
+/* eslint-disable no-global-assign */
+/* global Module, FS, readBinary, read_, calledMain, addRunDependency, removeRunDependency, buffer, assert, updateGlobalBufferAndViews */
 const hasNativeConsole = typeof console !== 'undefined'
 
 // implement console methods if they're missing
@@ -84,11 +85,13 @@ Module.preRun.push(function () {
     }
   }
 
-  Module.FS.writeFile('/fonts', '.fallback.' + self.fallbackFont.match(/(?:\.([^.]+))?$/)[1].toLowerCase(), read_(self.fallbackFont), { encoding: 'binary' })
+  const fallbackFontData = ArrayBuffer.isView(self.fallbackFont) ? self.fallbackFont : readBinary(self.fallbackFont)
+  Module.FS.writeFile('/fonts/.fallback', fallbackFontData, { encoding: 'binary' })
 
   const fontFiles = self.fontFiles || []
   for (let i = 0; i < fontFiles.length; i++) {
-    Module.FS.writeFile('/fonts', 'font' + i + '-' + fontFiles[i].split('/').pop(), read_(fontFiles[i]), { encoding: 'binary' })
+    const fontData = ArrayBuffer.isView(fontFiles[i]) ? fontFiles[i] : readBinary(fontFiles[i])
+    Module.FS.writeFile('/fonts/font' + i, fontData, { encoding: 'binary' })
   }
 })
 
@@ -97,7 +100,7 @@ const textByteLength = (input) => new TextEncoder().encode(input).buffer.byteLen
 Module.onRuntimeInitialized = function () {
   self.jassubObj = new Module.JASSUB()
 
-  self.jassubObj.initLibrary(self.width, self.height, '/fonts/.fallback.' + self.fallbackFont.match(/(?:\.([^.]+))?$/)[1].toLowerCase())
+  self.jassubObj.initLibrary(self.width, self.height, '/fonts/.fallback')
 
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
   self.jassubObj.setDropAnimations(self.dropAllAnimations)
@@ -114,28 +117,6 @@ Module.print = function (text) {
 Module.printErr = function (text) {
   if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ')
   console.error(text)
-}
-
-// Modified from https://github.com/kripken/emscripten/blob/6dc4ac5f9e4d8484e273e4dcc554f809738cedd6/src/proxyWorker.js
-if (!hasNativeConsole) {
-  // we can't call Module.printErr because that might be circular
-  console = {
-    log: function (x) {
-      if (typeof dump === 'function') dump('log: ' + x + '\n')
-    },
-    debug: function (x) {
-      if (typeof dump === 'function') dump('debug: ' + x + '\n')
-    },
-    info: function (x) {
-      if (typeof dump === 'function') dump('info: ' + x + '\n')
-    },
-    warn: function (x) {
-      if (typeof dump === 'function') dump('warn: ' + x + '\n')
-    },
-    error: function (x) {
-      if (typeof dump === 'function') dump('error: ' + x + '\n')
-    }
-  }
 }
 
 Module.FS = FS
@@ -688,15 +669,10 @@ onmessage = message => {
 
 let HEAPU8C = null
 
-function updateGlobalBufferAndViews (buf) {
-  buffer = buf
-  HEAPU8C = new Uint8ClampedArray(buf)
-  Module.HEAP8 = HEAP8 = new Int8Array(buf)
-  Module.HEAP16 = HEAP16 = new Int16Array(buf)
-  Module.HEAP32 = HEAP32 = new Int32Array(buf)
-  Module.HEAPU8 = HEAPU8 = new Uint8Array(buf)
-  Module.HEAPU16 = HEAPU16 = new Uint16Array(buf)
-  Module.HEAPU32 = HEAPU32 = new Uint32Array(buf)
-  Module.HEAPF32 = HEAPF32 = new Float32Array(buf)
-  Module.HEAPF64 = HEAPF64 = new Float64Array(buf)
-}
+// patch EMS function to include Uint8Clamped, but call old function too
+updateGlobalBufferAndViews = (function (_super) {
+  return function (buf) {
+    _super(buf)
+    HEAPU8C = new Uint8ClampedArray(buf)
+  }
+})(updateGlobalBufferAndViews)

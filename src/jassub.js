@@ -24,7 +24,7 @@ export default class JASSUB extends EventTarget {
    * @param {String} [options.legacyWorkerUrl='jassub-worker-legacy.js'] The URL of the legacy worker. Only loaded if the browser doesn't support WASM.
    * @param {String} [options.subUrl=options.subContent] The URL of the subtitle file to play.
    * @param {String} [options.subContent=options.subUrl] The content of the subtitle file to play.
-   * @param {String[]} [options.fonts] An array of links to the fonts used in the subtitle. This forces all the fonts in this array to be loaded by the renderer, regardless of if they are used.
+   * @param {String[]|Uint8Array[]} [options.fonts] An array of links or Uint8Arrays to the fonts used in the subtitle. If Uint8Array is used the array is copied, not referenced. This forces all the fonts in this array to be loaded by the renderer, regardless of if they are used.
    * @param {Object} [options.availableFonts] Object with all available fonts - Key is font name in lower case, value is link: { arial: '/font1.ttf' }. These fonts are selectively loaded if detected as used in the current subtitle track.
    * @param {String} [options.fallbackFont='default.woff2'] The URL of the fallback font to use.
    * @param {Number} [options.libassMemoryLimit] libass bitmap cache memory limit in MiB (approximate).
@@ -80,7 +80,6 @@ export default class JASSUB extends EventTarget {
     this._worker = new Worker(JASSUB._supportsWebAssembly ? options.workerUrl || 'jassub-worker.js' : options.legacyWorkerUrl || 'jassub-worker-legacy.js')
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
-
 
     this._worker.postMessage({
       target: 'init',

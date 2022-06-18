@@ -1,6 +1,6 @@
 {
   "name": "jassub",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "libass Subtitle Renderer and Parser library for browsers",
   "main": "src/jassub.js",
   "files": [
@@ -8,7 +8,6 @@
     "src/jassub.js"
   ],
   "scripts": {
-    "prepare": "./run-docker-build.sh",
     "bundle": "vite build"
   },
   "repository": {

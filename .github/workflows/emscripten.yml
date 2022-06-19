@@ -2,7 +2,7 @@ name: Emscripten
 
 on:
   push:
-    branches: [master, ci]
+    branches: [main, ci]
   pull_request:
   workflow_dispatch:
 

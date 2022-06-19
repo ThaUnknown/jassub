@@ -203,10 +203,6 @@ This library has a lot of methods and properties, however many aren't made for m
   - `{Number} Blur`
   - `{Number} Justify`
 
-
-## Brotli Compressed Subtitles
-JASSUB allows the use of compressed brotli subtitles, saving bandwidth. To use, just run: brotli subFile.ass and use the .br result file with the subUrl option.
-
 # How to build?
 ## Dependencies
 - git

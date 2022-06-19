@@ -35,22 +35,6 @@ function makeCustomConsole () {
   return console
 }
 
-/**
- * Test the subtitle file for Brotli compression.
- * @param {!string} url the URL of the subtitle file.
- * @returns {boolean} Brotli compression found or not.
- */
-function isBrotliFile (url) {
-  // Search for parameters
-  let len = url.indexOf('?')
-
-  if (len === -1) {
-    len = url.length
-  }
-
-  return url.endsWith('.br', len)
-}
-
 Module = Module || {}
 
 Module.preRun = Module.preRun || []
@@ -60,12 +44,7 @@ Module.preRun.push(function () {
   Module.FS_createPath('/', 'fontconfig', true, true)
 
   if (!self.subContent) {
-    // We can use sync xhr cause we're inside Web Worker
-    if (isBrotliFile(self.subUrl)) {
-      self.subContent = Module.BrotliDecode(readBinary(self.subUrl))
-    } else {
-      self.subContent = read_(self.subUrl)
-    }
+    self.subContent = read_(self.subUrl)
   }
 
   if (self.availableFonts && self.availableFonts.length !== 0) {
@@ -218,12 +197,8 @@ self.freeTrack = function () {
  * @param {!string} url the URL of the subtitle file.
  */
 self.setTrackByUrl = function (data) {
-  let content = ''
-  if (isBrotliFile(data.url)) {
-    content = Module.BrotliDecode(readBinary(data.url))
-  } else {
-    content = read_(data.url)
-  }
+  const content = read_(data.url)
+
   self.setTrack({ content })
 }
 

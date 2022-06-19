@@ -47,8 +47,6 @@ $(DIST_DIR)/lib/libexpat.a: build/lib/expat/configured
 	$(JSO_MAKE) install
 
 # Brotli
-build/lib/brotli/js/decode.js: build/lib/brotli/configured
-build/lib/brotli/js/polyfill.js: build/lib/brotli/configured
 build/lib/brotli/configured: lib/brotli $(wildcard $(BASE_DIR)build/patches/brotli/*.patch)
 	$(call PREPARE_SRC_PATCHED,brotli)
 	touch build/lib/brotli/configured
@@ -179,10 +177,10 @@ EMCC_COMMON_ARGS = \
 
 dist: src/jassub-worker.bc dist/js/jassub-worker.js dist/js/jassub.js
 
-dist/js/jassub-worker.js: src/jassub-worker.bc src/worker.js src/JASSUBInterface.js build/lib/brotli/js/decode.js
+dist/js/jassub-worker.js: src/jassub-worker.bc src/worker.js src/JASSUBInterface.js src/polyfill.js
 	mkdir -p dist/js
 	emcc src/jassub-worker.bc $(OCTP_DEPS) \
-		--pre-js build/lib/brotli/js/decode.js \
+	  --pre-js src/polyfill.js \
 		--post-js src/JASSUBInterface.js \
 		--post-js src/worker.js \
 		-s WASM=1 \

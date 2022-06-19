@@ -1,3 +1,4 @@
+/* eslint-disable no-global-assign */
 /* eslint no-extend-native: 0 */
 if (!String.prototype.startsWith) {
   String.prototype.startsWith = function (search, pos) {
@@ -41,3 +42,40 @@ if (!Uint8Array.prototype.slice) {
 Date.now = (Date.now || function () {
   return new Date().getTime()
 })
+
+// implement console methods if they're missing
+function makeCustomConsole () {
+  const console = (function () {
+    function postConsoleMessage (command, args) {
+      postMessage({
+        target: 'console',
+        command,
+        content: JSON.stringify(Array.prototype.slice.call(args))
+      })
+    }
+
+    return {
+      log: function () {
+        postConsoleMessage('log', arguments)
+      },
+      debug: function () {
+        postConsoleMessage('debug', arguments)
+      },
+      info: function () {
+        postConsoleMessage('info', arguments)
+      },
+      warn: function () {
+        postConsoleMessage('warn', arguments)
+      },
+      error: function () {
+        postConsoleMessage('error', arguments)
+      }
+    }
+  })()
+
+  return console
+}
+if (typeof console === 'undefined') {
+  console = makeCustomConsole()
+  console.log('overridden console')
+}

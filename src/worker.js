@@ -1,40 +1,5 @@
 /* eslint-disable no-global-assign */
 /* global Module, FS, readBinary, readAsync, read_, calledMain, addRunDependency, removeRunDependency, buffer, assert, updateGlobalBufferAndViews */
-const hasNativeConsole = typeof console !== 'undefined'
-
-// implement console methods if they're missing
-function makeCustomConsole () {
-  const console = (function () {
-    function postConsoleMessage (command, args) {
-      postMessage({
-        target: 'console',
-        command,
-        content: JSON.stringify(Array.prototype.slice.call(args))
-      })
-    }
-
-    return {
-      log: function () {
-        postConsoleMessage('log', arguments)
-      },
-      debug: function () {
-        postConsoleMessage('debug', arguments)
-      },
-      info: function () {
-        postConsoleMessage('info', arguments)
-      },
-      warn: function () {
-        postConsoleMessage('warn', arguments)
-      },
-      error: function () {
-        postConsoleMessage('error', arguments)
-      }
-    }
-  })()
-
-  return console
-}
-
 Module = Module || {}
 
 Module.preRun = Module.preRun || []
@@ -487,10 +452,6 @@ self.init = data => {
 
   self.availableFonts = data.availableFonts
   self.debug = data.debug
-  if (!hasNativeConsole && self.debug) {
-    console = makeCustomConsole()
-    console.log('overridden console')
-  }
   self.targetFps = data.targetFps || self.targetFps
   self.libassMemoryLimit = data.libassMemoryLimit || self.libassMemoryLimit
   self.libassGlyphLimit = data.libassGlyphLimit || 0

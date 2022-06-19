@@ -275,21 +275,18 @@ export default class JASSUB extends EventTarget {
       if (this._onDemandRender !== true) {
         this._playstate = video.paused
 
-        video.addEventListener('timeupdate', e => this._timeupdate(e), false)
-        video.addEventListener('progress', e => this._timeupdate(e), false)
-        video.addEventListener('waiting', e => this._timeupdate(e), false)
-        video.addEventListener('seeking', e => this._timeupdate(e), false)
-        video.addEventListener('playing', e => this._timeupdate(e), false)
-        video.addEventListener('ratechange', e => this.setRate(e), false)
+        video.addEventListener('timeupdate', this._timeupdate.bind(this), false)
+        video.addEventListener('progress', this._timeupdate.bind(this), false)
+        video.addEventListener('waiting', this._timeupdate.bind(this), false)
+        video.addEventListener('seeking', this._timeupdate.bind(this), false)
+        video.addEventListener('playing', this._timeupdate.bind(this), false)
+        video.addEventListener('ratechange', this.setRate.bind(this), false)
       }
-      if (video.videoWidth > 0) {
-        this.resize()
-      } else {
-        video.addEventListener('loadedmetadata', () => this.resize(0, 0, 0, 0), false)
-      }
+      if (video.videoWidth > 0) this.resize()
+      video.addEventListener('resize', this.resize.bind(this))
       // Support Element Resize Observer
       if (typeof ResizeObserver !== 'undefined') {
-        if (!this._ro) this._ro = new ResizeObserver(() => this.resize(0, 0, 0, 0))
+        if (!this._ro) this._ro = new ResizeObserver(() => this.resize())
         this._ro.observe(video)
       }
     } else {
@@ -596,6 +593,7 @@ export default class JASSUB extends EventTarget {
       this._video.removeEventListener('seeking', this._timeupdate)
       this._video.removeEventListener('playing', this._timeupdate)
       this._video.removeEventListener('ratechange', this.setRate)
+      this._video.removeEventListener('resize', this.resize)
     }
   }
 

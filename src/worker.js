@@ -40,29 +40,14 @@ Module = Module || {}
 Module.preRun = Module.preRun || []
 
 Module.preRun.push(function () {
-  Module.FS_createPath('/', 'fonts', true, true)
-  Module.FS_createPath('/', 'fontconfig', true, true)
+  Module.FS.createPath('/', 'fonts', true, true)
+  Module.FS.createPath('/', 'fontconfig', true, true)
 
   if (!self.subContent) {
     self.subContent = read_(self.subUrl)
   }
 
-  if (self.availableFonts && self.availableFonts.length !== 0) {
-    const sections = parseAss(self.subContent)
-    for (let i = 0; i < sections.length; i++) {
-      for (let j = 0; j < sections[i].body.length; j++) {
-        if (sections[i].body[j].key === 'Style') {
-          self.writeFontToFS(sections[i].body[j].value.Fontname)
-        }
-      }
-    }
-
-    const regex = /\\fn([^\\}]*?)[\\}]/g
-    let matches
-    while (matches = regex.exec(self.subContent)) {
-      self.writeFontToFS(matches[1])
-    }
-  }
+  self.writeAvailableFontsToFS(self.subContent)
 
   const fallbackFontData = ArrayBuffer.isView(self.fallbackFont) ? self.fallbackFont : readBinary(self.fallbackFont)
   Module.FS.writeFile('/fonts/.fallback', fallbackFontData, { encoding: 'binary' })
@@ -77,16 +62,8 @@ Module.onRuntimeInitialized = function () {
 
   const fontFiles = self.fontFiles || []
   for (let i = 0; i < fontFiles.length; i++) {
-    if (ArrayBuffer.isView(fontFiles[i])) {
-      Module.FS.writeFile('/fonts/font' + i, fontFiles[i], { encoding: 'binary' })
-    } else {
-      readAsync(fontFiles[i], fontData => {
-        Module.FS.writeFile('/fonts/font' + i, new Uint8Array(fontData), { encoding: 'binary' })
-        self.jassubObj.reloadFonts()
-      })
-    }
+    self.asyncWrite(fontFiles[i])
   }
-  self.jassubObj.reloadFonts()
 
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
   self.jassubObj.setDropAnimations(self.dropAllAnimations)
@@ -141,11 +118,20 @@ self.writeFontToFS = function (font) {
   self.fontMap_[font] = true
 
   if (!self.availableFonts[font]) return
-  const content = readBinary(self.availableFonts[font])
 
-  Module.FS.writeFile('/fonts/font' + (self.fontId++) + '-' + self.availableFonts[font].split('/').pop(), content, {
-    encoding: 'binary'
-  })
+  self.asyncWrite(self.availableFonts[font])
+}
+
+self.asyncWrite = function (font) {
+  if (ArrayBuffer.isView(font)) {
+    Module.FS.writeFile('/fonts/font-' + (self.fontId++), font, { encoding: 'binary' })
+    self.jassubObj.reloadFonts()
+  } else {
+    readAsync(font, fontData => {
+      Module.FS.writeFile('/fonts/font-' + (self.fontId++), new Uint8Array(fontData), { encoding: 'binary' })
+      self.jassubObj.reloadFonts()
+    })
+  }
 }
 
 /**
@@ -167,7 +153,7 @@ self.writeAvailableFontsToFS = function (content) {
 
   const regex = /\\fn([^\\}]*?)[\\}]/g
   let matches
-  while (matches = regex.exec(self.subContent)) {
+  while ((matches = regex.exec(self.subContent)) !== null) {
     self.writeFontToFS(matches[1])
   }
 }

@@ -191,17 +191,6 @@ dist/js/jassub-worker.js: src/jassub-worker.bc src/worker.js src/JASSUBInterface
 dist/js/jassub.js: src/jassub.js
 	mkdir -p dist/js
 
-dist/js/jassub.js: dist/license/all src/jassub.js
-	mkdir -p dist/js
-	awk '1 {print "// "$$0}' dist/license/all | cat - src/jassub.js > $@
-
-dist/license/all:
-	@#FIXME: allow -j in toplevel Makefile and reintegrate licence extraction into this file
-	make -j "$$(nproc)" -f Makefile_licence all
-
-dist/js/COPYRIGHT: dist/license/all
-	cp "$<" "$@"
-
 # Clean Tasks
 
 clean: clean-dist clean-libs clean-jassub

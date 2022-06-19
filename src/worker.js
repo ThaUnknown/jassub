@@ -107,6 +107,7 @@ Module.onRuntimeInitialized = function () {
       })
     }
   }
+  self.jassubObj.reloadFonts()
 
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
   self.jassubObj.setDropAnimations(self.dropAllAnimations)

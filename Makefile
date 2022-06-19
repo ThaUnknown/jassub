@@ -10,10 +10,10 @@ export CXXFLAGS = $(CFLAGS)
 export PKG_CONFIG_PATH = $(DIST_DIR)/lib/pkgconfig
 export EM_PKG_CONFIG_PATH = $(PKG_CONFIG_PATH)
 
-all: subtitleoctopus
-subtitleoctopus: dist
+all: jassub
+jassub: dist
 
-.PHONY: all subtitleoctopus dist
+.PHONY: all jassub dist
 
 include functions.mk
 
@@ -191,6 +191,10 @@ dist/js/jassub-worker.js: src/jassub-worker.bc src/worker.js src/JASSUBInterface
 dist/js/jassub.js: src/jassub.js
 	mkdir -p dist/js
 
+dist/js/jassub.js: dist/license/all src/jassub.js
+	mkdir -p dist/js
+	awk '1 {print "// "$$0}' dist/license/all | cat - src/jassub.js > $@
+
 dist/license/all:
 	@#FIXME: allow -j in toplevel Makefile and reintegrate licence extraction into this file
 	make -j "$$(nproc)" -f Makefile_licence all
@@ -223,4 +227,4 @@ $(foreach subm, $(SUBMODULES), $(eval $(call TR_GIT_SM_RESET,$(subm))))
 server: # Node http server npm i -g http-server
 	http-server
 
-.PHONY: clean clean-dist clean-libs clean-octopus git-checkout git-smreset server
+.PHONY: clean clean-dist clean-libs clean-jassub git-checkout git-smreset server

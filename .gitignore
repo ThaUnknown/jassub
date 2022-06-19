@@ -1,7 +1,3 @@
-src/WebIDLGrammar.pkl
-src/parser.out
-lib/expat/xmlwf/xmlwf
-.libs/
 *.bc
 *.lo
 *.la
@@ -13,3 +9,4 @@ node_modules/
 build/lib
 src/JASSUBInterface.cpp
 src/JASSUBInterface.js
+lib/

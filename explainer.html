@@ -25,9 +25,9 @@
             <li>This version can render TS perfectly without miscalculating display times at all</li>
             <li>This version can detect the video framerate, and render subtitles at that framerate, instead of hardcoding 24fps</li>
           </ul>
-          <li>This is smaller, 200kb smaller</li>
+          <li>This is smaller, 920kb smaller</li>
           <ul>
-            <li>This version removes a LOT of dead code, unused dependencies and misused functionality, a whole 60kb of it</li>
+            <li>This version removes a LOT of dead code, unused dependencies and misused functionality, a whole 800kb of it</li>
             <li>This version doesn't force default assets by default, instead they can easily be loaded at runtime, but only if needed</li>
           </ul>
           <li>This is faster, a LOT faster</li>
@@ -46,6 +46,12 @@
             <li>Your browser will free up memory quicker</li>
             <li>The subtitles will no longer randomly disappear</li>
             <li>The subtitles will no longer dissapear when moving the video</li>
+          </ul>
+          <li>This loads a LOT faster thanks to a lot of font improvements</li>
+          <ul>
+            <li>Now only the fallback font blocks the init of the library</li>
+            <li>All other fonts are loaded in the background and updated asynchronously</li>
+            <li>Fonts can be loaded as direct Uint8 data, so the user can preload fonts by themselves</li>
           </ul>
           <li>All of this is up to date with upstream</li>
         </ul>

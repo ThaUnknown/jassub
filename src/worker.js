@@ -228,9 +228,6 @@ self.setCurrentTime = function (currentTime) {
 }
 
 self._isPaused = true
-self.getIsPaused = function () {
-  return self._isPaused
-}
 self.setIsPaused = function (isPaused) {
   if (isPaused !== self._isPaused) {
     self._isPaused = isPaused

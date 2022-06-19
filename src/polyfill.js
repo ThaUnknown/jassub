@@ -8,15 +8,6 @@ if (!String.prototype.startsWith) {
   }
 }
 
-if (!String.prototype.endsWith) {
-  String.prototype.endsWith = function (search, len) {
-    if (len === undefined || len > this.length) {
-      len = this.length
-    }
-    return this.substring(len - search.length, len) === search
-  }
-}
-
 if (!String.prototype.includes) {
   String.prototype.includes = function (search, pos) {
     return this.indexOf(search, pos) !== -1
@@ -41,37 +32,9 @@ if (!ArrayBuffer.isView) {
   }
 }
 
-if (!Int8Array.prototype.slice) {
-  Object.defineProperty(Int8Array.prototype, 'slice', {
-    value: function (begin, end) {
-      return new Int8Array(this.subarray(begin, end))
-    }
-  })
-}
-
 if (!Uint8Array.prototype.slice) {
-  Object.defineProperty(Uint8Array.prototype, 'slice', {
-    value: function (begin, end) {
-      return new Uint8Array(this.subarray(begin, end))
-    }
-  })
-}
-
-if (!Int16Array.from) {
-  // Doesn't work for String
-  Int16Array.from = function (source) {
-    const arr = new Int16Array(source.length)
-    arr.set(source, 0)
-    return arr
-  }
-}
-
-if (!Int32Array.from) {
-  // Doesn't work for String
-  Int32Array.from = function (source) {
-    const arr = new Int32Array(source.length)
-    arr.set(source, 0)
-    return arr
+  Uint8Array.prototype.slice = function (begin, end) {
+    return new Uint8Array(this.subarray(begin, end))
   }
 }
 

@@ -423,6 +423,10 @@ public:
     ass_set_fonts(ass_renderer, m_defaultFont, NULL, ASS_FONTPROVIDER_FONTCONFIG, "/assets/fonts.conf", 1);
   }
 
+  void addFont(const char *name, const char *data, int data_size) {
+    ass_add_font(ass_library, name, data, data_size);
+  }
+
   void setMargin(int top, int bottom, int left, int right) {
     ass_set_margins(ass_renderer, top, bottom, left, right);
   }

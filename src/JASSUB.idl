@@ -88,6 +88,7 @@ interface JASSUB {
     RenderResult renderImage(double time, long force);
     void quitLibrary();
     void reloadLibrary();
+    void addFont(DOMString name, DOMString data, long data_size);
     void reloadFonts();
     void setMargin(long top, long bottom, long left, long right);
     long getEventCount();

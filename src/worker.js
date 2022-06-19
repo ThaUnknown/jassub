@@ -1,5 +1,5 @@
 /* eslint-disable no-global-assign */
-/* global Module, FS, readBinary, read_, calledMain, addRunDependency, removeRunDependency, buffer, assert, updateGlobalBufferAndViews */
+/* global Module, FS, readBinary, readAsync, read_, calledMain, addRunDependency, removeRunDependency, buffer, assert, updateGlobalBufferAndViews */
 const hasNativeConsole = typeof console !== 'undefined'
 
 // implement console methods if they're missing
@@ -87,12 +87,6 @@ Module.preRun.push(function () {
 
   const fallbackFontData = ArrayBuffer.isView(self.fallbackFont) ? self.fallbackFont : readBinary(self.fallbackFont)
   Module.FS.writeFile('/fonts/.fallback', fallbackFontData, { encoding: 'binary' })
-
-  const fontFiles = self.fontFiles || []
-  for (let i = 0; i < fontFiles.length; i++) {
-    const fontData = ArrayBuffer.isView(fontFiles[i]) ? fontFiles[i] : readBinary(fontFiles[i])
-    Module.FS.writeFile('/fonts/font' + i, fontData, { encoding: 'binary' })
-  }
 })
 
 const textByteLength = (input) => new TextEncoder().encode(input).buffer.byteLength
@@ -101,6 +95,18 @@ Module.onRuntimeInitialized = function () {
   self.jassubObj = new Module.JASSUB()
 
   self.jassubObj.initLibrary(self.width, self.height, '/fonts/.fallback')
+
+  const fontFiles = self.fontFiles || []
+  for (let i = 0; i < fontFiles.length; i++) {
+    if (ArrayBuffer.isView(fontFiles[i])) {
+      Module.FS.writeFile('/fonts/font' + i, fontFiles[i], { encoding: 'binary' })
+    } else {
+      readAsync(fontFiles[i], fontData => {
+        Module.FS.writeFile('/fonts/font' + i, new Uint8Array(fontData), { encoding: 'binary' })
+        self.jassubObj.reloadFonts()
+      })
+    }
+  }
 
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
   self.jassubObj.setDropAnimations(self.dropAllAnimations)

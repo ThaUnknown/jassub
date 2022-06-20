@@ -26,7 +26,8 @@ export default class JASSUB extends EventTarget {
    * @param {String} [options.subContent=options.subUrl] The content of the subtitle file to play.
    * @param {String[]|Uint8Array[]} [options.fonts] An array of links or Uint8Arrays to the fonts used in the subtitle. If Uint8Array is used the array is copied, not referenced. This forces all the fonts in this array to be loaded by the renderer, regardless of if they are used.
    * @param {Object} [options.availableFonts] Object with all available fonts - Key is font name in lower case, value is link: { arial: '/font1.ttf' }. These fonts are selectively loaded if detected as used in the current subtitle track.
-   * @param {String} [options.fallbackFont='default.woff2'] The URL of the fallback font to use.
+   * @param {String} [options.fallbackFont='default.woff2'] The URL of the fallback font to use. This font is used if the other font for the style is missing special glyphs or unicode.
+   * @param {Boolean} [options.useLocalFonts=false] If the Local Font Access API is enabled [chrome://flags/#font-access], the library will query for permissions to use local fonts and use them if any are missing. The permission can be queried beforehand using navigator.permissions.request({ name: 'local-fonts' }).
    * @param {Number} [options.libassMemoryLimit] libass bitmap cache memory limit in MiB (approximate).
    * @param {Number} [options.libassGlyphLimit] libass glyph cache memory limit in MiB (approximate).
    */
@@ -98,7 +99,8 @@ export default class JASSUB extends EventTarget {
       dropAllAnimations: options.dropAllAnimations,
       libassMemoryLimit: options.libassMemoryLimit || 0,
       libassGlyphLimit: options.libassGlyphLimit || 0,
-      hasAlphaBug: JASSUB._hasAlphaBug
+      hasAlphaBug: JASSUB._hasAlphaBug,
+      useLocalFonts: ('queryLocalFonts' in self) && !!options.useLocalFonts
     })
     if (_offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
     this.setVideo(options.video)
@@ -473,6 +475,27 @@ export default class JASSUB extends EventTarget {
    */
   addFont (font) {
     this.sendMessage('addFont', { font })
+  }
+
+  _getLocalFont ({ font }) {
+    try {
+      navigator.permissions.request({ name: 'local-fonts' }).then(permission => {
+        if (permission.state === 'granted') {
+          queryLocalFonts().then(fontData => {
+            const filtered = fontData && fontData.filter(obj => obj.fullName.toLowerCase() === font)
+            if (filtered && filtered.length) {
+              filtered[0].blob().then(blob => {
+                blob.arrayBuffer().then(buffer => {
+                  this.addFont(new Uint8Array(buffer))
+                })
+              })
+            }
+          })
+        }
+      })
+    } catch (e) {
+      console.warn('Local fonts API:', e)
+    }
   }
 
   _unbusy () {

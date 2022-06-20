@@ -14,8 +14,10 @@ Module.preRun.push(function () {
 
   self.writeAvailableFontsToFS(self.subContent)
 
-  const fallbackFontData = ArrayBuffer.isView(self.fallbackFont) ? self.fallbackFont : readBinary(self.fallbackFont)
-  Module.FS.writeFile('/fonts/.fallback', fallbackFontData, { encoding: 'binary' })
+  if (self.fallbackFont) {
+    const fallbackFontData = ArrayBuffer.isView(self.fallbackFont) ? self.fallbackFont : readBinary(self.fallbackFont)
+    Module.FS.writeFile('/fonts/.fallback', fallbackFontData, { encoding: 'binary' })
+  }
 })
 
 const textByteLength = (input) => new TextEncoder().encode(input).buffer.byteLength
@@ -25,9 +27,8 @@ Module.onRuntimeInitialized = function () {
 
   self.jassubObj.initLibrary(self.width, self.height, '/fonts/.fallback')
 
-  const fontFiles = self.fontFiles || []
-  for (let i = 0; i < fontFiles.length; i++) {
-    self.asyncWrite(fontFiles[i])
+  for (const font of self.fontFiles || []) {
+    self.asyncWrite(font)
   }
 
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
@@ -86,7 +87,12 @@ self.writeFontToFS = function (font) {
 
   self.fontMap_[font] = true
 
-  if (!self.availableFonts[font]) return
+  if (!self.availableFonts[font]) {
+    if (self.useLocalFonts) {
+      postMessage({ target: 'getLocalFont', font })
+    }
+    return
+  }
 
   self.asyncWrite(self.availableFonts[font])
 }
@@ -459,6 +465,7 @@ self.init = data => {
   self.targetFps = data.targetFps || self.targetFps
   self.libassMemoryLimit = data.libassMemoryLimit || self.libassMemoryLimit
   self.libassGlyphLimit = data.libassGlyphLimit || 0
+  self.useLocalFonts = data.useLocalFonts
   removeRunDependency('worker-init')
   postMessage({
     target: 'ready'

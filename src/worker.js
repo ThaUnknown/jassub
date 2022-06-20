@@ -1,12 +1,8 @@
 /* eslint-disable no-global-assign */
-/* global Module, FS, readBinary, readAsync, read_, calledMain, addRunDependency, removeRunDependency, buffer, assert, updateGlobalBufferAndViews */
-Module = Module || {}
-
-Module.preRun = Module.preRun || []
+/* global Module, FS, readBinary, readAsync, read_, calledMain, addRunDependency, removeRunDependency, buffer, assert, updateGlobalBufferAndViews, out, err */
 
 Module.preRun.push(function () {
-  Module.FS.createPath('/', 'fonts', true, true)
-  Module.FS.createPath('/', 'fontconfig', true, true)
+  FS.createPath('/', 'fonts', true, true)
 
   if (!self.subContent) {
     self.subContent = read_(self.subUrl)
@@ -16,7 +12,7 @@ Module.preRun.push(function () {
 
   if (self.fallbackFont) {
     const fallbackFontData = ArrayBuffer.isView(self.fallbackFont) ? self.fallbackFont : readBinary(self.fallbackFont)
-    Module.FS.writeFile('/fonts/.fallback', fallbackFontData, { encoding: 'binary' })
+    FS.writeFile('/fonts/.fallback', fallbackFontData, { encoding: 'binary' })
   }
 })
 
@@ -39,16 +35,22 @@ Module.onRuntimeInitialized = function () {
   }
 }
 
-Module.print = function (text) {
+out = function (text) {
   if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ')
-  console.log(text)
+  if (text === 'libass: No usable fontconfig configuration file found, using fallback.') {
+    console.debug(text)
+  } else {
+    console.log(text)
+  }
 }
-Module.printErr = function (text) {
+err = function (text) {
   if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ')
-  console.error(text)
+  if (text === 'Fontconfig error: Cannot load default config file: No such file: (null)') {
+    console.debug(text)
+  } else {
+    console.error(text)
+  }
 }
-
-Module.FS = FS
 
 self.delay = 0 // approximate delay (time of render + postMessage + drawImage), for example 1/60 or 0
 self.lastCurrentTime = 0
@@ -99,11 +101,11 @@ self.writeFontToFS = function (font) {
 
 self.asyncWrite = function (font) {
   if (ArrayBuffer.isView(font)) {
-    Module.FS.writeFile('/fonts/font-' + (self.fontId++), font, { encoding: 'binary' })
+    FS.writeFile('/fonts/font-' + (self.fontId++), font, { encoding: 'binary' })
     self.jassubObj.reloadFonts()
   } else {
     readAsync(font, fontData => {
-      Module.FS.writeFile('/fonts/font-' + (self.fontId++), new Uint8Array(fontData), { encoding: 'binary' })
+      FS.writeFile('/fonts/font-' + (self.fontId++), new Uint8Array(fontData), { encoding: 'binary' })
       self.jassubObj.reloadFonts()
     })
   }

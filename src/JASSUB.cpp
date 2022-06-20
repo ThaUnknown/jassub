@@ -420,7 +420,7 @@ public:
   }
 
   void reloadFonts() {
-    ass_set_fonts(ass_renderer, m_defaultFont, NULL, ASS_FONTPROVIDER_FONTCONFIG, "/assets/fonts.conf", 1);
+    ass_set_fonts(ass_renderer, m_defaultFont, NULL, ASS_FONTPROVIDER_FONTCONFIG, NULL, 1);
   }
 
   void addFont(const char *name, const char *data, int data_size) {

@@ -152,7 +152,6 @@ all-src:
 # Dist Files https://github.com/emscripten-core/emscripten/blob/2.0.34/src/settings.js
 EMCC_COMMON_ARGS = \
 	$(LDFLAGS) \
-	--preload-file assets/fonts.conf \
 	-s ALLOW_MEMORY_GROWTH=1 \
 	-s NO_FILESYSTEM=0 \
 	-s AUTO_JS_LIBRARIES=0 \

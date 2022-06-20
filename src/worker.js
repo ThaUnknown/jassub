@@ -67,6 +67,10 @@ self.fontId = 0
 
 let asyncRender = false
 
+self.addFont = function (data) {
+  self.asyncWrite(data.font)
+}
+
 /**
  * Make the font accessible by libass by writing it to the virtual FS.
  * @param {!string} font the font name.

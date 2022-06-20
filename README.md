@@ -160,6 +160,8 @@ This library has a lot of methods and properties, however many aren't made for m
   - {Number} index
 - `getStyles (callback)` - Get all ASS styles.
   - {function(Error|null, ASS_Style)} callback Function to callback when worker returns the styles.
+- `addfont (font)` - Adds a font to the renderer.
+  - {String|Uint8Array} font Font to add.
 
 ### ASS_Event object properties
 - `{Number} Start` - Start Time of the Event, in 0:00:00:00 format ie. Hrs:Mins:Secs:hundredths. This is the time elapsed during script playback at which the text will appear onscreen. Note that there is a single digit for the hours!

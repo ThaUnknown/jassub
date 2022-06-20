@@ -467,6 +467,14 @@ export default class JASSUB extends EventTarget {
     })
   }
 
+  /**
+   * Adds a font to the renderer.
+   * @param  {String|Uint8Array} font Font to add.
+   */
+  addFont (font) {
+    this.sendMessage('addFont', { font })
+  }
+
   _unbusy () {
     this.busy = false
   }

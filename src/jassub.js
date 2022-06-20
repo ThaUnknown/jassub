@@ -25,8 +25,8 @@ export default class JASSUB extends EventTarget {
    * @param {String} [options.subUrl=options.subContent] The URL of the subtitle file to play.
    * @param {String} [options.subContent=options.subUrl] The content of the subtitle file to play.
    * @param {String[]|Uint8Array[]} [options.fonts] An array of links or Uint8Arrays to the fonts used in the subtitle. If Uint8Array is used the array is copied, not referenced. This forces all the fonts in this array to be loaded by the renderer, regardless of if they are used.
-   * @param {Object} [options.availableFonts] Object with all available fonts - Key is font name in lower case, value is link: { arial: '/font1.ttf' }. These fonts are selectively loaded if detected as used in the current subtitle track.
-   * @param {String} [options.fallbackFont='default.woff2'] The URL of the fallback font to use. This font is used if the other font for the style is missing special glyphs or unicode.
+   * @param {Object} [options.availableFonts={'liberation sans': './default.woff2'}] Object with all available fonts - Key is font family in lower case, value is link or Uint8Array: { arial: '/font1.ttf' }. These fonts are selectively loaded if detected as used in the current subtitle track.
+   * @param {String} [options.fallbackFont='liberation sans'] The font family key of the fallback font in availableFonts to use if the other font for the style is missing special glyphs or unicode.
    * @param {Boolean} [options.useLocalFonts=false] If the Local Font Access API is enabled [chrome://flags/#font-access], the library will query for permissions to use local fonts and use them if any are missing. The permission can be queried beforehand using navigator.permissions.request({ name: 'local-fonts' }).
    * @param {Number} [options.libassMemoryLimit] libass bitmap cache memory limit in MiB (approximate).
    * @param {Number} [options.libassGlyphLimit] libass glyph cache memory limit in MiB (approximate).
@@ -92,8 +92,8 @@ export default class JASSUB extends EventTarget {
       subUrl: options.subUrl,
       subContent: options.subContent || null,
       fonts: options.fonts || [],
-      availableFonts: options.availableFonts || [],
-      fallbackFont: options.fallbackFont || './default.woff2',
+      availableFonts: options.availableFonts || { 'liberation sans': './default.woff2' },
+      fallbackFont: options.fallbackFont || 'liberation sans',
       debug: this.debug,
       targetFps: options.targetFps || 24,
       dropAllAnimations: options.dropAllAnimations,

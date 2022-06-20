@@ -153,12 +153,12 @@ all-src:
 EMCC_COMMON_ARGS = \
 	$(LDFLAGS) \
 	-s ALLOW_MEMORY_GROWTH=1 \
-	-s NO_FILESYSTEM=0 \
+	-s FILESYSTEM=0 \
 	-s AUTO_JS_LIBRARIES=0 \
 	-s AUTO_NATIVE_LIBRARIES=0 \
 	-s HTML5_SUPPORT_DEFERRING_USER_SENSITIVE_REQUESTS=0 \
 	-s USE_SDL=0 \
-	-s INCOMING_MODULE_JS_API="['onRuntimeInitialized','preRun','print','printErr']" \
+	-s INCOMING_MODULE_JS_API="['onRuntimeInitialized','print','printErr']" \
 	--no-heap-copy \
 	-o $@ \
   -O3

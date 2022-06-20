@@ -100,8 +100,8 @@ The default options are best, and automatically fallback to the next fastest opt
 - `{String} [options.subUrl=options.subContent]` The URL of the subtitle file to play.
 - `{String} [options.subContent=options.subUrl]` The content of the subtitle file to play.
 - `{String[]|Uint8Array[]} options.fonts` { Optional } An array of links or Uint8Arrays to the fonts used in the subtitle. If Uint8Array is used the array is copied, not referenced. This forces all the fonts in this array to be loaded by the renderer, regardless of if they are used.
-- `{Object} options.availableFonts` { Optional } Object with all available fonts - Key is font name in lower case, value is link: { arial: '/font1.ttf' }. These fonts are selectively loaded if detected as used in the current subtitle track.
-- `{String} options.fallbackFont` { Optional = 'default.woff2' } The URL of the fallback font to use. This font is used if the other font for the style is missing special glyphs or unicode.
+- `{Object} options.availableFonts` { Optional = {'liberation sans': './default.woff2'}} Object with all available fonts - Key is font family in lower case, value is link or Uint8Array: { arial: '/font1.ttf' }. These fonts are selectively loaded if detected as used in the current subtitle track.
+- `{String} options.fallbackFont` { Optional = 'liberation sans' } The font family key of the fallback font in availableFonts to use if the other font for the style is missing special glyphs or unicode.
 - `{Boolean} options.useLocalFonts` { Optional = false } If the Local Font Access API is enabled [chrome://flags/#font-access], the library will query for permissions to use local fonts and use them if any are missing. The permission can be queried beforehand using navigator.permissions.request({ name: 'local-fonts' }).
 - `{Number} options.libassMemoryLimit` { Optional } libass bitmap cache memory limit in MiB (approximate).
 - `{Number} options.libassGlyphLimit` { Optional } libass glyph cache memory limit in MiB (approximate).

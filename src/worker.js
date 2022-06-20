@@ -1,31 +1,19 @@
 /* eslint-disable no-global-assign */
-/* global Module, FS, readBinary, readAsync, read_, calledMain, addRunDependency, removeRunDependency, buffer, assert, updateGlobalBufferAndViews, out, err */
-
-Module.preRun.push(function () {
-  FS.createPath('/', 'fonts', true, true)
-
-  if (!self.subContent) {
-    self.subContent = read_(self.subUrl)
-  }
-
-  self.writeAvailableFontsToFS(self.subContent)
-
-  if (self.fallbackFont) {
-    const fallbackFontData = ArrayBuffer.isView(self.fallbackFont) ? self.fallbackFont : readBinary(self.fallbackFont)
-    FS.writeFile('/fonts/.fallback', fallbackFontData, { encoding: 'binary' })
-  }
-})
-
+/* global Module, HEAPU8, readAsync, read_, calledMain, addRunDependency, removeRunDependency, buffer, updateGlobalBufferAndViews, out, err */
 const textByteLength = (input) => new TextEncoder().encode(input).buffer.byteLength
 
 Module.onRuntimeInitialized = function () {
   self.jassubObj = new Module.JASSUB()
 
-  self.jassubObj.initLibrary(self.width, self.height, '/fonts/.fallback')
+  self.jassubObj.initLibrary(self.width, self.height, self.fallbackFont || null)
 
-  for (const font of self.fontFiles || []) {
-    self.asyncWrite(font)
-  }
+  if (self.fallbackFont) self.findAvailableFonts(self.fallbackFont)
+
+  if (!self.subContent) self.subContent = read_(self.subUrl)
+
+  self.processAvailableFonts(self.subContent)
+
+  for (const font of self.fontFiles || []) self.asyncWrite(font)
 
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
   self.jassubObj.setDropAnimations(self.dropAllAnimations)
@@ -74,11 +62,7 @@ self.addFont = function (data) {
   self.asyncWrite(data.font)
 }
 
-/**
- * Make the font accessible by libass by writing it to the virtual FS.
- * @param {!string} font the font name.
- */
-self.writeFontToFS = function (font) {
+self.findAvailableFonts = function (font) {
   font = font.trim().toLowerCase()
 
   if (font.startsWith('@')) {
@@ -101,21 +85,22 @@ self.writeFontToFS = function (font) {
 
 self.asyncWrite = function (font) {
   if (ArrayBuffer.isView(font)) {
-    FS.writeFile('/fonts/font-' + (self.fontId++), font, { encoding: 'binary' })
-    self.jassubObj.reloadFonts()
+    self.allocFont(font)
   } else {
     readAsync(font, fontData => {
-      FS.writeFile('/fonts/font-' + (self.fontId++), new Uint8Array(fontData), { encoding: 'binary' })
-      self.jassubObj.reloadFonts()
+      self.allocFont(new Uint8Array(fontData))
     })
   }
 }
 
-/**
- * Write all font's mentioned in the .ass file to the virtual FS.
- * @param {!string} content the file content.
- */
-self.writeAvailableFontsToFS = function (content) {
+self.allocFont = function (uint8) {
+  const ptr = Module._malloc(uint8.byteLength)
+  HEAPU8.set(uint8, ptr)
+  self.jassubObj.addFont('font-' + (self.fontId++), ptr, uint8.byteLength)
+  self.jassubObj.reloadFonts()
+}
+
+self.processAvailableFonts = function (content) {
   if (!self.availableFonts) return
 
   const sections = parseAss(content)
@@ -123,7 +108,7 @@ self.writeAvailableFontsToFS = function (content) {
   for (let i = 0; i < sections.length; i++) {
     for (let j = 0; j < sections[i].body.length; j++) {
       if (sections[i].body[j].key === 'Style') {
-        self.writeFontToFS(sections[i].body[j].value.Fontname)
+        self.findAvailableFonts(sections[i].body[j].value.Fontname)
       }
     }
   }
@@ -131,7 +116,7 @@ self.writeAvailableFontsToFS = function (content) {
   const regex = /\\fn([^\\}]*?)[\\}]/g
   let matches
   while ((matches = regex.exec(self.subContent)) !== null) {
-    self.writeFontToFS(matches[1])
+    self.findAvailableFonts(matches[1])
   }
 }
 /**
@@ -140,7 +125,7 @@ self.writeAvailableFontsToFS = function (content) {
  */
 self.setTrack = function (data) {
   // Make sure that the fonts are loaded
-  self.writeAvailableFontsToFS(data.content)
+  self.processAvailableFonts(data.content)
 
   // Tell libass to render the new track
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
@@ -425,12 +410,13 @@ let messageResenderTimeout = null
 
 function messageResender () {
   if (calledMain) {
-    assert(messageBuffer && messageBuffer.length > 0)
-    messageResenderTimeout = null
-    messageBuffer.forEach(function (message) {
-      onmessage(message)
-    })
-    messageBuffer = null
+    if (messageBuffer && messageBuffer.length > 0) {
+      messageResenderTimeout = null
+      messageBuffer.forEach(function (message) {
+        onmessage(message)
+      })
+      messageBuffer = null
+    }
   } else {
     messageResenderTimeout = setTimeout(messageResender, 50)
   }
@@ -450,7 +436,7 @@ self.init = data => {
   self.subUrl = data.subUrl
   self.subContent = data.subContent
   self.fontFiles = data.fonts
-  self.fallbackFont = data.fallbackFont
+  self.fallbackFont = data.fallbackFont.toLowerCase()
   self.blendMode = data.blendMode
   asyncRender = data.asyncRender
   self.dropAllAnimations = !!data.dropAllAnimations || self.dropAllAnimations

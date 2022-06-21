@@ -11,6 +11,9 @@ fontselect.addEventListener('change', async ({ detail }) => {
     video: document.querySelector('video'),
     subUrl: '../subtitles/test.ass',
     workerUrl: '../jassub-worker.js',
-    fallbackFont: uint8
+    fallbackFont: detail[0].fullName,
+    availableFonts: {
+      [detail[0].fullName.toLowerCase()]: uint8
+    }
   })
 })

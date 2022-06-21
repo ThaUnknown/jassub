@@ -107,14 +107,15 @@ const _JASSUB = class extends EventTarget {
       subUrl: options.subUrl,
       subContent: options.subContent || null,
       fonts: options.fonts || [],
-      availableFonts: options.availableFonts || [],
-      fallbackFont: options.fallbackFont || "./default.woff2",
+      availableFonts: options.availableFonts || { "liberation sans": "./default.woff2" },
+      fallbackFont: options.fallbackFont || "liberation sans",
       debug: this.debug,
       targetFps: options.targetFps || 24,
       dropAllAnimations: options.dropAllAnimations,
       libassMemoryLimit: options.libassMemoryLimit || 0,
       libassGlyphLimit: options.libassGlyphLimit || 0,
-      hasAlphaBug: _JASSUB._hasAlphaBug
+      hasAlphaBug: _JASSUB._hasAlphaBug,
+      useLocalFonts: "queryLocalFonts" in self && !!options.useLocalFonts
     });
     if (_offscreenRender === true)
       this.sendMessage("offscreenCanvas", null, [this._canvasctrl]);
@@ -327,6 +328,29 @@ const _JASSUB = class extends EventTarget {
     }, (err, { styles }) => {
       callback(err, styles);
     });
+  }
+  addFont(font) {
+    this.sendMessage("addFont", { font });
+  }
+  _getLocalFont({ font }) {
+    try {
+      navigator.permissions.request({ name: "local-fonts" }).then((permission) => {
+        if (permission.state === "granted") {
+          queryLocalFonts().then((fontData) => {
+            const filtered = fontData && fontData.filter((obj) => obj.fullName.toLowerCase() === font);
+            if (filtered && filtered.length) {
+              filtered[0].blob().then((blob) => {
+                blob.arrayBuffer().then((buffer) => {
+                  this.addFont(new Uint8Array(buffer));
+                });
+              });
+            }
+          });
+        }
+      });
+    } catch (e) {
+      console.warn("Local fonts API:", e);
+    }
   }
   _unbusy() {
     this.busy = false;

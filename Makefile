@@ -4,8 +4,8 @@
 BASE_DIR:=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 DIST_DIR:=$(BASE_DIR)dist/libraries
 
-export LDFLAGS = -O3 -s ENVIRONMENT=worker -s NO_EXIT_RUNTIME=1
-export CFLAGS = -O3 -s USE_PTHREADS=0
+export LDFLAGS = -O3 -s EVAL_CTORS=1 -flto -s ENVIRONMENT=worker -s NO_EXIT_RUNTIME=1
+export CFLAGS = -O3 -flto -s USE_PTHREADS=0
 export CXXFLAGS = $(CFLAGS)
 export PKG_CONFIG_PATH = $(DIST_DIR)/lib/pkgconfig
 export EM_PKG_CONFIG_PATH = $(PKG_CONFIG_PATH)
@@ -173,7 +173,7 @@ EMCC_COMMON_ARGS = \
 	#--memory-init-file 0
 
 
-dist: src/jassub-worker.bc dist/js/jassub-worker.js dist/js/jassub.js
+dist: src/jassub-worker.bc dist/js/jassub-worker.js dist/js/jassub-worker-legacy.js dist/js/jassub.js dist/js/COPYRIGHT
 
 dist/js/jassub-worker.js: src/jassub-worker.bc src/worker.js src/JASSUBInterface.js src/polyfill.js
 	mkdir -p dist/js
@@ -183,9 +183,29 @@ dist/js/jassub-worker.js: src/jassub-worker.bc src/worker.js src/JASSUBInterface
 		--post-js src/worker.js \
 		-s WASM=1 \
 		$(EMCC_COMMON_ARGS)
-
-dist/js/jassub.js: src/jassub.js
+		
+dist/js/jassub-worker-legacy.js: src/jassub-worker.bc src/worker.js src/JASSUBInterface.js src/polyfill.js
 	mkdir -p dist/js
+	emcc src/jassub-worker.bc $(OCTP_DEPS) \
+	  --pre-js src/polyfill.js \
+		--post-js src/JASSUBInterface.js \
+		--post-js src/worker.js \
+		-s WASM=0 \
+		-s LEGACY_VM_SUPPORT=1 \
+		-s MIN_CHROME_VERSION=27 \
+		-s MIN_SAFARI_VERSION=60005 \
+		$(EMCC_COMMON_ARGS)
+
+dist/js/jassub.js: dist/license/all src/jassub.js
+	mkdir -p dist/js
+	awk '1 {print "// "$$0}' dist/license/all | cat - src/jassub.js > $@
+
+dist/license/all:
+	@#FIXME: allow -j in toplevel Makefile and reintegrate licence extraction into this file
+	make -j "$$(nproc)" -f Makefile_licence all
+
+dist/js/COPYRIGHT: dist/license/all
+	cp "$<" "$@"
 
 # Clean Tasks
 

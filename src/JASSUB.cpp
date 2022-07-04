@@ -408,7 +408,7 @@ public:
   }
 
   void quitLibrary() {
-    removeTrack(track);
+    removeTrack();
     ass_renderer_done(ass_renderer);
     ass_library_done(ass_library);
     m_buffer.clear();

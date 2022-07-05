@@ -478,16 +478,20 @@ export default class JASSUB extends EventTarget {
   }
 
   _sendLocalFont (font) {
-    queryLocalFonts().then(fontData => {
-      const filtered = fontData && fontData.filter(obj => obj.fullName.toLowerCase() === font)
-      if (filtered && filtered.length) {
-        filtered[0].blob().then(blob => {
-          blob.arrayBuffer().then(buffer => {
-            this.addFont(new Uint8Array(buffer))
+    try {
+      queryLocalFonts().then(fontData => {
+        const filtered = fontData && fontData.filter(obj => obj.fullName.toLowerCase() === font)
+        if (filtered && filtered.length) {
+          filtered[0].blob().then(blob => {
+            blob.arrayBuffer().then(buffer => {
+              this.addFont(new Uint8Array(buffer))
+            })
           })
-        })
-      }
-    })
+        }
+      })
+    } catch (e) {
+      console.warn('Local fonts API:', e)
+    }
   }
 
   _getLocalFont ({ font }) {

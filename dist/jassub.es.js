@@ -332,22 +332,29 @@ const _JASSUB = class extends EventTarget {
   addFont(font) {
     this.sendMessage("addFont", { font });
   }
+  _sendLocalFont(font) {
+    queryLocalFonts().then((fontData) => {
+      const filtered = fontData && fontData.filter((obj) => obj.fullName.toLowerCase() === font);
+      if (filtered && filtered.length) {
+        filtered[0].blob().then((blob) => {
+          blob.arrayBuffer().then((buffer) => {
+            this.addFont(new Uint8Array(buffer));
+          });
+        });
+      }
+    });
+  }
   _getLocalFont({ font }) {
     try {
-      navigator.permissions.request({ name: "local-fonts" }).then((permission) => {
-        if (permission.state === "granted") {
-          queryLocalFonts().then((fontData) => {
-            const filtered = fontData && fontData.filter((obj) => obj.fullName.toLowerCase() === font);
-            if (filtered && filtered.length) {
-              filtered[0].blob().then((blob) => {
-                blob.arrayBuffer().then((buffer) => {
-                  this.addFont(new Uint8Array(buffer));
-                });
-              });
-            }
-          });
-        }
-      });
+      if ("request" in navigator.permissions) {
+        navigator.permissions.request({ name: "local-fonts" }).then((permission) => {
+          if (permission.state === "granted") {
+            this._sendLocalFont(font);
+          }
+        });
+      } else if ("queryLocalFonts" in self) {
+        this._sendLocalFont(font);
+      }
     } catch (e) {
       console.warn("Local fonts API:", e);
     }

@@ -43,11 +43,13 @@ npm i jassub
 
 ```js
 import JASSUB from 'jassub'
+import workerUrl from 'jassub/dist/jassub-worker.js?url'
+import 'jassub/dist/jassub-worker.wasm?raw'
 
 const renderer = new JASSUB({
   video: document.querySelector('video'),
   subContent: subtitleString,
-  workerUrl: new URL('jassub/dist/jassub-worker.js', import.meta.url)
+  workerUrl // you can also use: `new URL('jassub/dist/jassub-worker.js', import.meta.url)` instead of importing it as an url
 })
 ```
 ## Using only with canvas

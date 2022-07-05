@@ -311,7 +311,7 @@ public:
 
   /* TRACK */
   void createTrackMem(char *buf, unsigned long bufsize) {
-    reloadLibrary();
+    removeTrack();
     track = ass_read_memory(ass_library, buf, (size_t)bufsize, NULL);
     if (!track) {
       fprintf(stderr, "jso: Failed to start a track\n");

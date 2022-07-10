@@ -1,6 +1,8 @@
 /* eslint-disable no-global-assign */
 /* global Module, HEAPU8, readAsync, read_, calledMain, addRunDependency, removeRunDependency, buffer, updateGlobalBufferAndViews, out, err */
-const textByteLength = (input) => new TextEncoder().encode(input).buffer.byteLength
+
+const encoder = new TextEncoder()
+const textByteLength = (input) => encoder.encode(input).buffer.byteLength
 
 Module.onRuntimeInitialized = function () {
   self.jassubObj = new Module.JASSUB()
@@ -39,6 +41,8 @@ err = function (text) {
     console.error(text)
   }
 }
+
+self.onerror = self.onerror || err
 
 self.delay = 0 // approximate delay (time of render + postMessage + drawImage), for example 1/60 or 0
 self.lastCurrentTime = 0

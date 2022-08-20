@@ -5,7 +5,8 @@
   "main": "src/jassub.js",
   "files": [
     "dist/*",
-    "src/jassub.js"
+    "src/jassub.js",
+    "index.d.ts"
   ],
   "scripts": {
     "bundle": "vite build"

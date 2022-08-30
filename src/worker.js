@@ -41,8 +41,6 @@ self.err = function (text) {
   }
 }
 
-self.onerror = self.onerror || self.err
-
 self.delay = 0 // approximate delay (time of render + postMessage + drawImage), for example 1/60 or 0
 self.lastCurrentTime = 0
 self.rate = 1
@@ -92,7 +90,7 @@ self.asyncWrite = (font) => {
   } else {
     readAsync(font, fontData => {
       self.allocFont(new Uint8Array(fontData))
-    })
+    }, console.error)
   }
 }
 

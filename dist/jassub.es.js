@@ -178,30 +178,28 @@ const _JASSUB = class extends EventTarget {
       top = videoSize.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top);
       left = videoSize.x;
     }
-    if (this._canvas.style.top !== top + "px" || this._canvas.style.left !== left + "px") {
-      if (videoSize != null) {
-        this._canvas.style.top = top + "px";
-        this._canvas.style.left = left + "px";
-        this._canvas.style.width = videoSize.width + "px";
-        this._canvas.style.height = videoSize.height + "px";
-      }
-      if (!(this._canvasctrl.width === width && this._canvasctrl.height === height)) {
-        if (this._resizeTimeoutBuffer) {
-          clearTimeout(this._resizeTimeoutBuffer);
-          this._resizeTimeoutBuffer = setTimeout(() => {
-            this._resizeTimeoutBuffer = void 0;
-            this._canvasctrl.width = width;
-            this._canvasctrl.height = height;
-            this.sendMessage("canvas", { width, height });
-          }, 100);
-        } else {
+    if (videoSize != null) {
+      this._canvas.style.top = top + "px";
+      this._canvas.style.left = left + "px";
+      this._canvas.style.width = videoSize.width + "px";
+      this._canvas.style.height = videoSize.height + "px";
+    }
+    if (!(this._canvasctrl.width === width && this._canvasctrl.height === height)) {
+      if (this._resizeTimeoutBuffer) {
+        clearTimeout(this._resizeTimeoutBuffer);
+        this._resizeTimeoutBuffer = setTimeout(() => {
+          this._resizeTimeoutBuffer = void 0;
           this._canvasctrl.width = width;
           this._canvasctrl.height = height;
           this.sendMessage("canvas", { width, height });
-          this._resizeTimeoutBuffer = setTimeout(() => {
-            this._resizeTimeoutBuffer = void 0;
-          }, 100);
-        }
+        }, 100);
+      } else {
+        this._canvasctrl.width = width;
+        this._canvasctrl.height = height;
+        this.sendMessage("canvas", { width, height });
+        this._resizeTimeoutBuffer = setTimeout(() => {
+          this._resizeTimeoutBuffer = void 0;
+        }, 100);
       }
     }
   }

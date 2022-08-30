@@ -1,10 +1,9 @@
-/* eslint-disable no-global-assign */
-/* global Module, HEAPU8, readAsync, read_, calledMain, addRunDependency, removeRunDependency, buffer, updateGlobalBufferAndViews, out, err */
+/* global Module, HEAPU8, readAsync, read_, calledMain, addRunDependency, removeRunDependency, buffer */
 
 const encoder = new TextEncoder()
 const textByteLength = (input) => encoder.encode(input).buffer.byteLength
 
-Module.onRuntimeInitialized = function () {
+Module.onRuntimeInitialized = () => {
   self.jassubObj = new Module.JASSUB()
 
   self.jassubObj.initLibrary(self.width, self.height, self.fallbackFont || null)
@@ -25,7 +24,7 @@ Module.onRuntimeInitialized = function () {
   }
 }
 
-out = function (text) {
+self.out = function (text) {
   if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ')
   if (text === 'libass: No usable fontconfig configuration file found, using fallback.') {
     console.debug(text)
@@ -33,7 +32,7 @@ out = function (text) {
     console.log(text)
   }
 }
-err = function (text) {
+self.err = function (text) {
   if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ')
   if (text === 'Fontconfig error: Cannot load default config file: No such file: (null)') {
     console.debug(text)
@@ -42,7 +41,7 @@ err = function (text) {
   }
 }
 
-self.onerror = self.onerror || err
+self.onerror = self.onerror || self.err
 
 self.delay = 0 // approximate delay (time of render + postMessage + drawImage), for example 1/60 or 0
 self.lastCurrentTime = 0
@@ -62,11 +61,11 @@ self.fontId = 0
 
 let asyncRender = false
 
-self.addFont = function (data) {
+self.addFont = (data) => {
   self.asyncWrite(data.font)
 }
 
-self.findAvailableFonts = function (font) {
+self.findAvailableFonts = (font) => {
   font = font.trim().toLowerCase()
 
   if (font.startsWith('@')) {
@@ -87,7 +86,7 @@ self.findAvailableFonts = function (font) {
   self.asyncWrite(self.availableFonts[font])
 }
 
-self.asyncWrite = function (font) {
+self.asyncWrite = (font) => {
   if (ArrayBuffer.isView(font)) {
     self.allocFont(font)
   } else {
@@ -97,14 +96,14 @@ self.asyncWrite = function (font) {
   }
 }
 
-self.allocFont = function (uint8) {
+self.allocFont = (uint8) => {
   const ptr = Module._malloc(uint8.byteLength)
   HEAPU8.set(uint8, ptr)
   self.jassubObj.addFont('font-' + (self.fontId++), ptr, uint8.byteLength)
   self.jassubObj.reloadFonts()
 }
 
-self.processAvailableFonts = function (content) {
+self.processAvailableFonts = (content) => {
   if (!self.availableFonts) return
 
   const sections = parseAss(content)
@@ -127,9 +126,11 @@ self.processAvailableFonts = function (content) {
  * Set the subtitle track.
  * @param {!string} content the content of the subtitle file.
  */
-self.setTrack = function (data) {
+self.setTrack = (data) => {
   // Make sure that the fonts are loaded
   self.processAvailableFonts(data.content)
+
+  self.subContent = data.content
 
   // Tell libass to render the new track
   self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
@@ -139,7 +140,7 @@ self.setTrack = function (data) {
 /**
  * Remove subtitle track.
  */
-self.freeTrack = function () {
+self.freeTrack = () => {
   self.jassubObj.removeTrack()
   self.renderLoop()
 }
@@ -148,7 +149,7 @@ self.freeTrack = function () {
  * Set the subtitle track.
  * @param {!string} url the URL of the subtitle file.
  */
-self.setTrackByUrl = function (data) {
+self.setTrackByUrl = (data) => {
   const content = read_(data.url)
 
   self.setTrack({ content })
@@ -164,7 +165,7 @@ self.resize = (width, height) => {
   self.jassubObj.resizeCanvas(width, height)
 }
 
-self.getCurrentTime = function () {
+self.getCurrentTime = () => {
   const diff = (Date.now() - self.lastCurrentTimeReceivedAt) / 1000
   if (self._isPaused) {
     return self.lastCurrentTime
@@ -176,7 +177,7 @@ self.getCurrentTime = function () {
     return self.lastCurrentTime + (diff * self.rate)
   }
 }
-self.setCurrentTime = function (currentTime) {
+self.setCurrentTime = (currentTime) => {
   self.lastCurrentTime = currentTime
   self.lastCurrentTimeReceivedAt = Date.now()
   if (!self.rafId) {
@@ -186,7 +187,7 @@ self.setCurrentTime = function (currentTime) {
       self.renderLoop()
 
       // Give onmessage chance to receive all queued messages
-      setTimeout(function () {
+      setTimeout(() => {
         self.nextIsRaf = false
       }, 20)
     }
@@ -194,7 +195,7 @@ self.setCurrentTime = function (currentTime) {
 }
 
 self._isPaused = true
-self.setIsPaused = function (isPaused) {
+self.setIsPaused = (isPaused) => {
   if (isPaused !== self._isPaused) {
     self._isPaused = isPaused
     if (isPaused) {
@@ -357,7 +358,7 @@ function parseAss (content) {
             value = value.slice(0, format.length - 1)
             value.push(lastPart)
           }
-          value = value.map(function (s) {
+          value = value.map(s => {
             return s.trim()
           })
           if (format) {
@@ -382,10 +383,10 @@ function parseAss (content) {
   return sections
 };
 
-self.requestAnimationFrame = (function () {
+self.requestAnimationFrame = (() => {
   // similar to Browser.requestAnimationFrame
   let nextRAF = 0
-  return function (func) {
+  return func => {
     // try to keep target fps (30fps) between calls to here
     const now = Date.now()
     if (nextRAF === 0) {
@@ -401,7 +402,6 @@ self.requestAnimationFrame = (function () {
   }
 })()
 
-
 // Frame throttling
 
 // Wait to start running until we receive some info from the client
@@ -416,7 +416,7 @@ function messageResender () {
   if (calledMain) {
     if (messageBuffer && messageBuffer.length > 0) {
       messageResenderTimeout = null
-      messageBuffer.forEach(function (message) {
+      messageBuffer.forEach(message => {
         onmessage(message)
       })
       messageBuffer = null
@@ -599,9 +599,9 @@ onmessage = message => {
 let HEAPU8C = null
 
 // patch EMS function to include Uint8Clamped, but call old function too
-updateGlobalBufferAndViews = (function (_super) {
-  return function (buf) {
+self.updateGlobalBufferAndViews = (_super => {
+  return buf => {
     _super(buf)
     HEAPU8C = new Uint8ClampedArray(buf)
   }
-})(updateGlobalBufferAndViews)
+})(self.updateGlobalBufferAndViews)

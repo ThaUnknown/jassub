@@ -51,19 +51,19 @@ jobs:
           ref: gh-pages
 
       - name: Remove old assets
-        run: rm -fr assets/js
+        run: rm -fr jassub/assets
 
       - name: Download nightly build
         uses: actions/download-artifact@v2
         with:
           name: js
-          path: assets/js
+          path: jassub/assets
 
       - name: Push new version
         run: |
           git config --global user.email "actions@noreply.github.com"
           git config --global user.name "GitHub Action"
-          git add assets/js
+          git add jassub/assets
           git commit -m "$(printf \
             "Update binaries to latest nightly\n\nFrom %s" "${{ github.sha }}")"
           git push origin gh-pages

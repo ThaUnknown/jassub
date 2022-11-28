@@ -176,7 +176,7 @@ export default class JASSUB extends EventTarget {
     let videoSize = null
     if ((!width || !height) && this._video) {
       videoSize = this._getVideoPosition()
-      const newsize = this._computeCanvasSize(videoSize.width || 0 * (window.devicePixelRatio || 1), videoSize.height || 0 * (window.devicePixelRatio || 1))
+      const newsize = this._computeCanvasSize((videoSize.width || 0) * (window.devicePixelRatio || 1), (videoSize.height || 0) * (window.devicePixelRatio || 1))
       width = newsize.width
       height = newsize.height
       top = videoSize.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top)
@@ -496,8 +496,9 @@ export default class JASSUB extends EventTarget {
     try {
       // electron by default has all permissions enabled, and it doesn't have requesting
       // if this happens, make sure you can query fonts
-      if ('request' in navigator.permissions) {
-        navigator.permissions.request({ name: 'local-fonts' }).then(permission => {
+      const query = navigator?.permissions?.request || navigator?.permissions?.query
+      if (query) {
+        query({ name: 'local-fonts' }).then(permission => {
           if (permission.state === 'granted') {
             this._sendLocalFont(font)
           }

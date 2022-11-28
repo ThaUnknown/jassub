@@ -172,7 +172,7 @@ const _JASSUB = class extends EventTarget {
     let videoSize = null;
     if ((!width || !height) && this._video) {
       videoSize = this._getVideoPosition();
-      const newsize = this._computeCanvasSize(videoSize.width || 0 * (window.devicePixelRatio || 1), videoSize.height || 0 * (window.devicePixelRatio || 1));
+      const newsize = this._computeCanvasSize((videoSize.width || 0) * (window.devicePixelRatio || 1), (videoSize.height || 0) * (window.devicePixelRatio || 1));
       width = newsize.width;
       height = newsize.height;
       top = videoSize.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top);
@@ -347,9 +347,11 @@ const _JASSUB = class extends EventTarget {
     }
   }
   _getLocalFont({ font }) {
+    var _a, _b;
     try {
-      if ("request" in navigator.permissions) {
-        navigator.permissions.request({ name: "local-fonts" }).then((permission) => {
+      const query = ((_a = navigator == null ? void 0 : navigator.permissions) == null ? void 0 : _a.request) || ((_b = navigator == null ? void 0 : navigator.permissions) == null ? void 0 : _b.query);
+      if (query) {
+        query({ name: "local-fonts" }).then((permission) => {
           if (permission.state === "granted") {
             this._sendLocalFont(font);
           }

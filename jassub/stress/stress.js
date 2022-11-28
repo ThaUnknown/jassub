@@ -1,7 +1,7 @@
 const renderer = new JASSUB({
   video: document.querySelector('video'),
   subUrl: '../subtitles/beastars.ass',
-  workerUrl: '../jassub-worker.js',
+  workerUrl: '../assets/jassub-worker.js',
   fonts: [
     '../fonts/architext.regular.ttf',
     '../fonts/FRABK.TTF',

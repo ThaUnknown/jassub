@@ -10,7 +10,7 @@ fontselect.addEventListener('change', async ({ detail }) => {
   renderer = new JASSUB({
     video: document.querySelector('video'),
     subUrl: '../subtitles/test.ass',
-    workerUrl: '../jassub-worker.js',
+    workerUrl: '../assets/jassub-worker.js',
     fallbackFont: detail[0].fullName,
     availableFonts: {
       [detail[0].fullName.toLowerCase()]: uint8

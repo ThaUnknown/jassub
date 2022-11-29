@@ -37,10 +37,10 @@ export default class JASSUB extends EventTarget {
       this.destroy('Worker not supported')
     }
     JASSUB._test()
-    const _blendMode = options.blendMode || 'js'
-    const _asyncRender = typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true)
-    const _offscreenRender = typeof OffscreenCanvas !== 'undefined' && (options.offscreenRender ?? true)
-    this._onDemandRender = 'requestVideoFrameCallback' in HTMLVideoElement.prototype && (options.onDemandRender ?? true)
+    const blendMode = options.blendMode || 'js'
+    const asyncRender = typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true)
+    const offscreenRender = typeof OffscreenCanvas !== 'undefined' && (options.offscreenRender ?? true)
+    this._onDemandRender = 'requestVideoFrameCallback' in HTMLVideoElement.prototype && options.video && (options.onDemandRender ?? true)
 
     this.timeOffset = options.timeOffset || 0
     this._video = options.video
@@ -68,8 +68,8 @@ export default class JASSUB extends EventTarget {
     this._bufferCanvas = document.createElement('canvas')
     this._bufferCtx = this._bufferCanvas.getContext('2d')
 
-    this._canvasctrl = _offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas
-    this._ctx = !_offscreenRender && this._canvasctrl.getContext('2d')
+    this._canvasctrl = offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas
+    this._ctx = !offscreenRender && this._canvasctrl.getContext('2d')
 
     this._lastRenderTime = 0
     this.debug = !!options.debug
@@ -84,11 +84,11 @@ export default class JASSUB extends EventTarget {
 
     this._worker.postMessage({
       target: 'init',
-      asyncRender: _asyncRender,
+      asyncRender,
       width: this._canvas.width,
       height: this._canvas.height,
       preMain: true,
-      blendMode: _blendMode,
+      blendMode,
       subUrl: options.subUrl,
       subContent: options.subContent || null,
       fonts: options.fonts || [],
@@ -100,9 +100,9 @@ export default class JASSUB extends EventTarget {
       libassMemoryLimit: options.libassMemoryLimit || 0,
       libassGlyphLimit: options.libassGlyphLimit || 0,
       hasAlphaBug: JASSUB._hasAlphaBug,
-      useLocalFonts: ('queryLocalFonts' in self) && !!options.useLocalFonts
+      useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)
     })
-    if (_offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
+    if (offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
 
     this._boundResize = this.resize.bind(this)
     this._boundTimeUpdate = this._timeupdate.bind(this)
@@ -124,7 +124,7 @@ export default class JASSUB extends EventTarget {
     if (JASSUB._supportsWebAssembly !== null) return null
 
     const canvas1 = document.createElement('canvas')
-    const ctx1 = canvas1.getContext('2d')
+    const ctx1 = canvas1.getContext('2d', { willReadFrequently: true })
     // test ImageData constructor
     if (typeof ImageData.prototype.constructor === 'function') {
       try {
@@ -499,16 +499,15 @@ export default class JASSUB extends EventTarget {
 
   _getLocalFont ({ font }) {
     try {
-      // electron by default has all permissions enabled, and it doesn't have requesting
-      // if this happens, make sure you can query fonts
-      const query = navigator?.permissions?.request || navigator?.permissions?.query
-      if (query) {
-        query({ name: 'local-fonts' }).then(permission => {
+      // electron by default has all permissions enabled, and it doesn't have perm query
+      // if this happens, just send it
+      if (navigator?.permissions?.query) {
+        navigator.permissions.query({ name: 'local-fonts' }).then(permission => {
           if (permission.state === 'granted') {
             this._sendLocalFont(font)
           }
         })
-      } else if ('queryLocalFonts' in self) {
+      } else {
         this._sendLocalFont(font)
       }
     } catch (e) {

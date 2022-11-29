@@ -25,7 +25,6 @@ Module.onRuntimeInitialized = () => {
 }
 
 self.out = function (text) {
-  if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ')
   if (text === 'libass: No usable fontconfig configuration file found, using fallback.') {
     console.debug(text)
   } else {
@@ -33,7 +32,6 @@ self.out = function (text) {
   }
 }
 self.err = function (text) {
-  if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ')
   if (text === 'Fontconfig error: Cannot load default config file: No such file: (null)') {
     console.debug(text)
   } else {

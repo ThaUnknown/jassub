@@ -41,16 +41,16 @@ if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPla
 }
 const _JASSUB = class extends EventTarget {
   constructor(options = {}) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     super();
     if (!globalThis.Worker) {
       this.destroy("Worker not supported");
     }
     _JASSUB._test();
-    const _blendMode = options.blendMode || "js";
-    const _asyncRender = typeof createImageBitmap !== "undefined" && ((_a = options.asyncRender) != null ? _a : true);
-    const _offscreenRender = typeof OffscreenCanvas !== "undefined" && ((_b = options.offscreenRender) != null ? _b : true);
-    this._onDemandRender = "requestVideoFrameCallback" in HTMLVideoElement.prototype && ((_c = options.onDemandRender) != null ? _c : true);
+    const blendMode = options.blendMode || "js";
+    const asyncRender = typeof createImageBitmap !== "undefined" && ((_a = options.asyncRender) != null ? _a : true);
+    const offscreenRender = typeof OffscreenCanvas !== "undefined" && ((_b = options.offscreenRender) != null ? _b : true);
+    this._onDemandRender = "requestVideoFrameCallback" in HTMLVideoElement.prototype && options.video && ((_c = options.onDemandRender) != null ? _c : true);
     this.timeOffset = options.timeOffset || 0;
     this._video = options.video;
     this._canvasParent = null;
@@ -73,8 +73,8 @@ const _JASSUB = class extends EventTarget {
     this._canvasParent.appendChild(this._canvas);
     this._bufferCanvas = document.createElement("canvas");
     this._bufferCtx = this._bufferCanvas.getContext("2d");
-    this._canvasctrl = _offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas;
-    this._ctx = !_offscreenRender && this._canvasctrl.getContext("2d");
+    this._canvasctrl = offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas;
+    this._ctx = !offscreenRender && this._canvasctrl.getContext("2d");
     this._lastRenderTime = 0;
     this.debug = !!options.debug;
     this.prescaleFactor = options.prescaleFactor || 1;
@@ -85,11 +85,11 @@ const _JASSUB = class extends EventTarget {
     this._worker.onerror = (e) => this._error(e);
     this._worker.postMessage({
       target: "init",
-      asyncRender: _asyncRender,
+      asyncRender,
       width: this._canvas.width,
       height: this._canvas.height,
       preMain: true,
-      blendMode: _blendMode,
+      blendMode,
       subUrl: options.subUrl,
       subContent: options.subContent || null,
       fonts: options.fonts || [],
@@ -101,9 +101,9 @@ const _JASSUB = class extends EventTarget {
       libassMemoryLimit: options.libassMemoryLimit || 0,
       libassGlyphLimit: options.libassGlyphLimit || 0,
       hasAlphaBug: _JASSUB._hasAlphaBug,
-      useLocalFonts: "queryLocalFonts" in self && !!options.useLocalFonts
+      useLocalFonts: "queryLocalFonts" in self && ((_d = options.useLocalFonts) != null ? _d : true)
     });
-    if (_offscreenRender === true)
+    if (offscreenRender === true)
       this.sendMessage("offscreenCanvas", null, [this._canvasctrl]);
     this._boundResize = this.resize.bind(this);
     this._boundTimeUpdate = this._timeupdate.bind(this);
@@ -118,7 +118,7 @@ const _JASSUB = class extends EventTarget {
     if (_JASSUB._supportsWebAssembly !== null)
       return null;
     const canvas1 = document.createElement("canvas");
-    const ctx1 = canvas1.getContext("2d");
+    const ctx1 = canvas1.getContext("2d", { willReadFrequently: true });
     if (typeof ImageData.prototype.constructor === "function") {
       try {
         new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1);
@@ -336,16 +336,15 @@ const _JASSUB = class extends EventTarget {
     }
   }
   _getLocalFont({ font }) {
-    var _a, _b;
+    var _a;
     try {
-      const query = ((_a = navigator == null ? void 0 : navigator.permissions) == null ? void 0 : _a.request) || ((_b = navigator == null ? void 0 : navigator.permissions) == null ? void 0 : _b.query);
-      if (query) {
-        query({ name: "local-fonts" }).then((permission) => {
+      if ((_a = navigator == null ? void 0 : navigator.permissions) == null ? void 0 : _a.query) {
+        navigator.permissions.query({ name: "local-fonts" }).then((permission) => {
           if (permission.state === "granted") {
             this._sendLocalFont(font);
           }
         });
-      } else if ("queryLocalFonts" in self) {
+      } else {
         this._sendLocalFont(font);
       }
     } catch (e) {

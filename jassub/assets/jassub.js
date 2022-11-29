@@ -1017,10 +1017,10 @@ export default class JASSUB extends EventTarget {
     this._canvasParent.appendChild(this._canvas)
 
     this._bufferCanvas = document.createElement('canvas')
-    this._bufferCtx = this._bufferCanvas.getContext('2d')
+    this._bufferCtx = this._bufferCanvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
 
     this._canvasctrl = offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas
-    this._ctx = !offscreenRender && this._canvasctrl.getContext('2d')
+    this._ctx = !offscreenRender && this._canvasctrl.getContext('2d', { desynchronized: true })
 
     this._lastRenderTime = 0
     this.debug = !!options.debug
@@ -1099,7 +1099,7 @@ export default class JASSUB extends EventTarget {
     try {
       if (typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function') {
         const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
-        if (module instanceof WebAssembly.Module) { JASSUB._supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance) }
+        if (module instanceof WebAssembly.Module) JASSUB._supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance)
       }
     } catch (e) {
       JASSUB._supportsWebAssembly = false
@@ -1108,7 +1108,7 @@ export default class JASSUB extends EventTarget {
     // Test for alpha bug, where e.g. WebKit can render a transparent pixel
     // (with alpha == 0) as non-black which then leads to visual artifacts.
     const canvas2 = document.createElement('canvas')
-    const ctx2 = canvas2.getContext('2d')
+    const ctx2 = canvas2.getContext('2d', { willReadFrequently: true })
 
     canvas1.width = canvas2.width = 1
     canvas1.height = canvas2.height = 1

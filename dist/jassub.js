@@ -988,9 +988,9 @@ export default class JASSUB extends EventTarget {
       this.destroy('Worker not supported')
     }
     JASSUB._test()
-    const _blendMode = options.blendMode || 'js'
-    const _asyncRender = typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true)
-    const _offscreenRender = typeof OffscreenCanvas !== 'undefined' && (options.offscreenRender ?? true)
+    const blendMode = options.blendMode || 'js'
+    const asyncRender = typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true)
+    const offscreenRender = typeof OffscreenCanvas !== 'undefined' && (options.offscreenRender ?? true)
     this._onDemandRender = 'requestVideoFrameCallback' in HTMLVideoElement.prototype && (options.onDemandRender ?? true)
 
     this.timeOffset = options.timeOffset || 0
@@ -1017,10 +1017,10 @@ export default class JASSUB extends EventTarget {
     this._canvasParent.appendChild(this._canvas)
 
     this._bufferCanvas = document.createElement('canvas')
-    this._bufferCtx = this._bufferCanvas.getContext('2d')
+    this._bufferCtx = this._bufferCanvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
 
-    this._canvasctrl = _offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas
-    this._ctx = !_offscreenRender && this._canvasctrl.getContext('2d')
+    this._canvasctrl = offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas
+    this._ctx = !offscreenRender && this._canvasctrl.getContext('2d', { desynchronized: true })
 
     this._lastRenderTime = 0
     this.debug = !!options.debug
@@ -1035,11 +1035,12 @@ export default class JASSUB extends EventTarget {
 
     this._worker.postMessage({
       target: 'init',
-      asyncRender: _asyncRender,
+      asyncRender,
+      onDemandRender: this._onDemandRender,
       width: this._canvas.width,
       height: this._canvas.height,
       preMain: true,
-      blendMode: _blendMode,
+      blendMode,
       subUrl: options.subUrl,
       subContent: options.subContent || null,
       fonts: options.fonts || [],
@@ -1051,13 +1052,19 @@ export default class JASSUB extends EventTarget {
       libassMemoryLimit: options.libassMemoryLimit || 0,
       libassGlyphLimit: options.libassGlyphLimit || 0,
       hasAlphaBug: JASSUB._hasAlphaBug,
-      useLocalFonts: ('queryLocalFonts' in self) && !!options.useLocalFonts
+      useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)
     })
-    if (_offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
+    if (offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
+
+    this._boundResize = this.resize.bind(this)
+    this._boundTimeUpdate = this._timeupdate.bind(this)
+    this._boundSetRate = this.setRate.bind(this)
     this.setVideo(options.video)
+
     if (this._onDemandRender) {
       this.busy = false
-      this._video.requestVideoFrameCallback(this._demandRender.bind(this))
+      this._lastDemandTime = null
+      this._video?.requestVideoFrameCallback(this._handleRVFC.bind(this))
     }
   }
 
@@ -1070,7 +1077,7 @@ export default class JASSUB extends EventTarget {
     if (JASSUB._supportsWebAssembly !== null) return null
 
     const canvas1 = document.createElement('canvas')
-    const ctx1 = canvas1.getContext('2d')
+    const ctx1 = canvas1.getContext('2d', { willReadFrequently: true })
     // test ImageData constructor
     if (typeof ImageData.prototype.constructor === 'function') {
       try {
@@ -1092,7 +1099,7 @@ export default class JASSUB extends EventTarget {
     try {
       if (typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function') {
         const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
-        if (module instanceof WebAssembly.Module) { JASSUB._supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance) }
+        if (module instanceof WebAssembly.Module) JASSUB._supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance)
       }
     } catch (e) {
       JASSUB._supportsWebAssembly = false
@@ -1101,7 +1108,7 @@ export default class JASSUB extends EventTarget {
     // Test for alpha bug, where e.g. WebKit can render a transparent pixel
     // (with alpha == 0) as non-black which then leads to visual artifacts.
     const canvas2 = document.createElement('canvas')
-    const ctx2 = canvas2.getContext('2d')
+    const ctx2 = canvas2.getContext('2d', { willReadFrequently: true })
 
     canvas1.width = canvas2.width = 1
     canvas1.height = canvas2.height = 1
@@ -1223,18 +1230,20 @@ export default class JASSUB extends EventTarget {
     if (video instanceof HTMLVideoElement) {
       this._removeListeners()
       this._video = video
-      if (this._onDemandRender !== true) {
+      if (this._onDemandRender) {
+        this._video.requestVideoFrameCallback(this._handleRVFC.bind(this))
+      } else {
         this._playstate = video.paused
 
-        video.addEventListener('timeupdate', this._timeupdate.bind(this), false)
-        video.addEventListener('progress', this._timeupdate.bind(this), false)
-        video.addEventListener('waiting', this._timeupdate.bind(this), false)
-        video.addEventListener('seeking', this._timeupdate.bind(this), false)
-        video.addEventListener('playing', this._timeupdate.bind(this), false)
-        video.addEventListener('ratechange', this.setRate.bind(this), false)
+        video.addEventListener('timeupdate', this._boundTimeUpdate, false)
+        video.addEventListener('progress', this._boundTimeUpdate, false)
+        video.addEventListener('waiting', this._boundTimeUpdate, false)
+        video.addEventListener('seeking', this._boundTimeUpdate, false)
+        video.addEventListener('playing', this._boundTimeUpdate, false)
+        video.addEventListener('ratechange', this._boundSetRate, false)
       }
       if (video.videoWidth > 0) this.resize()
-      video.addEventListener('resize', this.resize.bind(this))
+      video.addEventListener('resize', this._boundResize)
       // Support Element Resize Observer
       if (typeof ResizeObserver !== 'undefined') {
         if (!this._ro) this._ro = new ResizeObserver(() => this.resize())
@@ -1445,16 +1454,15 @@ export default class JASSUB extends EventTarget {
 
   _getLocalFont ({ font }) {
     try {
-      // electron by default has all permissions enabled, and it doesn't have requesting
-      // if this happens, make sure you can query fonts
-      const query = navigator?.permissions?.request || navigator?.permissions?.query
-      if (query) {
-        query({ name: 'local-fonts' }).then(permission => {
+      // electron by default has all permissions enabled, and it doesn't have perm query
+      // if this happens, just send it
+      if (navigator?.permissions?.query) {
+        navigator.permissions.query({ name: 'local-fonts' }).then(permission => {
           if (permission.state === 'granted') {
             this._sendLocalFont(font)
           }
         })
-      } else if ('queryLocalFonts' in self) {
+      } else {
         this._sendLocalFont(font)
       }
     } catch (e) {
@@ -1463,16 +1471,28 @@ export default class JASSUB extends EventTarget {
   }
 
   _unbusy () {
-    this.busy = false
+    // play catchup, leads to more frames being painted, but also more jitter
+    if (this._lastDemandTime) {
+      this._demandRender(this._lastDemandTime)
+    } else {
+      this.busy = false
+    }
   }
 
-  _demandRender (now, metadata) {
+  _handleRVFC (now, { mediaTime }) {
     if (this._destroyed) return null
-    if (!this.busy) {
+    if (this.busy) {
+      this._lastDemandTime = mediaTime
+    } else {
       this.busy = true
-      this.sendMessage('demand', { time: metadata.mediaTime + this.timeOffset })
+      this._demandRender(mediaTime)
     }
-    this._video.requestVideoFrameCallback(this._demandRender.bind(this))
+    this._video.requestVideoFrameCallback(this._handleRVFC.bind(this))
+  }
+
+  _demandRender (time) {
+    this._lastDemandTime = null
+    this.sendMessage('demand', { time: time + this.timeOffset })
   }
 
   _render ({ images, async, times }) {
@@ -1582,13 +1602,13 @@ export default class JASSUB extends EventTarget {
   _removeListeners () {
     if (this._video) {
       if (this._ro) this._ro.unobserve(this._video)
-      this._video.removeEventListener('timeupdate', this._timeupdate)
-      this._video.removeEventListener('progress', this._timeupdate)
-      this._video.removeEventListener('waiting', this._timeupdate)
-      this._video.removeEventListener('seeking', this._timeupdate)
-      this._video.removeEventListener('playing', this._timeupdate)
-      this._video.removeEventListener('ratechange', this.setRate)
-      this._video.removeEventListener('resize', this.resize)
+      this._video.removeEventListener('timeupdate', this._boundTimeUpdate)
+      this._video.removeEventListener('progress', this._boundTimeUpdate)
+      this._video.removeEventListener('waiting', this._boundTimeUpdate)
+      this._video.removeEventListener('seeking', this._boundTimeUpdate)
+      this._video.removeEventListener('playing', this._boundTimeUpdate)
+      this._video.removeEventListener('ratechange', this._boundSetRate)
+      this._video.removeEventListener('resize', this._boundResize)
     }
   }
 

@@ -478,9 +478,11 @@ self.video = data => {
 
 self.offscreenCanvas = data => {
   self.offscreenCanvas = data.transferable[0]
-  self.offscreenCanvasCtx = self.offscreenCanvas.getContext('2d')
-  self.bufferCanvas = new OffscreenCanvas(self.height, self.width)
-  self.bufferCtx = self.bufferCanvas.getContext('2d')
+  self.offscreenCanvasCtx = self.offscreenCanvas.getContext('2d', { desynchronized: true })
+  if (!asyncRender) {
+    self.bufferCanvas = new OffscreenCanvas(self.height, self.width)
+    self.bufferCtx = self.bufferCanvas.getContext('2d', { desynchronized: true })
+  }
 }
 
 self.destroy = () => {

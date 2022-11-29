@@ -72,9 +72,9 @@ const _JASSUB = class extends EventTarget {
     this._canvas.style.pointerEvents = "none";
     this._canvasParent.appendChild(this._canvas);
     this._bufferCanvas = document.createElement("canvas");
-    this._bufferCtx = this._bufferCanvas.getContext("2d");
+    this._bufferCtx = this._bufferCanvas.getContext("2d", { desynchronized: true, willReadFrequently: true });
     this._canvasctrl = offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas;
-    this._ctx = !offscreenRender && this._canvasctrl.getContext("2d");
+    this._ctx = !offscreenRender && this._canvasctrl.getContext("2d", { desynchronized: true });
     this._lastRenderTime = 0;
     this.debug = !!options.debug;
     this.prescaleFactor = options.prescaleFactor || 1;
@@ -137,9 +137,8 @@ const _JASSUB = class extends EventTarget {
     try {
       if (typeof WebAssembly === "object" && typeof WebAssembly.instantiate === "function") {
         const module = new WebAssembly.Module(Uint8Array.of(0, 97, 115, 109, 1, 0, 0, 0));
-        if (module instanceof WebAssembly.Module) {
+        if (module instanceof WebAssembly.Module)
           _JASSUB._supportsWebAssembly = new WebAssembly.Instance(module) instanceof WebAssembly.Instance;
-        }
       }
     } catch (e) {
       _JASSUB._supportsWebAssembly = false;

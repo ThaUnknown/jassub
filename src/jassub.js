@@ -66,10 +66,10 @@ export default class JASSUB extends EventTarget {
     this._canvasParent.appendChild(this._canvas)
 
     this._bufferCanvas = document.createElement('canvas')
-    this._bufferCtx = this._bufferCanvas.getContext('2d')
+    this._bufferCtx = this._bufferCanvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
 
     this._canvasctrl = offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas
-    this._ctx = !offscreenRender && this._canvasctrl.getContext('2d')
+    this._ctx = !offscreenRender && this._canvasctrl.getContext('2d', { desynchronized: true })
 
     this._lastRenderTime = 0
     this.debug = !!options.debug
@@ -148,7 +148,7 @@ export default class JASSUB extends EventTarget {
     try {
       if (typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function') {
         const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
-        if (module instanceof WebAssembly.Module) { JASSUB._supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance) }
+        if (module instanceof WebAssembly.Module) JASSUB._supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance)
       }
     } catch (e) {
       JASSUB._supportsWebAssembly = false

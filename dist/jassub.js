@@ -19,8 +19,8 @@
 // License: Expat
 // Copyright: 2019 Zhongyuan Zhou <zhouzhongyuan@huawei.com>
 //   2020 Joe Orton <jorton@redhat.com>
-//   2016-2019 Sebastian Pipping <sebastian@pipping.org>
 //   2021 Dong-hee Na <donghee.na@python.org>
+//   2016-2019 Sebastian Pipping <sebastian@pipping.org>
 //   2017 Joe Orton <jorton@redhat.com>
 //   2002 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
 //   2004-2006 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
@@ -53,21 +53,21 @@
 //   2018 Marco Maggi <marco.maggi-ipsu@poste.it>
 //   2017-2018 Rhodri James <rhodri@wildebeest.org.uk>
 //   2005-2012 Karl Waclawek <karl@waclawek.net>
-//   2022 Thijs Schreijer <thijs@thijsschreijer.nl>
 //   2020 Boris Kolpackov <boris@codesynthesis.com>
+//   2022 Thijs Schreijer <thijs@thijsschreijer.nl>
 //   2016 Cristian Rodr\x{00c3}\x{00ad}guez <crrodriguez@opensuse.org>
 //   2017-2019 Sebastian Pipping <sebastian@pipping.org>
 //   2005 Karl Waclawek <karl@waclawek.net>
 //   1999-2000 Thai Open Source Software Center Ltd
 //   2000-2017 Expat development team / 1997-2000 Thai Open Source Software Center Ltd
+//   2016-2021 Sebastian Pipping <sebastian@pipping.org>
 //   2005-2007 Steven Solie <steven@solie.ca>
 //   2005 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
-//   2016-2021 Sebastian Pipping <sebastian@pipping.org>
 //   2018 Anton Maklakov <antmak.pub@gmail.com>
 //   2017 Alexander Bluhm <alexander.bluhm@gmx.net>
 //   1997-2000 Thai Open Source Software Center Ltd
-//   2016-2022 Sebastian Pipping <sebastian@pipping.org>
 //   2017-2021 Sebastian Pipping <sebastian@pipping.org>
+//   2016-2022 Sebastian Pipping <sebastian@pipping.org>
 //   2002-2009 Karl Waclawek <karl@waclawek.net>
 //   2002 Karl Waclawek <karl@waclawek.net>
 //   2020 Tim Gates <tim.gates@iress.com>
@@ -75,8 +75,8 @@
 //   2016 Pascal Cuoq <cuoq@trust-in-soft.com>
 //   2017 Jos\x{00c3}\x{00a9} Guti\x{00c3}\x{00a9}rrez de la Concha <jose@zeroc.com>
 //   2001-2002 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
-//   2000-2005 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
 //   2002-2006 Karl Waclawek <karl@waclawek.net>
+//   2000-2005 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
 //   2018 Yury Gribov <tetra2005@gmail.com>
 //   2005-2009 Steven Solie <steven@solie.ca>
 //   2003 Greg Stein <gstein@users.sourceforge.net>
@@ -103,12 +103,12 @@
 //   2010-2021 Joel Klinghed.
 //   2007-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
 //   1996-2021 David Turner, Robert Wilhelm, and Werner Lemberg
-//   2005-2021 Werner Lemberg and Detlef W\x{00fc}rkner.
 //   \x{00c5}\x{009d}\x{00c5}\x{00a5} \x{00c5}\x{009d}\x{00c5}\x{00a5}\x{00d1}\x{008f}\x{00c3}\x{00af}\x{00ef}\x{00ac}\x{00af}\x{00c4}\x{009f}"));
+//   2005-2021 Werner Lemberg and Detlef W\x{00fc}rkner.
 //   2002-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
+//   2013-2014 Adobe Systems Incorporated.
 //   2003 Huw D M Davies for Codeweavers
 //   2004-2021 David Turner, Robert Wilhelm, Werner Lemberg, and George Williams.
-//   2013-2014 Adobe Systems Incorporated.
 //   1996-2021 David Turner, Robert Wilhelm, Werner Lemberg, and Detlef Wuerkner.
 //   2000-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
 //   2007-2021 David Turner.
@@ -123,35 +123,35 @@
 //   1996-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
 //   2003-2021 Masatake YAMATO, Redhat K.K.,
 //   2008-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
-//   2009-2021 Oran Agra and Mickey Gabel.
 //   2006-2013 Adobe Systems Incorporated.
+//   2009-2021 Oran Agra and Mickey Gabel.
 //   2013-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
 //   2004-2021 Masatake YAMATO, Red Hat K.K.,
 //   2016-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
-//   2007-2021 Rahul Bhalerao <rahul.bhalerao@redhat.com>, <b.rahul.pm@gmail.com>.
 //   2020-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
 //   2002-2021 Roberto Alameda.
+//   2007-2021 Rahul Bhalerao <rahul.bhalerao@redhat.com>, <b.rahul.pm@gmail.com>.
 //   1995-2002 Jean-loup Gailly.
 //   2004-2021 suzuki toshiya, Masatake YAMATO, Red Hat K.K.,
-//   2004-2021 Albert Chin-A-Young.
 //   2018-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
+//   2004-2021 Albert Chin-A-Young.
 //   2018-2021 David Turner, Robert Wilhelm, Dominik R\x{00c3}\x{00b6}ttsches, and Werner Lemberg.
 //   2002-2021 David Turner, Robert Wilhelm, and Werner Lemberg
 //   \x{00e1}\x{00bb}\x{008b}...): %dn", "\x{00e1}\x{00ba}\x{0083}\x{00ce}\x{00ad}\x{00c5}\x{0082}\x{00c4}\x{00ba}", "all", 42);
-//   2005-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
 //   2013 Google, Inc.
+//   2005-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
 //   2009-2014 Adobe Systems Incorporated.
-//   2010-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
-//   2013-2021 Google, Inc.
 //   2007-2013 Adobe Systems Incorporated.
-//   2001, 2012 David Turner, Robert Wilhelm, and Werner Lemberg.
+//   2013-2021 Google, Inc.
+//   2010-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
 //   2007-2021 Derek Clegg and Michael Toftdal.
+//   2001, 2012 David Turner, Robert Wilhelm, and Werner Lemberg.
 //   2003-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
 //   2008-2021 David Turner, Robert Wilhelm, Werner Lemberg, and suzuki toshiya.
 //   1990, 1994, 1998 The Open Group
 //   2004-2021 David Turner, Robert Wilhelm, and Werner Lemberg.
-//   1996-2021 David Turner, Robert Wilhelm, Werner Lemberg and Detlef W\x{00fc}rkner.
 //   2005-2021 suzuki toshiya, Masatake YAMATO, Red Hat K.K.,
+//   1996-2021 David Turner, Robert Wilhelm, Werner Lemberg and Detlef W\x{00fc}rkner.
 //   2004-2021 Masatake YAMATO, Redhat K.K,
 // 
 // License: public-domain
@@ -161,8 +161,8 @@
 // Copyright: 1995-2002 Jean-loup Gailly and Mark Adler
 // 
 // License: Expat
-// Copyright: 2000-2001, 2004 Francesco Zappa Nardelli
-//   2001-2004 Francesco Zappa Nardelli
+// Copyright: 2001-2004 Francesco Zappa Nardelli
+//   2000-2001, 2004 Francesco Zappa Nardelli
 //   2003 Francesco Zappa Nardelli
 //   2001-2015 Francesco Zappa Nardelli
 //   2001-2004, 2011 Francesco Zappa Nardelli
@@ -216,15 +216,15 @@
 //   \x{00e6}\x{0081}\x{00af} 2010 Behdad Esfahbod
 //   2014 Red Hat, Inc.
 //   2007 Keith Packard
-//   \x{00e6}\x{0081}\x{00af} 2006 Keith Packard
 //   2018 Akira TAGOH
+//   \x{00e6}\x{0081}\x{00af} 2006 Keith Packard
 //   2008 Danilo Šegan
 //   2015 Akira TAGOH
 //   2008-2009 Red Hat, Inc.
 //   2016 Akira TAGOH
 //   2000 Keith Packard
-//   2010 Behdad Esfahbod
 //   2013 Google, Inc.
+//   2010 Behdad Esfahbod
 //   2013 Akira TAGOH
 // 
 // License: MIT~old
@@ -256,11 +256,11 @@
 //   2014 Google, Inc.
 //   2018 Ebrahim Byagowi
 //   2016 Igalia S.L.
-//   2018 Ebrahim Byagowi.
 //   2011 Martin Hosken
-//   2020 Ebrahim Byagowi
-//   1998-2004 David Turner and Werner Lemberg
+//   2018 Ebrahim Byagowi.
 //   2019 Ebrahim Byagowi
+//   1998-2004 David Turner and Werner Lemberg
+//   2020 Ebrahim Byagowi
 //   2013 Red Hat, Inc.
 //   2011-2012 Google, Inc.
 //   2011 SIL International
@@ -268,8 +268,8 @@
 //   2018 Google, Inc.
 //   2019-2020 Ebrahim Byagowi
 //   2012 Google, Inc.
-//   2007-2009 Red Hat, Inc.
 //   2017 Google, Inc.
+//   2007-2009 Red Hat, Inc.
 //   2011 Codethink Limited
 //   2013 Google, Inc.
 //   2015-2019 Ebrahim Byagowi
@@ -288,8 +288,9 @@
 // License: ISC
 // Copyright: 2015 Oleg Oshmyan <chortos@inbox.lv>
 //   2011-2014 Yu Zhuohuang <yuzhuohuang@qq.com>
-//   2016 Vabishchevich Nikolay <vabnick@gmail.com>
 //   2013 rcombs <rcombs@rcombs.me>
+//   2016 Vabishchevich Nikolay <vabnick@gmail.com>
+//   2022 libass contributors
 //   2015 Stephan Vedder <stephan.vedder@gmail.com>
 //   2015 Vabishchevich Nikolay <vabnick@gmail.com>
 //   interest in the
@@ -299,8 +300,8 @@
 //   2011 Grigori Goronzy <greg@chown.ath.cx>
 //   2010 Grigori Goronzy <greg@geekmind.org>
 //   2014 Vabishchevich Nikolay <vabnick@gmail.com>
-//   2013 Stefano Pigozzi <stefano.pigozzi@gmail.com>
 //   2015 Grigori Goronzy <greg@kinoho.net>
+//   2013 Stefano Pigozzi <stefano.pigozzi@gmail.com>
 //   2006 Evgeniy Stepanov <eugeni.stepanov@gmail.com>
 //   2009 Grigori Goronzy <greg@geekmind.org>
 // 
@@ -1126,7 +1127,7 @@ export default class JASSUB extends EventTarget {
     let videoSize = null
     if ((!width || !height) && this._video) {
       videoSize = this._getVideoPosition()
-      const newsize = this._computeCanvasSize(videoSize.width || 0 * (window.devicePixelRatio || 1), videoSize.height || 0 * (window.devicePixelRatio || 1))
+      const newsize = this._computeCanvasSize((videoSize.width || 0) * (window.devicePixelRatio || 1), (videoSize.height || 0) * (window.devicePixelRatio || 1))
       width = newsize.width
       height = newsize.height
       top = videoSize.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top)
@@ -1446,8 +1447,9 @@ export default class JASSUB extends EventTarget {
     try {
       // electron by default has all permissions enabled, and it doesn't have requesting
       // if this happens, make sure you can query fonts
-      if ('request' in navigator.permissions) {
-        navigator.permissions.request({ name: 'local-fonts' }).then(permission => {
+      const query = navigator?.permissions?.request || navigator?.permissions?.query
+      if (query) {
+        query({ name: 'local-fonts' }).then(permission => {
           if (permission.state === 'granted') {
             this._sendLocalFont(font)
           }

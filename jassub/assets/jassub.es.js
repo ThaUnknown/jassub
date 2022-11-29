@@ -41,7 +41,7 @@ if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPla
 }
 const _JASSUB = class extends EventTarget {
   constructor(options = {}) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     super();
     if (!globalThis.Worker) {
       this.destroy("Worker not supported");
@@ -50,7 +50,7 @@ const _JASSUB = class extends EventTarget {
     const blendMode = options.blendMode || "js";
     const asyncRender = typeof createImageBitmap !== "undefined" && ((_a = options.asyncRender) != null ? _a : true);
     const offscreenRender = typeof OffscreenCanvas !== "undefined" && ((_b = options.offscreenRender) != null ? _b : true);
-    this._onDemandRender = "requestVideoFrameCallback" in HTMLVideoElement.prototype && options.video && ((_c = options.onDemandRender) != null ? _c : true);
+    this._onDemandRender = "requestVideoFrameCallback" in HTMLVideoElement.prototype && ((_c = options.onDemandRender) != null ? _c : true);
     this.timeOffset = options.timeOffset || 0;
     this._video = options.video;
     this._canvasParent = null;
@@ -86,6 +86,7 @@ const _JASSUB = class extends EventTarget {
     this._worker.postMessage({
       target: "init",
       asyncRender,
+      onDemandRender: this._onDemandRender,
       width: this._canvas.width,
       height: this._canvas.height,
       preMain: true,
@@ -109,8 +110,11 @@ const _JASSUB = class extends EventTarget {
     this._boundTimeUpdate = this._timeupdate.bind(this);
     this._boundSetRate = this.setRate.bind(this);
     this.setVideo(options.video);
-    if (this._onDemandRender)
-      this._demandRender();
+    if (this._onDemandRender) {
+      this.busy = false;
+      this._lastDemandTime = null;
+      (_e = this._video) == null ? void 0 : _e.requestVideoFrameCallback(this._handleRVFC.bind(this));
+    }
   }
   static _test() {
     if (_JASSUB._supportsWebAssembly !== null)
@@ -240,7 +244,9 @@ const _JASSUB = class extends EventTarget {
     if (video instanceof HTMLVideoElement) {
       this._removeListeners();
       this._video = video;
-      if (this._onDemandRender !== true) {
+      if (this._onDemandRender) {
+        this._video.requestVideoFrameCallback(this._handleRVFC.bind(this));
+      } else {
         this._playstate = video.paused;
         video.addEventListener("timeupdate", this._boundTimeUpdate, false);
         video.addEventListener("progress", this._boundTimeUpdate, false);
@@ -349,12 +355,27 @@ const _JASSUB = class extends EventTarget {
       console.warn("Local fonts API:", e);
     }
   }
-  _demandRender() {
-    this._video.requestVideoFrameCallback((now, metadata) => {
-      if (this._destroyed)
-        return null;
-      this.sendMessage("demand", { time: metadata.mediaTime + this.timeOffset });
-    });
+  _unbusy() {
+    if (this._lastDemandTime) {
+      this._demandRender(this._lastDemandTime);
+    } else {
+      this.busy = false;
+    }
+  }
+  _handleRVFC(now, { mediaTime }) {
+    if (this._destroyed)
+      return null;
+    if (this.busy) {
+      this._lastDemandTime = mediaTime;
+    } else {
+      this.busy = true;
+      this._demandRender(mediaTime);
+    }
+    this._video.requestVideoFrameCallback(this._handleRVFC.bind(this));
+  }
+  _demandRender(time) {
+    this._lastDemandTime = null;
+    this.sendMessage("demand", { time: time + this.timeOffset });
   }
   _render({ images, async, times }) {
     const drawStartTime = Date.now();

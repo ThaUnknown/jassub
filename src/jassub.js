@@ -157,7 +157,7 @@ export default class JASSUB extends EventTarget {
     // Test for alpha bug, where e.g. WebKit can render a transparent pixel
     // (with alpha == 0) as non-black which then leads to visual artifacts.
     const canvas2 = document.createElement('canvas')
-    const ctx2 = canvas2.getContext('2d')
+    const ctx2 = canvas2.getContext('2d', { willReadFrequently: true })
 
     canvas1.width = canvas2.width = 1
     canvas1.height = canvas2.height = 1

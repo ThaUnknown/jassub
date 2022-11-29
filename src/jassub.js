@@ -40,7 +40,7 @@ export default class JASSUB extends EventTarget {
     const blendMode = options.blendMode || 'js'
     const asyncRender = typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true)
     const offscreenRender = typeof OffscreenCanvas !== 'undefined' && (options.offscreenRender ?? true)
-    this._onDemandRender = 'requestVideoFrameCallback' in HTMLVideoElement.prototype && options.video && (options.onDemandRender ?? true)
+    this._onDemandRender = 'requestVideoFrameCallback' in HTMLVideoElement.prototype && (options.onDemandRender ?? true)
 
     this.timeOffset = options.timeOffset || 0
     this._video = options.video
@@ -85,6 +85,7 @@ export default class JASSUB extends EventTarget {
     this._worker.postMessage({
       target: 'init',
       asyncRender,
+      onDemandRender: this._onDemandRender,
       width: this._canvas.width,
       height: this._canvas.height,
       preMain: true,
@@ -111,7 +112,8 @@ export default class JASSUB extends EventTarget {
 
     if (this._onDemandRender) {
       this.busy = false
-      this._video.requestVideoFrameCallback(this._demandRender.bind(this))
+      this._lastDemandTime = null
+      this._video?.requestVideoFrameCallback(this._handleRVFC.bind(this))
     }
   }
 
@@ -277,7 +279,9 @@ export default class JASSUB extends EventTarget {
     if (video instanceof HTMLVideoElement) {
       this._removeListeners()
       this._video = video
-      if (this._onDemandRender !== true) {
+      if (this._onDemandRender) {
+        this._video.requestVideoFrameCallback(this._handleRVFC.bind(this))
+      } else {
         this._playstate = video.paused
 
         video.addEventListener('timeupdate', this._boundTimeUpdate, false)
@@ -516,16 +520,28 @@ export default class JASSUB extends EventTarget {
   }
 
   _unbusy () {
-    this.busy = false
+    // play catchup, leads to more frames being painted, but also more jitter
+    if (this._lastDemandTime) {
+      this._demandRender(this._lastDemandTime)
+    } else {
+      this.busy = false
+    }
   }
 
-  _demandRender (now, metadata) {
+  _handleRVFC (now, { mediaTime }) {
     if (this._destroyed) return null
-    if (!this.busy) {
+    if (this.busy) {
+      this._lastDemandTime = mediaTime
+    } else {
       this.busy = true
-      this.sendMessage('demand', { time: metadata.mediaTime + this.timeOffset })
+      this._demandRender(mediaTime)
     }
-    this._video.requestVideoFrameCallback(this._demandRender.bind(this))
+    this._video.requestVideoFrameCallback(this._handleRVFC.bind(this))
+  }
+
+  _demandRender (time) {
+    this._lastDemandTime = null
+    this.sendMessage('demand', { time: time + this.timeOffset })
   }
 
   _render ({ images, async, times }) {

@@ -92,6 +92,7 @@ self.asyncWrite = (font) => {
   }
 }
 
+// TODO: this should re-draw last frame!
 self.allocFont = (uint8) => {
   const ptr = Module._malloc(uint8.byteLength)
   HEAPU8.set(uint8, ptr)
@@ -260,7 +261,7 @@ self.render = (time, force) => {
   const result = self.renderImageData(time, force)
   if (result.changed !== 0 || force) {
     self.processRender(result)
-  } else {
+  } else if (self.onDemandRender) {
     postMessage({
       target: 'unbusy'
     })
@@ -313,9 +314,11 @@ self.paintImages = (data) => {
       times: data.times
     }, data.buffers)
   }
-  postMessage({
-    target: 'unbusy'
-  })
+  if (self.onDemandRender) {
+    postMessage({
+      target: 'unbusy'
+    })
+  }
 }
 
 /**
@@ -439,6 +442,7 @@ self.init = data => {
   self.fallbackFont = data.fallbackFont.toLowerCase()
   self.blendMode = data.blendMode
   asyncRender = data.asyncRender
+  self.onDemandRender = data.onDemandRender
   self.dropAllAnimations = !!data.dropAllAnimations || self.dropAllAnimations
   // Force fallback if engine does not support 'lossy' mode.
   // We only use createImageBitmap in the worker and historic WebKit versions supported

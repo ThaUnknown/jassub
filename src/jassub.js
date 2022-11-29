@@ -103,7 +103,12 @@ export default class JASSUB extends EventTarget {
       useLocalFonts: ('queryLocalFonts' in self) && !!options.useLocalFonts
     })
     if (_offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
+
+    this._boundResize = this.resize.bind(this)
+    this._boundTimeUpdate = this._timeupdate.bind(this)
+    this._boundSetRate = this.setRate.bind(this)
     this.setVideo(options.video)
+
     if (this._onDemandRender) {
       this.busy = false
       this._video.requestVideoFrameCallback(this._demandRender.bind(this))
@@ -275,15 +280,15 @@ export default class JASSUB extends EventTarget {
       if (this._onDemandRender !== true) {
         this._playstate = video.paused
 
-        video.addEventListener('timeupdate', this._timeupdate.bind(this), false)
-        video.addEventListener('progress', this._timeupdate.bind(this), false)
-        video.addEventListener('waiting', this._timeupdate.bind(this), false)
-        video.addEventListener('seeking', this._timeupdate.bind(this), false)
-        video.addEventListener('playing', this._timeupdate.bind(this), false)
-        video.addEventListener('ratechange', this.setRate.bind(this), false)
+        video.addEventListener('timeupdate', this._boundTimeUpdate, false)
+        video.addEventListener('progress', this._boundTimeUpdate, false)
+        video.addEventListener('waiting', this._boundTimeUpdate, false)
+        video.addEventListener('seeking', this._boundTimeUpdate, false)
+        video.addEventListener('playing', this._boundTimeUpdate, false)
+        video.addEventListener('ratechange', this._boundSetRate, false)
       }
       if (video.videoWidth > 0) this.resize()
-      video.addEventListener('resize', this.resize.bind(this))
+      video.addEventListener('resize', this._boundResize)
       // Support Element Resize Observer
       if (typeof ResizeObserver !== 'undefined') {
         if (!this._ro) this._ro = new ResizeObserver(() => this.resize())
@@ -631,13 +636,13 @@ export default class JASSUB extends EventTarget {
   _removeListeners () {
     if (this._video) {
       if (this._ro) this._ro.unobserve(this._video)
-      this._video.removeEventListener('timeupdate', this._timeupdate)
-      this._video.removeEventListener('progress', this._timeupdate)
-      this._video.removeEventListener('waiting', this._timeupdate)
-      this._video.removeEventListener('seeking', this._timeupdate)
-      this._video.removeEventListener('playing', this._timeupdate)
-      this._video.removeEventListener('ratechange', this.setRate)
-      this._video.removeEventListener('resize', this.resize)
+      this._video.removeEventListener('timeupdate', this._boundTimeUpdate)
+      this._video.removeEventListener('progress', this._boundTimeUpdate)
+      this._video.removeEventListener('waiting', this._boundTimeUpdate)
+      this._video.removeEventListener('seeking', this._boundTimeUpdate)
+      this._video.removeEventListener('playing', this._boundTimeUpdate)
+      this._video.removeEventListener('ratechange', this._boundSetRate)
+      this._video.removeEventListener('resize', this._boundResize)
     }
   }
 

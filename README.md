@@ -12,13 +12,13 @@ JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>
 
 ## Features
 - Supports most SSA/ASS features (everything libass supports)
-- Fully compatible with libass' extensions (beware of compatability with other ASS-renderers)
-- Supports all OpenType-, TrueType-fonts and embedded fonts (including woff2 fonts)
+- Supports all OpenType, TrueType and WOFF fonts, as well as embedded fonts
+- Capable of using local fonts [(on browsers which support it)](https://caniuse.com/mdn-api_window_querylocalfonts)
 - Works fast (all the heavy lifting is done by WebAssembly)
 - Is fully threaded (on browsers which support it, it's capable of working fully on a separate thread)
 - Is asynchronous (renders when available, not in order of execution)
 - Benefits from hardware acceleration (uses hardware accelerated canvas API's)
-- Doesn't manipulate the DOM
+- Doesn't manipulate the DOM to render subtitles
 - Easy to use - just connect it to video element
 
 ## Isn't this just the same thing as JavascriptSubtitlesOctopus?

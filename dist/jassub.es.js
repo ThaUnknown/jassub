@@ -1,19 +1,5 @@
 var __defProp = Object.defineProperty;
-var __getOwnPropSymbols = Object.getOwnPropertySymbols;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __propIsEnum = Object.prototype.propertyIsEnumerable;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __spreadValues = (a, b) => {
-  for (var prop in b || (b = {}))
-    if (__hasOwnProp.call(b, prop))
-      __defNormalProp(a, prop, b[prop]);
-  if (__getOwnPropSymbols)
-    for (var prop of __getOwnPropSymbols(b)) {
-      if (__propIsEnum.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    }
-  return a;
-};
 var __publicField = (obj, key, value) => {
   __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
   return value;
@@ -22,10 +8,10 @@ if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPla
   HTMLVideoElement.prototype._rvfcpolyfillmap = {};
   HTMLVideoElement.prototype.requestVideoFrameCallback = function(callback) {
     const quality = this.getVideoPlaybackQuality();
-    const baseline = this.mozPresentedFrames || quality.totalVideoFrames - quality.droppedVideoFrames;
+    const baseline = this.mozPresentedFrames || this.mozPaintedFrames || quality.totalVideoFrames - quality.droppedVideoFrames;
     const check = (old, now2) => {
       const newquality = this.getVideoPlaybackQuality();
-      const presentedFrames = this.mozPresentedFrames || newquality.totalVideoFrames - newquality.droppedVideoFrames;
+      const presentedFrames = this.mozPresentedFrames || this.mozPaintedFrames || newquality.totalVideoFrames - newquality.droppedVideoFrames;
       if (presentedFrames > baseline) {
         const processingDuration = this.mozFrameDelay || newquality.totalFrameDelay - quality.totalFrameDelay || 0;
         const timediff = now2 - old;
@@ -119,6 +105,9 @@ const _JASSUB = class extends EventTarget {
     });
     if (_offscreenRender === true)
       this.sendMessage("offscreenCanvas", null, [this._canvasctrl]);
+    this._boundResize = this.resize.bind(this);
+    this._boundTimeUpdate = this._timeupdate.bind(this);
+    this._boundSetRate = this.setRate.bind(this);
     this.setVideo(options.video);
     if (this._onDemandRender) {
       this.busy = false;
@@ -255,16 +244,16 @@ const _JASSUB = class extends EventTarget {
       this._video = video;
       if (this._onDemandRender !== true) {
         this._playstate = video.paused;
-        video.addEventListener("timeupdate", this._timeupdate.bind(this), false);
-        video.addEventListener("progress", this._timeupdate.bind(this), false);
-        video.addEventListener("waiting", this._timeupdate.bind(this), false);
-        video.addEventListener("seeking", this._timeupdate.bind(this), false);
-        video.addEventListener("playing", this._timeupdate.bind(this), false);
-        video.addEventListener("ratechange", this.setRate.bind(this), false);
+        video.addEventListener("timeupdate", this._boundTimeUpdate, false);
+        video.addEventListener("progress", this._boundTimeUpdate, false);
+        video.addEventListener("waiting", this._boundTimeUpdate, false);
+        video.addEventListener("seeking", this._boundTimeUpdate, false);
+        video.addEventListener("playing", this._boundTimeUpdate, false);
+        video.addEventListener("ratechange", this._boundSetRate, false);
       }
       if (video.videoWidth > 0)
         this.resize();
-      video.addEventListener("resize", this.resize.bind(this));
+      video.addEventListener("resize", this._boundResize);
       if (typeof ResizeObserver !== "undefined") {
         if (!this._ro)
           this._ro = new ResizeObserver(() => this.resize());
@@ -412,14 +401,16 @@ const _JASSUB = class extends EventTarget {
   }
   sendMessage(target, data = {}, transferable) {
     if (transferable) {
-      this._worker.postMessage(__spreadValues({
+      this._worker.postMessage({
         target,
-        transferable
-      }, data), [...transferable]);
+        transferable,
+        ...data
+      }, [...transferable]);
     } else {
-      this._worker.postMessage(__spreadValues({
-        target
-      }, data));
+      this._worker.postMessage({
+        target,
+        ...data
+      });
     }
   }
   _fetchFromWorker(workerOptions, callback) {
@@ -465,13 +456,13 @@ const _JASSUB = class extends EventTarget {
     if (this._video) {
       if (this._ro)
         this._ro.unobserve(this._video);
-      this._video.removeEventListener("timeupdate", this._timeupdate);
-      this._video.removeEventListener("progress", this._timeupdate);
-      this._video.removeEventListener("waiting", this._timeupdate);
-      this._video.removeEventListener("seeking", this._timeupdate);
-      this._video.removeEventListener("playing", this._timeupdate);
-      this._video.removeEventListener("ratechange", this.setRate);
-      this._video.removeEventListener("resize", this.resize);
+      this._video.removeEventListener("timeupdate", this._boundTimeUpdate);
+      this._video.removeEventListener("progress", this._boundTimeUpdate);
+      this._video.removeEventListener("waiting", this._boundTimeUpdate);
+      this._video.removeEventListener("seeking", this._boundTimeUpdate);
+      this._video.removeEventListener("playing", this._boundTimeUpdate);
+      this._video.removeEventListener("ratechange", this._boundSetRate);
+      this._video.removeEventListener("resize", this._boundResize);
     }
   }
   destroy(err) {

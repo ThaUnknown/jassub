@@ -50,11 +50,8 @@ jobs:
         with:
           ref: gh-pages
 
-      - name: Remove old assets
-        run: rm -fr jassub/assets
-
       - name: Download nightly build
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: js
           path: jassub/assets

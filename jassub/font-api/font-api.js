@@ -9,7 +9,7 @@ fontselect.addEventListener('change', async ({ detail }) => {
   if (renderer) renderer.destroy()
   renderer = new JASSUB({
     video: document.querySelector('video'),
-    subUrl: '../subtitles/test.ass',
+    subUrl: '../../subtitles/test.ass',
     workerUrl: '../assets/jassub-worker.js',
     fallbackFont: detail[0].fullName,
     availableFonts: {

@@ -45,18 +45,21 @@ export default class JASSUB extends EventTarget {
     this.timeOffset = options.timeOffset || 0
     this._video = options.video
     this._canvasParent = null
-    if (this._video) {
+    
+    if (options.canvas || options.video) {
       this._canvasParent = document.createElement('div')
       this._canvasParent.className = 'JASSUB'
       this._canvasParent.style.position = 'relative'
+    } else {
+      this.destroy('Don\'t know where to render: you should give video or canvas in options.')
+    }
 
+    if (this._video) {
       if (this._video.nextSibling) {
         this._video.parentNode.insertBefore(this._canvasParent, this._video.nextSibling)
       } else {
         this._video.parentNode.appendChild(this._canvasParent)
       }
-    } else if (!this._canvas) {
-      this.destroy('Don\'t know where to render: you should give video or canvas in options.')
     }
 
     this._canvas = options.canvas || document.createElement('canvas')
@@ -108,7 +111,7 @@ export default class JASSUB extends EventTarget {
     this._boundResize = this.resize.bind(this)
     this._boundTimeUpdate = this._timeupdate.bind(this)
     this._boundSetRate = this.setRate.bind(this)
-    this.setVideo(options.video)
+    if (options.video) { this.setVideo(options.video) }
 
     if (this._onDemandRender) {
       this.busy = false

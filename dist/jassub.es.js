@@ -53,11 +53,16 @@ const _JASSUB = class extends EventTarget {
     this._onDemandRender = "requestVideoFrameCallback" in HTMLVideoElement.prototype && ((_c = options.onDemandRender) != null ? _c : true);
     this.timeOffset = options.timeOffset || 0;
     this._video = options.video;
-    this._canvasParent = null;
-    if (this._video) {
+    this._canvas = options.canvas;
+    if (this._video && !this._canvas) {
       this._canvasParent = document.createElement("div");
       this._canvasParent.className = "JASSUB";
       this._canvasParent.style.position = "relative";
+      this._canvas = document.createElement("canvas");
+      this._canvas.style.display = "block";
+      this._canvas.style.position = "absolute";
+      this._canvas.style.pointerEvents = "none";
+      this._canvasParent.appendChild(this._canvas);
       if (this._video.nextSibling) {
         this._video.parentNode.insertBefore(this._canvasParent, this._video.nextSibling);
       } else {
@@ -66,11 +71,6 @@ const _JASSUB = class extends EventTarget {
     } else if (!this._canvas) {
       this.destroy("Don't know where to render: you should give video or canvas in options.");
     }
-    this._canvas = options.canvas || document.createElement("canvas");
-    this._canvas.style.display = "block";
-    this._canvas.style.position = "absolute";
-    this._canvas.style.pointerEvents = "none";
-    this._canvasParent.appendChild(this._canvas);
     this._bufferCanvas = document.createElement("canvas");
     this._bufferCtx = this._bufferCanvas.getContext("2d", { desynchronized: true, willReadFrequently: true });
     this._canvasctrl = offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas;
@@ -109,7 +109,8 @@ const _JASSUB = class extends EventTarget {
     this._boundResize = this.resize.bind(this);
     this._boundTimeUpdate = this._timeupdate.bind(this);
     this._boundSetRate = this.setRate.bind(this);
-    this.setVideo(options.video);
+    if (this._video)
+      this.setVideo(options.video);
     if (this._onDemandRender) {
       this.busy = false;
       this._lastDemandTime = null;
@@ -126,7 +127,7 @@ const _JASSUB = class extends EventTarget {
         new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1);
       } catch (e) {
         console.log("detected that ImageData is not constructable despite browser saying so");
-        window.ImageData = function(data, width, height) {
+        self.ImageData = function(data, width, height) {
           const imageData = ctx1.createImageData(width, height);
           if (data)
             imageData.data.set(data);
@@ -156,17 +157,20 @@ const _JASSUB = class extends EventTarget {
     _JASSUB._hasAlphaBug = prePut[1] !== postPut[1];
     if (_JASSUB._hasAlphaBug)
       console.log("Detected a browser having issue with transparent pixels, applying workaround");
+    canvas1.remove();
     canvas2.remove();
   }
   resize(width = 0, height = 0, top = 0, left = 0) {
     let videoSize = null;
     if ((!width || !height) && this._video) {
       videoSize = this._getVideoPosition();
-      const newsize = this._computeCanvasSize((videoSize.width || 0) * (window.devicePixelRatio || 1), (videoSize.height || 0) * (window.devicePixelRatio || 1));
+      const newsize = this._computeCanvasSize((videoSize.width || 0) * (self.devicePixelRatio || 1), (videoSize.height || 0) * (self.devicePixelRatio || 1));
       width = newsize.width;
       height = newsize.height;
-      top = videoSize.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top);
-      left = videoSize.x;
+      if (this._canvasParent) {
+        top = videoSize.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top);
+        left = videoSize.x;
+      }
     }
     if (videoSize != null) {
       this._canvas.style.top = top + "px";
@@ -325,9 +329,9 @@ const _JASSUB = class extends EventTarget {
   _sendLocalFont(font) {
     try {
       queryLocalFonts().then((fontData) => {
-        const filtered = fontData && fontData.filter((obj) => obj.fullName.toLowerCase() === font);
-        if (filtered && filtered.length) {
-          filtered[0].blob().then((blob) => {
+        const font2 = fontData == null ? void 0 : fontData.find((obj) => obj.fullName.toLowerCase() === font2);
+        if (font2) {
+          font2.blob().then((blob) => {
             blob.arrayBuffer().then((buffer) => {
               this.addFont(new Uint8Array(buffer));
             });

@@ -487,10 +487,10 @@ export default class JASSUB extends EventTarget {
     this.sendMessage('addFont', { font })
   }
 
-  _sendLocalFont (font) {
+  _sendLocalFont (name) {
     try {
       queryLocalFonts().then(fontData => {
-        const font = fontData?.find(obj => obj.fullName.toLowerCase() === font)
+        const font = fontData?.find(obj => obj.fullName.toLowerCase() === name)
         if (font) {
           font.blob().then(blob => {
             blob.arrayBuffer().then(buffer => {
@@ -670,7 +670,7 @@ export default class JASSUB extends EventTarget {
    */
   destroy (err) {
     if (err) this._error(err)
-    if (this._video) this._video.parentNode.removeChild(this._canvasParent)
+    if (this._video && this._canvasParent) this._video.parentNode.removeChild(this._canvasParent)
     this._destroyed = true
     this._removeListeners()
     this.sendMessage('destroy')

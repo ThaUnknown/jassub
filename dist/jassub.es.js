@@ -326,12 +326,12 @@ const _JASSUB = class extends EventTarget {
   addFont(font) {
     this.sendMessage("addFont", { font });
   }
-  _sendLocalFont(font) {
+  _sendLocalFont(name) {
     try {
       queryLocalFonts().then((fontData) => {
-        const font2 = fontData == null ? void 0 : fontData.find((obj) => obj.fullName.toLowerCase() === font2);
-        if (font2) {
-          font2.blob().then((blob) => {
+        const font = fontData == null ? void 0 : fontData.find((obj) => obj.fullName.toLowerCase() === name);
+        if (font) {
+          font.blob().then((blob) => {
             blob.arrayBuffer().then((buffer) => {
               this.addFont(new Uint8Array(buffer));
             });
@@ -484,7 +484,7 @@ const _JASSUB = class extends EventTarget {
   destroy(err) {
     if (err)
       this._error(err);
-    if (this._video)
+    if (this._video && this._canvasParent)
       this._video.parentNode.removeChild(this._canvasParent);
     this._destroyed = true;
     this._removeListeners();

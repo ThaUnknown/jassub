@@ -648,7 +648,17 @@ export default class JASSUB extends EventTarget {
 
   _error (err) {
     if (!(err instanceof ErrorEvent)) this.dispatchEvent(new ErrorEvent('error', { message: err instanceof Error ? err.cause : err }))
-    throw err instanceof Error ? err : new Error(err instanceof ErrorEvent ? err.message : 'error', { cause: err })
+    if (!(err instanceof Error)) {
+      if (err instanceof ErrorEvent) {
+        // construct custom error with custom stacktrace, kinda hacky but very good for DX
+        const e = new Error(err.message)
+        e.stack = `Error: ${err.message}\n    at ${err.filename}:${err.lineno}:${err.colno}`
+        err = e
+      } else {
+        err = new Error('error', { cause: err })
+      }
+    }
+    console.error(err)
   }
 
   _removeListeners () {

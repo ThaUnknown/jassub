@@ -249,8 +249,13 @@ self.processRender = (result) => {
   } else {
     for (let image = result; image.ptr !== 0; image = image.next) {
       if (image.image) {
-        images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
-        buffers.push(buffer.slice(image.image, image.image + image.w * image.h * 4))
+        const img = { w: image.w, h: image.h, x: image.x, y: image.y, image: image.image }
+        if (!self.offscreenCanvasCtx) {
+          const buf = buffer.slice(image.image, image.image + image.w * image.h * 4)
+          buffers.push(buf)
+          img.image = buf
+        }
+        images.push(img)
       }
     }
     self.paintImages({ images, buffers, times: result.times, decodeStartTime })

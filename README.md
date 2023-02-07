@@ -13,6 +13,7 @@ JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>
 ## Features
 - Supports most SSA/ASS features (everything libass supports)
 - Supports all OpenType, TrueType and WOFF fonts, as well as embedded fonts
+- Supports anamorphic videos [(on browsers which support it)](https://caniuse.com/mdn-api_htmlvideoelement_requestvideoframecallback)
 - Capable of using local fonts [(on browsers which support it)](https://caniuse.com/mdn-api_window_querylocalfonts)
 - Works fast (all the heavy lifting is done by WebAssembly)
 - Is fully threaded (on browsers which support it, it's capable of working fully on a separate thread)

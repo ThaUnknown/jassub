@@ -155,10 +155,6 @@ self.setTrackByUrl = (data) => {
 self.resize = (width, height) => {
   self.width = width
   self.height = height
-  if (self.offscreenCanvas) {
-    self.offscreenCanvas.width = width
-    self.offscreenCanvas.height = height
-  }
   self.jassubObj.resizeCanvas(width, height)
 }
 
@@ -266,7 +262,7 @@ self.render = (time, force) => {
   const result = self.renderImageData(time, force)
   if (result.changed !== 0 || force) {
     self.processRender(result)
-  } else if (self.onDemandRender) {
+  } else {
     postMessage({
       target: 'unbusy'
     })
@@ -291,7 +287,12 @@ self.paintImages = (data) => {
   data.times.decodeTime = Date.now() - data.decodeStartTime
   if (self.offscreenCanvasCtx) {
     const drawStartTime = Date.now()
-    self.offscreenCanvasCtx.clearRect(0, 0, self.offscreenCanvas.width, self.offscreenCanvas.height)
+    if (self.offscreenCanvas.width !== self.width || self.offscreenCanvas.height !== self.height) {
+      self.offscreenCanvas.width = self.width
+      self.offscreenCanvas.height = self.height
+    } else {
+      self.offscreenCanvasCtx.clearRect(0, 0, self.width, self.height)
+    }
     for (const image of data.images) {
       if (image.image) {
         if (asyncRender) {
@@ -311,18 +312,18 @@ self.paintImages = (data) => {
       for (const key in data.times) total += data.times[key]
       console.log('Bitmaps: ' + data.images.length + ' Total: ' + Math.round(total) + 'ms', data.times)
     }
+    postMessage({
+      target: 'unbusy'
+    })
   } else {
     postMessage({
       target: 'render',
       async: asyncRender,
       images: data.images,
-      times: data.times
+      times: data.times,
+      width: self.width,
+      height: self.height
     }, data.buffers)
-  }
-  if (self.onDemandRender) {
-    postMessage({
-      target: 'unbusy'
-    })
   }
 }
 
@@ -471,8 +472,8 @@ self.init = data => {
 
 self.canvas = data => {
   if (data.width == null) throw new Error('Invalid canvas size specified')
-  self.resize(data.width, data.height)
-  self.renderLoop()
+  self.resize(data.width, data.height, data.force)
+  if (data.force) self.render(self.lastCurrentTime)
 }
 
 self.video = data => {

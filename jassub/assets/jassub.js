@@ -995,6 +995,8 @@ export default class JASSUB extends EventTarget {
 
     this.timeOffset = options.timeOffset || 0
     this._video = options.video
+    this._videoHeight = 0
+    this._videoWidth = 0
     this._canvas = options.canvas
     if (this._video && !this._canvas) {
       this._canvasParent = document.createElement('div')
@@ -1037,8 +1039,8 @@ export default class JASSUB extends EventTarget {
       target: 'init',
       asyncRender,
       onDemandRender: this._onDemandRender,
-      width: this._canvas.width,
-      height: this._canvas.height,
+      width: this._canvasctrl.width,
+      height: this._canvasctrl.height,
       preMain: true,
       blendMode,
       subUrl: options.subUrl,
@@ -1130,8 +1132,9 @@ export default class JASSUB extends EventTarget {
    * @param  {Number} [height=0]
    * @param  {Number} [top=0]
    * @param  {Number} [left=0]
+   * @param  {Boolean} [force=true]
    */
-  resize (width = 0, height = 0, top = 0, left = 0) {
+  resize (width = 0, height = 0, top = 0, left = 0, force = false) {
     let videoSize = null
     if ((!width || !height) && this._video) {
       videoSize = this._getVideoPosition()
@@ -1150,30 +1153,11 @@ export default class JASSUB extends EventTarget {
       this._canvas.style.width = videoSize.width + 'px'
       this._canvas.style.height = videoSize.height + 'px'
     }
-    if (!(this._canvasctrl.width === width && this._canvasctrl.height === height)) {
-      // only re-paint if dimensions actually changed
-      // dont spam re-paints like crazy when re-sizing with animations, but still update instantly without them
-      if (this._resizeTimeoutBuffer) {
-        clearTimeout(this._resizeTimeoutBuffer)
-        this._resizeTimeoutBuffer = setTimeout(() => {
-          this._resizeTimeoutBuffer = undefined
-          this._canvasctrl.width = width
-          this._canvasctrl.height = height
-          this.sendMessage('canvas', { width, height })
-        }, 100)
-      } else {
-        this._canvasctrl.width = width
-        this._canvasctrl.height = height
-        this.sendMessage('canvas', { width, height })
-        this._resizeTimeoutBuffer = setTimeout(() => {
-          this._resizeTimeoutBuffer = undefined
-        }, 100)
-      }
-    }
+    this.sendMessage('canvas', { width, height, force })
   }
 
-  _getVideoPosition (customWidth, customHeight) {
-    const videoRatio = (customWidth || this._video.videoWidth) / (customHeight || this._video.videoHeight)
+  _getVideoPosition () {
+    const videoRatio = (this._videoWidth || this._video.videoWidth) / (this._videoHeight || this._video.videoHeight)
     const { offsetWidth, offsetHeight } = this._video
     const elementRatio = offsetWidth / offsetHeight
     let width = offsetWidth
@@ -1247,9 +1231,9 @@ export default class JASSUB extends EventTarget {
         video.addEventListener('seeking', this._boundTimeUpdate, false)
         video.addEventListener('playing', this._boundTimeUpdate, false)
         video.addEventListener('ratechange', this._boundSetRate, false)
+        video.addEventListener('resize', this._boundResize)
       }
       if (video.videoWidth > 0) this.resize()
-      video.addEventListener('resize', this._boundResize)
       // Support Element Resize Observer
       if (typeof ResizeObserver !== 'undefined') {
         if (!this._ro) this._ro = new ResizeObserver(() => this.resize())
@@ -1498,17 +1482,22 @@ export default class JASSUB extends EventTarget {
 
   _demandRender ({ mediaTime, width, height }) {
     this._lastDemandTime = null
-    const { width: displayWidth, height: displayHeight } = this._getVideoPosition(width, height)
-    this.sendMessage('demand', { time: mediaTime + this.timeOffset, ...this._computeCanvasSize(displayWidth, displayHeight) })
+    if (width !== this._videoWidth || height !== this._videoHeight) {
+      this._videoWidth = width
+      this._videoHeight = height
+      this.resize()
+    }
+    this.sendMessage('demand', { time: mediaTime + this.timeOffset })
   }
 
   _render ({ images, async, times, width, height }) {
     const drawStartTime = Date.now()
-    if (width && height) {
+    if (this._canvasctrl.width !== width || this._canvasctrl.height !== height) {
       this._canvasctrl.width = width
       this._canvasctrl.height = height
+    } else {
+      this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
     }
-    this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
     for (const image of images) {
       if (image.image) {
         if (async) {

@@ -1135,7 +1135,7 @@ export default class JASSUB extends EventTarget {
     let videoSize = null
     if ((!width || !height) && this._video) {
       videoSize = this._getVideoPosition()
-      const newsize = this._computeCanvasSize((videoSize.width || 0) * (self.devicePixelRatio || 1), (videoSize.height || 0) * (self.devicePixelRatio || 1))
+      const newsize = this._computeCanvasSize(videoSize.width || 0, videoSize.height || 0)
       width = newsize.width
       height = newsize.height
       if (this._canvasParent) {
@@ -1172,8 +1172,8 @@ export default class JASSUB extends EventTarget {
     }
   }
 
-  _getVideoPosition () {
-    const videoRatio = this._video.videoWidth / this._video.videoHeight
+  _getVideoPosition (customWidth, customHeight) {
+    const videoRatio = (customWidth || this._video.videoWidth) / (customHeight || this._video.videoHeight)
     const { offsetWidth, offsetHeight } = this._video
     const elementRatio = offsetWidth / offsetHeight
     let width = offsetWidth
@@ -1192,6 +1192,9 @@ export default class JASSUB extends EventTarget {
 
   _computeCanvasSize (width = 0, height = 0) {
     const scalefactor = this.prescaleFactor <= 0 ? 1.0 : this.prescaleFactor
+    const ratio = self.devicePixelRatio || 1
+    width = width * ratio
+    height = height * ratio
 
     if (height <= 0 || width <= 0) {
       width = 0
@@ -1495,7 +1498,8 @@ export default class JASSUB extends EventTarget {
 
   _demandRender ({ mediaTime, width, height }) {
     this._lastDemandTime = null
-    this.sendMessage('demand', { time: mediaTime + this.timeOffset, width, height })
+    const { width: displayWidth, height: displayHeight } = this._getVideoPosition(width, height)
+    this.sendMessage('demand', { time: mediaTime + this.timeOffset, ...this._computeCanvasSize(displayWidth, displayHeight) })
   }
 
   _render ({ images, async, times, width, height }) {
@@ -1503,9 +1507,8 @@ export default class JASSUB extends EventTarget {
     if (width && height) {
       this._canvasctrl.width = width
       this._canvasctrl.height = height
-    } else {
-      this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
     }
+    this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
     for (const image of images) {
       if (image.image) {
         if (async) {

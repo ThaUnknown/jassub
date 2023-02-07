@@ -46,6 +46,8 @@ export default class JASSUB extends EventTarget {
 
     this.timeOffset = options.timeOffset || 0
     this._video = options.video
+    this._videoHeight = 0
+    this._videoWidth = 0
     this._canvas = options.canvas
     if (this._video && !this._canvas) {
       this._canvasParent = document.createElement('div')
@@ -88,8 +90,8 @@ export default class JASSUB extends EventTarget {
       target: 'init',
       asyncRender,
       onDemandRender: this._onDemandRender,
-      width: this._canvas.width,
-      height: this._canvas.height,
+      width: this._canvasctrl.width,
+      height: this._canvasctrl.height,
       preMain: true,
       blendMode,
       subUrl: options.subUrl,
@@ -181,54 +183,41 @@ export default class JASSUB extends EventTarget {
    * @param  {Number} [height=0]
    * @param  {Number} [top=0]
    * @param  {Number} [left=0]
+   * @param  {Boolean} [force=false]
    */
-  resize (width = 0, height = 0, top = 0, left = 0) {
-    let videoSize = null
+  resize (width = 0, height = 0, top = 0, left = 0, force = this._video?.paused) {
     if ((!width || !height) && this._video) {
-      videoSize = this._getVideoPosition()
-      const newsize = this._computeCanvasSize((videoSize.width || 0) * (self.devicePixelRatio || 1), (videoSize.height || 0) * (self.devicePixelRatio || 1))
-      width = newsize.width
-      height = newsize.height
+      const videoSize = this._getVideoPosition()
+      let renderSize = null
+      // support anamorphic video
+      if (this._videoWidth) {
+        const widthRatio = this._video.videoWidth / this._videoWidth
+        const heightRatio = this._video.videoHeight / this._videoHeight
+        renderSize = this._computeCanvasSize((videoSize.width || 0) / widthRatio, (videoSize.height || 0) / heightRatio)
+      } else {
+        renderSize = this._computeCanvasSize(videoSize.width || 0, videoSize.height || 0)
+      }
+      width = renderSize.width
+      height = renderSize.height
       if (this._canvasParent) {
         top = videoSize.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top)
         left = videoSize.x
       }
-    }
-
-    if (videoSize != null) {
-      this._canvas.style.top = top + 'px'
-      this._canvas.style.left = left + 'px'
       this._canvas.style.width = videoSize.width + 'px'
       this._canvas.style.height = videoSize.height + 'px'
     }
-    if (!(this._canvasctrl.width === width && this._canvasctrl.height === height)) {
-      // only re-paint if dimensions actually changed
-      // dont spam re-paints like crazy when re-sizing with animations, but still update instantly without them
-      if (this._resizeTimeoutBuffer) {
-        clearTimeout(this._resizeTimeoutBuffer)
-        this._resizeTimeoutBuffer = setTimeout(() => {
-          this._resizeTimeoutBuffer = undefined
-          this._canvasctrl.width = width
-          this._canvasctrl.height = height
-          this.sendMessage('canvas', { width, height })
-        }, 100)
-      } else {
-        this._canvasctrl.width = width
-        this._canvasctrl.height = height
-        this.sendMessage('canvas', { width, height })
-        this._resizeTimeoutBuffer = setTimeout(() => {
-          this._resizeTimeoutBuffer = undefined
-        }, 100)
-      }
-    }
+
+    this._canvas.style.top = top + 'px'
+    this._canvas.style.left = left + 'px'
+    this.sendMessage('canvas', { width, height, force: force && this.busy === false })
   }
 
-  _getVideoPosition () {
-    const videoRatio = this._video.videoWidth / this._video.videoHeight
+  _getVideoPosition (width = this._video.videoWidth, height = this._video.videoHeight) {
+    const videoRatio = width / height
     const { offsetWidth, offsetHeight } = this._video
     const elementRatio = offsetWidth / offsetHeight
-    let width = offsetWidth
-    let height = offsetHeight
+    width = offsetWidth
+    height = offsetHeight
     if (elementRatio > videoRatio) {
       width = Math.floor(offsetHeight * videoRatio)
     } else {
@@ -243,13 +232,14 @@ export default class JASSUB extends EventTarget {
 
   _computeCanvasSize (width = 0, height = 0) {
     const scalefactor = this.prescaleFactor <= 0 ? 1.0 : this.prescaleFactor
+    const ratio = self.devicePixelRatio || 1
 
     if (height <= 0 || width <= 0) {
       width = 0
       height = 0
     } else {
       const sgn = scalefactor < 1 ? -1 : 1
-      let newH = height
+      let newH = height * ratio
       if (sgn * newH * scalefactor <= sgn * this.prescaleHeightLimit) {
         newH *= scalefactor
       } else if (sgn * newH < sgn * this.prescaleHeightLimit) {
@@ -258,7 +248,7 @@ export default class JASSUB extends EventTarget {
 
       if (this.maxRenderHeight > 0 && newH > this.maxRenderHeight) newH = this.maxRenderHeight
 
-      width *= newH / height
+      width *= ratio * newH / height
       height = newH
     }
 
@@ -295,9 +285,9 @@ export default class JASSUB extends EventTarget {
         video.addEventListener('seeking', this._boundTimeUpdate, false)
         video.addEventListener('playing', this._boundTimeUpdate, false)
         video.addEventListener('ratechange', this._boundSetRate, false)
+        video.addEventListener('resize', this._boundResize)
       }
       if (video.videoWidth > 0) this.resize()
-      video.addEventListener('resize', this._boundResize)
       // Support Element Resize Observer
       if (typeof ResizeObserver !== 'undefined') {
         if (!this._ro) this._ro = new ResizeObserver(() => this.resize())
@@ -533,25 +523,36 @@ export default class JASSUB extends EventTarget {
     }
   }
 
-  _handleRVFC (now, { mediaTime }) {
+  _handleRVFC (now, { mediaTime, width, height }) {
     if (this._destroyed) return null
     if (this.busy) {
-      this._lastDemandTime = mediaTime
+      this._lastDemandTime = { mediaTime, width, height }
     } else {
       this.busy = true
-      this._demandRender(mediaTime)
+      this._demandRender({ mediaTime, width, height })
     }
     this._video.requestVideoFrameCallback(this._handleRVFC.bind(this))
   }
 
-  _demandRender (time) {
+  _demandRender ({ mediaTime, width, height }) {
     this._lastDemandTime = null
-    this.sendMessage('demand', { time: time + this.timeOffset })
+    if (width !== this._videoWidth || height !== this._videoHeight) {
+      this._videoWidth = width
+      this._videoHeight = height
+      this.resize()
+    }
+    this.sendMessage('demand', { time: mediaTime + this.timeOffset })
   }
 
-  _render ({ images, async, times }) {
+  _render ({ images, async, times, width, height }) {
+    this._unbusy()
     const drawStartTime = Date.now()
-    this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
+    if (this._canvasctrl.width !== width || this._canvasctrl.height !== height) {
+      this._canvasctrl.width = width
+      this._canvasctrl.height = height
+    } else {
+      this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
+    }
     for (const image of images) {
       if (image.image) {
         if (async) {

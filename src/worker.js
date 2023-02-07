@@ -287,8 +287,9 @@ self.paintImages = (data) => {
   data.times.decodeTime = Date.now() - data.decodeStartTime
   if (self.offscreenCanvasCtx) {
     const drawStartTime = Date.now()
-    if (self.offscreenCanvas.width !== self.width || self.offscreenCanvas.height !== self.height) {
-      self.offscreenCanvas.width = self.width
+    // force updates
+    self.offscreenCanvas.width = self.width
+    if (self.offscreenCanvas.height !== self.height) {
       self.offscreenCanvas.height = self.height
     } else {
       self.offscreenCanvasCtx.clearRect(0, 0, self.width, self.height)

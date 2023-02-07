@@ -1482,25 +1482,30 @@ export default class JASSUB extends EventTarget {
     }
   }
 
-  _handleRVFC (now, { mediaTime }) {
+  _handleRVFC (now, { mediaTime, width, height }) {
     if (this._destroyed) return null
     if (this.busy) {
-      this._lastDemandTime = mediaTime
+      this._lastDemandTime = { mediaTime, width, height }
     } else {
       this.busy = true
-      this._demandRender(mediaTime)
+      this._demandRender({ mediaTime, width, height })
     }
     this._video.requestVideoFrameCallback(this._handleRVFC.bind(this))
   }
 
-  _demandRender (time) {
+  _demandRender ({ mediaTime, width, height }) {
     this._lastDemandTime = null
-    this.sendMessage('demand', { time: time + this.timeOffset })
+    this.sendMessage('demand', { time: mediaTime + this.timeOffset, width, height })
   }
 
-  _render ({ images, async, times }) {
+  _render ({ images, async, times, width, height }) {
     const drawStartTime = Date.now()
-    this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
+    if (width && height) {
+      this._canvasctrl.width = width
+      this._canvasctrl.height = height
+    } else {
+      this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
+    }
     for (const image of images) {
       if (image.image) {
         if (async) {
@@ -1598,13 +1603,10 @@ export default class JASSUB extends EventTarget {
   }
 
   _error (err) {
-    if (!(err instanceof ErrorEvent)) this.dispatchEvent(new ErrorEvent('error', { message: err instanceof Error ? err.cause : err }))
+    this.dispatchEvent(err instanceof ErrorEvent ? err : new ErrorEvent('error', { cause: err instanceof Error ? err.cause : err }))
     if (!(err instanceof Error)) {
       if (err instanceof ErrorEvent) {
-        // construct custom error with custom stacktrace, kinda hacky but very good for DX
-        const e = new Error(err.message)
-        e.stack = `Error: ${err.message}\n    at ${err.filename}:${err.lineno}:${err.colno}`
-        err = e
+        err = err.error
       } else {
         err = new Error('error', { cause: err })
       }

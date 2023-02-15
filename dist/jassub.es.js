@@ -389,9 +389,8 @@ const _JASSUB = class extends EventTarget {
     if (this._canvasctrl.width !== width || this._canvasctrl.height !== height) {
       this._canvasctrl.width = width;
       this._canvasctrl.height = height;
-    } else {
-      this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height);
     }
+    this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height);
     for (const image of images) {
       if (image.image) {
         if (async) {

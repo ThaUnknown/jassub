@@ -41,7 +41,7 @@ if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPla
 }
 const _JASSUB = class extends EventTarget {
   constructor(options = {}) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c;
     super();
     if (!globalThis.Worker) {
       this.destroy("Worker not supported");
@@ -53,11 +53,18 @@ const _JASSUB = class extends EventTarget {
     this._onDemandRender = "requestVideoFrameCallback" in HTMLVideoElement.prototype && ((_c = options.onDemandRender) != null ? _c : true);
     this.timeOffset = options.timeOffset || 0;
     this._video = options.video;
-    this._canvasParent = null;
-    if (this._video) {
+    this._videoHeight = 0;
+    this._videoWidth = 0;
+    this._canvas = options.canvas;
+    if (this._video && !this._canvas) {
       this._canvasParent = document.createElement("div");
       this._canvasParent.className = "JASSUB";
       this._canvasParent.style.position = "relative";
+      this._canvas = document.createElement("canvas");
+      this._canvas.style.display = "block";
+      this._canvas.style.position = "absolute";
+      this._canvas.style.pointerEvents = "none";
+      this._canvasParent.appendChild(this._canvas);
       if (this._video.nextSibling) {
         this._video.parentNode.insertBefore(this._canvasParent, this._video.nextSibling);
       } else {
@@ -66,15 +73,10 @@ const _JASSUB = class extends EventTarget {
     } else if (!this._canvas) {
       this.destroy("Don't know where to render: you should give video or canvas in options.");
     }
-    this._canvas = options.canvas || document.createElement("canvas");
-    this._canvas.style.display = "block";
-    this._canvas.style.position = "absolute";
-    this._canvas.style.pointerEvents = "none";
-    this._canvasParent.appendChild(this._canvas);
     this._bufferCanvas = document.createElement("canvas");
-    this._bufferCtx = this._bufferCanvas.getContext("2d");
+    this._bufferCtx = this._bufferCanvas.getContext("2d", { desynchronized: true, willReadFrequently: true });
     this._canvasctrl = offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas;
-    this._ctx = !offscreenRender && this._canvasctrl.getContext("2d");
+    this._ctx = !offscreenRender && this._canvasctrl.getContext("2d", { desynchronized: true });
     this._lastRenderTime = 0;
     this.debug = !!options.debug;
     this.prescaleFactor = options.prescaleFactor || 1;
@@ -83,38 +85,44 @@ const _JASSUB = class extends EventTarget {
     this._worker = new Worker(_JASSUB._supportsWebAssembly ? options.workerUrl || "jassub-worker.js" : options.legacyWorkerUrl || "jassub-worker-legacy.js");
     this._worker.onmessage = (e) => this._onmessage(e);
     this._worker.onerror = (e) => this._error(e);
-    this._worker.postMessage({
-      target: "init",
-      asyncRender,
-      onDemandRender: this._onDemandRender,
-      width: this._canvas.width,
-      height: this._canvas.height,
-      preMain: true,
-      blendMode,
-      subUrl: options.subUrl,
-      subContent: options.subContent || null,
-      fonts: options.fonts || [],
-      availableFonts: options.availableFonts || { "liberation sans": "./default.woff2" },
-      fallbackFont: options.fallbackFont || "liberation sans",
-      debug: this.debug,
-      targetFps: options.targetFps || 24,
-      dropAllAnimations: options.dropAllAnimations,
-      libassMemoryLimit: options.libassMemoryLimit || 0,
-      libassGlyphLimit: options.libassGlyphLimit || 0,
-      hasAlphaBug: _JASSUB._hasAlphaBug,
-      useLocalFonts: "queryLocalFonts" in self && ((_d = options.useLocalFonts) != null ? _d : true)
-    });
-    if (offscreenRender === true)
-      this.sendMessage("offscreenCanvas", null, [this._canvasctrl]);
-    this._boundResize = this.resize.bind(this);
-    this._boundTimeUpdate = this._timeupdate.bind(this);
-    this._boundSetRate = this.setRate.bind(this);
-    this.setVideo(options.video);
-    if (this._onDemandRender) {
-      this.busy = false;
-      this._lastDemandTime = null;
-      (_e = this._video) == null ? void 0 : _e.requestVideoFrameCallback(this._handleRVFC.bind(this));
-    }
+    this._init = () => {
+      var _a2, _b2;
+      if (this._destroyed)
+        return;
+      this._worker.postMessage({
+        target: "init",
+        asyncRender,
+        onDemandRender: this._onDemandRender,
+        width: this._canvasctrl.width,
+        height: this._canvasctrl.height,
+        preMain: true,
+        blendMode,
+        subUrl: options.subUrl,
+        subContent: options.subContent || null,
+        fonts: options.fonts || [],
+        availableFonts: options.availableFonts || { "liberation sans": "./default.woff2" },
+        fallbackFont: options.fallbackFont || "liberation sans",
+        debug: this.debug,
+        targetFps: options.targetFps || 24,
+        dropAllAnimations: options.dropAllAnimations,
+        libassMemoryLimit: options.libassMemoryLimit || 0,
+        libassGlyphLimit: options.libassGlyphLimit || 0,
+        hasAlphaBug: _JASSUB._hasAlphaBug,
+        useLocalFonts: "queryLocalFonts" in self && ((_a2 = options.useLocalFonts) != null ? _a2 : true)
+      });
+      if (offscreenRender === true)
+        this.sendMessage("offscreenCanvas", null, [this._canvasctrl]);
+      this._boundResize = this.resize.bind(this);
+      this._boundTimeUpdate = this._timeupdate.bind(this);
+      this._boundSetRate = this.setRate.bind(this);
+      if (this._video)
+        this.setVideo(options.video);
+      if (this._onDemandRender) {
+        this.busy = false;
+        this._lastDemandTime = null;
+        (_b2 = this._video) == null ? void 0 : _b2.requestVideoFrameCallback(this._handleRVFC.bind(this));
+      }
+    };
   }
   static _test() {
     if (_JASSUB._supportsWebAssembly !== null)
@@ -126,7 +134,7 @@ const _JASSUB = class extends EventTarget {
         new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1);
       } catch (e) {
         console.log("detected that ImageData is not constructable despite browser saying so");
-        window.ImageData = function(data, width, height) {
+        self.ImageData = function(data, width, height) {
           const imageData = ctx1.createImageData(width, height);
           if (data)
             imageData.data.set(data);
@@ -137,15 +145,14 @@ const _JASSUB = class extends EventTarget {
     try {
       if (typeof WebAssembly === "object" && typeof WebAssembly.instantiate === "function") {
         const module = new WebAssembly.Module(Uint8Array.of(0, 97, 115, 109, 1, 0, 0, 0));
-        if (module instanceof WebAssembly.Module) {
+        if (module instanceof WebAssembly.Module)
           _JASSUB._supportsWebAssembly = new WebAssembly.Instance(module) instanceof WebAssembly.Instance;
-        }
       }
     } catch (e) {
       _JASSUB._supportsWebAssembly = false;
     }
     const canvas2 = document.createElement("canvas");
-    const ctx2 = canvas2.getContext("2d");
+    const ctx2 = canvas2.getContext("2d", { willReadFrequently: true });
     canvas1.width = canvas2.width = 1;
     canvas1.height = canvas2.height = 1;
     ctx1.clearRect(0, 0, 1, 1);
@@ -157,49 +164,39 @@ const _JASSUB = class extends EventTarget {
     _JASSUB._hasAlphaBug = prePut[1] !== postPut[1];
     if (_JASSUB._hasAlphaBug)
       console.log("Detected a browser having issue with transparent pixels, applying workaround");
+    canvas1.remove();
     canvas2.remove();
   }
-  resize(width = 0, height = 0, top = 0, left = 0) {
-    let videoSize = null;
+  resize(width = 0, height = 0, top = 0, left = 0, force = ((_a) => (_a = this._video) == null ? void 0 : _a.paused)()) {
     if ((!width || !height) && this._video) {
-      videoSize = this._getVideoPosition();
-      const newsize = this._computeCanvasSize((videoSize.width || 0) * (window.devicePixelRatio || 1), (videoSize.height || 0) * (window.devicePixelRatio || 1));
-      width = newsize.width;
-      height = newsize.height;
-      top = videoSize.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top);
-      left = videoSize.x;
-    }
-    if (videoSize != null) {
-      this._canvas.style.top = top + "px";
-      this._canvas.style.left = left + "px";
+      const videoSize = this._getVideoPosition();
+      let renderSize = null;
+      if (this._videoWidth) {
+        const widthRatio = this._video.videoWidth / this._videoWidth;
+        const heightRatio = this._video.videoHeight / this._videoHeight;
+        renderSize = this._computeCanvasSize((videoSize.width || 0) / widthRatio, (videoSize.height || 0) / heightRatio);
+      } else {
+        renderSize = this._computeCanvasSize(videoSize.width || 0, videoSize.height || 0);
+      }
+      width = renderSize.width;
+      height = renderSize.height;
+      if (this._canvasParent) {
+        top = videoSize.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top);
+        left = videoSize.x;
+      }
       this._canvas.style.width = videoSize.width + "px";
       this._canvas.style.height = videoSize.height + "px";
     }
-    if (!(this._canvasctrl.width === width && this._canvasctrl.height === height)) {
-      if (this._resizeTimeoutBuffer) {
-        clearTimeout(this._resizeTimeoutBuffer);
-        this._resizeTimeoutBuffer = setTimeout(() => {
-          this._resizeTimeoutBuffer = void 0;
-          this._canvasctrl.width = width;
-          this._canvasctrl.height = height;
-          this.sendMessage("canvas", { width, height });
-        }, 100);
-      } else {
-        this._canvasctrl.width = width;
-        this._canvasctrl.height = height;
-        this.sendMessage("canvas", { width, height });
-        this._resizeTimeoutBuffer = setTimeout(() => {
-          this._resizeTimeoutBuffer = void 0;
-        }, 100);
-      }
-    }
+    this._canvas.style.top = top + "px";
+    this._canvas.style.left = left + "px";
+    this.sendMessage("canvas", { width, height, force: force && this.busy === false });
   }
-  _getVideoPosition() {
-    const videoRatio = this._video.videoWidth / this._video.videoHeight;
+  _getVideoPosition(width = this._video.videoWidth, height = this._video.videoHeight) {
+    const videoRatio = width / height;
     const { offsetWidth, offsetHeight } = this._video;
     const elementRatio = offsetWidth / offsetHeight;
-    let width = offsetWidth;
-    let height = offsetHeight;
+    width = offsetWidth;
+    height = offsetHeight;
     if (elementRatio > videoRatio) {
       width = Math.floor(offsetHeight * videoRatio);
     } else {
@@ -211,12 +208,13 @@ const _JASSUB = class extends EventTarget {
   }
   _computeCanvasSize(width = 0, height = 0) {
     const scalefactor = this.prescaleFactor <= 0 ? 1 : this.prescaleFactor;
+    const ratio = self.devicePixelRatio || 1;
     if (height <= 0 || width <= 0) {
       width = 0;
       height = 0;
     } else {
       const sgn = scalefactor < 1 ? -1 : 1;
-      let newH = height;
+      let newH = height * ratio;
       if (sgn * newH * scalefactor <= sgn * this.prescaleHeightLimit) {
         newH *= scalefactor;
       } else if (sgn * newH < sgn * this.prescaleHeightLimit) {
@@ -224,7 +222,7 @@ const _JASSUB = class extends EventTarget {
       }
       if (this.maxRenderHeight > 0 && newH > this.maxRenderHeight)
         newH = this.maxRenderHeight;
-      width *= newH / height;
+      width *= ratio * newH / height;
       height = newH;
     }
     return { width, height };
@@ -254,10 +252,10 @@ const _JASSUB = class extends EventTarget {
         video.addEventListener("seeking", this._boundTimeUpdate, false);
         video.addEventListener("playing", this._boundTimeUpdate, false);
         video.addEventListener("ratechange", this._boundSetRate, false);
+        video.addEventListener("resize", this._boundResize);
       }
       if (video.videoWidth > 0)
         this.resize();
-      video.addEventListener("resize", this._boundResize);
       if (typeof ResizeObserver !== "undefined") {
         if (!this._ro)
           this._ro = new ResizeObserver(() => this.resize());
@@ -323,12 +321,12 @@ const _JASSUB = class extends EventTarget {
   addFont(font) {
     this.sendMessage("addFont", { font });
   }
-  _sendLocalFont(font) {
+  _sendLocalFont(name) {
     try {
       queryLocalFonts().then((fontData) => {
-        const filtered = fontData && fontData.filter((obj) => obj.fullName.toLowerCase() === font);
-        if (filtered && filtered.length) {
-          filtered[0].blob().then((blob) => {
+        const font = fontData == null ? void 0 : fontData.find((obj) => obj.fullName.toLowerCase() === name);
+        if (font) {
+          font.blob().then((blob) => {
             blob.arrayBuffer().then((buffer) => {
               this.addFont(new Uint8Array(buffer));
             });
@@ -362,24 +360,35 @@ const _JASSUB = class extends EventTarget {
       this.busy = false;
     }
   }
-  _handleRVFC(now, { mediaTime }) {
+  _handleRVFC(now, { mediaTime, width, height }) {
     if (this._destroyed)
       return null;
     if (this.busy) {
-      this._lastDemandTime = mediaTime;
+      this._lastDemandTime = { mediaTime, width, height };
     } else {
       this.busy = true;
-      this._demandRender(mediaTime);
+      this._demandRender({ mediaTime, width, height });
     }
     this._video.requestVideoFrameCallback(this._handleRVFC.bind(this));
   }
-  _demandRender(time) {
+  _demandRender({ mediaTime, width, height }) {
     this._lastDemandTime = null;
-    this.sendMessage("demand", { time: time + this.timeOffset });
+    if (width !== this._videoWidth || height !== this._videoHeight) {
+      this._videoWidth = width;
+      this._videoHeight = height;
+      this.resize();
+    }
+    this.sendMessage("demand", { time: mediaTime + this.timeOffset });
   }
-  _render({ images, async, times }) {
+  _render({ images, async, times, width, height }) {
+    this._unbusy();
     const drawStartTime = Date.now();
-    this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height);
+    if (this._canvasctrl.width !== width || this._canvasctrl.height !== height) {
+      this._canvasctrl.width = width;
+      this._canvasctrl.height = height;
+    } else {
+      this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height);
+    }
     for (const image of images) {
       if (image.image) {
         if (async) {
@@ -410,6 +419,7 @@ const _JASSUB = class extends EventTarget {
     return uint8;
   }
   _ready() {
+    this._init();
     this.dispatchEvent(new CustomEvent("ready"));
   }
   sendMessage(target, data = {}, transferable) {
@@ -461,9 +471,15 @@ const _JASSUB = class extends EventTarget {
       this["_" + data.target](data);
   }
   _error(err) {
-    if (!(err instanceof ErrorEvent))
-      this.dispatchEvent(new ErrorEvent("error", { message: err instanceof Error ? err.cause : err }));
-    throw err instanceof Error ? err : new Error(err instanceof ErrorEvent ? err.message : "error", { cause: err });
+    this.dispatchEvent(err instanceof ErrorEvent ? err : new ErrorEvent("error", { cause: err instanceof Error ? err.cause : err }));
+    if (!(err instanceof Error)) {
+      if (err instanceof ErrorEvent) {
+        err = err.error;
+      } else {
+        err = new Error("error", { cause: err });
+      }
+    }
+    console.error(err);
   }
   _removeListeners() {
     if (this._video) {
@@ -481,7 +497,7 @@ const _JASSUB = class extends EventTarget {
   destroy(err) {
     if (err)
       this._error(err);
-    if (this._video)
+    if (this._video && this._canvasParent)
       this._video.parentNode.removeChild(this._canvasParent);
     this._destroyed = true;
     this._removeListeners();

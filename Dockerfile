@@ -10,7 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         itstool \
         pkg-config \
         python3 \
-        python3-ply \
         gettext \
         autopoint \
         automake \

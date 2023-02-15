@@ -223,7 +223,6 @@ This library has a lot of methods and properties, however many aren't made for m
 - gettext
 - ragel - Required by Harfbuzz
 - itstool - Required by Fontconfig
-- python3-ply - Required by WebIDL
 - gperf - Required by Fontconfig
 - licensecheck
 

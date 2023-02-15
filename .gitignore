@@ -15,8 +15,6 @@ lib/expat/xmlwf/xmlwf
 venv/
 node_modules/
 build/lib/*
-src/JASSUBInterface.cpp
-src/JASSUBInterface.js
 dist/js
 dist/libraries
 dist/license

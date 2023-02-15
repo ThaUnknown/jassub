@@ -41,7 +41,7 @@ if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPla
 }
 const _JASSUB = class extends EventTarget {
   constructor(options = {}) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c;
     super();
     if (!globalThis.Worker) {
       this.destroy("Worker not supported");
@@ -85,39 +85,44 @@ const _JASSUB = class extends EventTarget {
     this._worker = new Worker(_JASSUB._supportsWebAssembly ? options.workerUrl || "jassub-worker.js" : options.legacyWorkerUrl || "jassub-worker-legacy.js");
     this._worker.onmessage = (e) => this._onmessage(e);
     this._worker.onerror = (e) => this._error(e);
-    this._worker.postMessage({
-      target: "init",
-      asyncRender,
-      onDemandRender: this._onDemandRender,
-      width: this._canvasctrl.width,
-      height: this._canvasctrl.height,
-      preMain: true,
-      blendMode,
-      subUrl: options.subUrl,
-      subContent: options.subContent || null,
-      fonts: options.fonts || [],
-      availableFonts: options.availableFonts || { "liberation sans": "./default.woff2" },
-      fallbackFont: options.fallbackFont || "liberation sans",
-      debug: this.debug,
-      targetFps: options.targetFps || 24,
-      dropAllAnimations: options.dropAllAnimations,
-      libassMemoryLimit: options.libassMemoryLimit || 0,
-      libassGlyphLimit: options.libassGlyphLimit || 0,
-      hasAlphaBug: _JASSUB._hasAlphaBug,
-      useLocalFonts: "queryLocalFonts" in self && ((_d = options.useLocalFonts) != null ? _d : true)
-    });
-    if (offscreenRender === true)
-      this.sendMessage("offscreenCanvas", null, [this._canvasctrl]);
-    this._boundResize = this.resize.bind(this);
-    this._boundTimeUpdate = this._timeupdate.bind(this);
-    this._boundSetRate = this.setRate.bind(this);
-    if (this._video)
-      this.setVideo(options.video);
-    if (this._onDemandRender) {
-      this.busy = false;
-      this._lastDemandTime = null;
-      (_e = this._video) == null ? void 0 : _e.requestVideoFrameCallback(this._handleRVFC.bind(this));
-    }
+    this._init = () => {
+      var _a2, _b2;
+      if (this._destroyed)
+        return;
+      this._worker.postMessage({
+        target: "init",
+        asyncRender,
+        onDemandRender: this._onDemandRender,
+        width: this._canvasctrl.width,
+        height: this._canvasctrl.height,
+        preMain: true,
+        blendMode,
+        subUrl: options.subUrl,
+        subContent: options.subContent || null,
+        fonts: options.fonts || [],
+        availableFonts: options.availableFonts || { "liberation sans": "./default.woff2" },
+        fallbackFont: options.fallbackFont || "liberation sans",
+        debug: this.debug,
+        targetFps: options.targetFps || 24,
+        dropAllAnimations: options.dropAllAnimations,
+        libassMemoryLimit: options.libassMemoryLimit || 0,
+        libassGlyphLimit: options.libassGlyphLimit || 0,
+        hasAlphaBug: _JASSUB._hasAlphaBug,
+        useLocalFonts: "queryLocalFonts" in self && ((_a2 = options.useLocalFonts) != null ? _a2 : true)
+      });
+      if (offscreenRender === true)
+        this.sendMessage("offscreenCanvas", null, [this._canvasctrl]);
+      this._boundResize = this.resize.bind(this);
+      this._boundTimeUpdate = this._timeupdate.bind(this);
+      this._boundSetRate = this.setRate.bind(this);
+      if (this._video)
+        this.setVideo(options.video);
+      if (this._onDemandRender) {
+        this.busy = false;
+        this._lastDemandTime = null;
+        (_b2 = this._video) == null ? void 0 : _b2.requestVideoFrameCallback(this._handleRVFC.bind(this));
+      }
+    };
   }
   static _test() {
     if (_JASSUB._supportsWebAssembly !== null)
@@ -414,6 +419,7 @@ const _JASSUB = class extends EventTarget {
     return uint8;
   }
   _ready() {
+    this._init();
     this.dispatchEvent(new CustomEvent("ready"));
   }
   sendMessage(target, data = {}, transferable) {

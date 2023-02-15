@@ -8,13 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-#else
-// make IDE happy
-#define emscripten_get_now() 0.0
-#endif
+#include <emscripten/bind.h>
 
 int log_level = 3;
 
@@ -100,10 +95,9 @@ const float MAX_UINT8_CAST = 255.9 / 255;
 
 typedef struct RenderResult {
 public:
-  int changed;
   double time;
   int x, y, w, h;
-  unsigned char *image;
+  uint32_t image;
   RenderResult *next;
 } RenderResult;
 
@@ -248,7 +242,9 @@ private:
 
 public:
   ASS_Track *track;
-  JASSUB() {
+  int changed = 0;
+  int count = 0;
+  JASSUB(int frame_w, int frame_h, const std::string &df) {
     status = 0;
     ass_library = NULL;
     ass_renderer = NULL;
@@ -257,32 +253,8 @@ public:
     canvas_h = 0;
     drop_animations = false;
     scanned_events = 0;
-  }
 
-  void setLogLevel(int level) {
-    log_level = level;
-  }
-
-  void setDropAnimations(int value) {
-    drop_animations = !!value;
-    if (drop_animations)
-      scanAnimations(scanned_events);
-  }
-
-  /*
-   * \brief Scan events starting at index i for animations
-   * and discard animated tags when found.
-   * Note that once animated tags were dropped they cannot be restored.
-   * Updates the class member scanned_events to last scanned index.
-   */
-  void scanAnimations(int i) {
-    for (; i < track->n_events; i++) {
-      _is_event_animated(track->events + i, drop_animations);
-    }
-    scanned_events = i;
-  }
-
-  void initLibrary(int frame_w, int frame_h, char *defaultFont) {
+    const char *defaultFont = df.c_str();
     if (strlen(defaultFont) >= sizeof(m_defaultFont)) {
       printf("defaultFont is too large!\n");
       exit(4);
@@ -309,10 +281,33 @@ public:
     m_buffer.clear();
   }
 
+  void setLogLevel(int level) {
+    log_level = level;
+  }
+
+  void setDropAnimations(int value) {
+    drop_animations = !!value;
+    if (drop_animations)
+      scanAnimations(scanned_events);
+  }
+
+  /*
+   * \brief Scan events starting at index i for animations
+   * and discard animated tags when found.
+   * Note that once animated tags were dropped they cannot be restored.
+   * Updates the class member scanned_events to last scanned index.
+   */
+  void scanAnimations(int i) {
+    for (; i < track->n_events; i++) {
+      _is_event_animated(track->events + i, drop_animations);
+    }
+    scanned_events = i;
+  }
+
   /* TRACK */
-  void createTrackMem(char *buf, unsigned long bufsize) {
+  void createTrackMem(std::string buf) {
     removeTrack();
-    track = ass_read_memory(ass_library, buf, (size_t)bufsize, NULL);
+    track = ass_read_memory(ass_library, buf.data(), buf.size(), NULL);
     if (!track) {
       fprintf(stderr, "jso: Failed to start a track\n");
       exit(4);
@@ -345,6 +340,7 @@ public:
     return size;
   }
   void processImages(RenderResult *&renderResult, ASS_Image *img, char *rawbuffer) {
+    count = 0;
     for (RenderResult *tmp = renderResult; img; img = img->next) {
       int w = img->w, h = img->h;
       if (w == 0 || h == 0) {
@@ -362,7 +358,7 @@ public:
       result->h = h;
       result->x = img->dst_x;
       result->y = img->dst_y;
-      result->image = (uint8_t *)data;
+      result->image = (uint32_t)data;
       if (tmp) {
         tmp->next = result;
       } else {
@@ -370,6 +366,7 @@ public:
       }
       tmp = result;
       rawbuffer += datasize + sizeof(RenderResult);
+      ++count;
     }
   }
   void decodeBitmap(double alpha, uint32_t *data, ASS_Image *img, int w, int h) {
@@ -388,10 +385,10 @@ public:
   RenderResult *renderImage(double time, int force) {
     m_renderResult.time = 0.0;
     m_renderResult.image = NULL;
-    ASS_Image *img = ass_render_frame(ass_renderer, track, (int)(time * 1000), &m_renderResult.changed);
+    ASS_Image *img = ass_render_frame(ass_renderer, track, (int)(time * 1000), &changed);
 
-    RenderResult *renderResult = NULL;
-    if (img == NULL || (m_renderResult.changed == 0 && !force)) {
+    RenderResult *renderResult;
+    if (img == NULL || (changed == 0 && !force)) {
       return &m_renderResult;
     }
     double start_decode_time = emscripten_get_now();
@@ -403,7 +400,6 @@ public:
     }
     processImages(renderResult, img, rawbuffer);
     renderResult->time = emscripten_get_now() - start_decode_time;
-    renderResult->changed = m_renderResult.changed;
     return renderResult;
   }
 
@@ -413,18 +409,13 @@ public:
     ass_library_done(ass_library);
     m_buffer.clear();
   }
-  void reloadLibrary() {
-    quitLibrary();
-
-    initLibrary(canvas_w, canvas_h, m_defaultFont);
-  }
 
   void reloadFonts() {
     ass_set_fonts(ass_renderer, NULL, m_defaultFont, ASS_FONTPROVIDER_NONE, NULL, 1);
   }
 
-  void addFont(char *name, char *data, unsigned long data_size) {
-    ass_add_font(ass_library, name, data, (size_t)data_size);
+  void addFont(const std::string &name, int data, unsigned long data_size) {
+    ass_add_font(ass_library, name.c_str(), (char*)data, (size_t)data_size);
   }
 
   void setMargin(int top, int bottom, int left, int right) {
@@ -447,14 +438,6 @@ public:
     return track->n_styles;
   }
 
-  int getStyleByName(const char *name) const {
-    for (int n = 0; n < track->n_styles; n++) {
-      if (track->styles[n].Name && strcmp(track->styles[n].Name, name) == 0)
-        return n;
-    }
-    return 0;
-  }
-
   int allocStyle() {
     return ass_alloc_style(track);
   }
@@ -475,9 +458,10 @@ public:
   RenderResult *renderBlend(double tm, int force) {
     m_renderResult.time = 0.0;
     m_renderResult.image = NULL;
+    count = 1;
 
-    ASS_Image *img = ass_render_frame(ass_renderer, track, (int)(tm * 1000), &m_renderResult.changed);
-    if (img == NULL || (m_renderResult.changed == 0 && !force)) {
+    ASS_Image *img = ass_render_frame(ass_renderer, track, (int)(tm * 1000), &changed);
+    if (img == NULL || (changed == 0 && !force)) {
       return &m_renderResult;
     }
 
@@ -584,15 +568,156 @@ public:
     m_renderResult.w = width;
     m_renderResult.h = height;
     m_renderResult.time = emscripten_get_now() - start_blend_time;
-    m_renderResult.image = (unsigned char *)result;
+    m_renderResult.image = (uint32_t)result;
     return &m_renderResult;
+  }
+
+  ASS_Event *getEvent(int i) {
+    return &track->events[i];
+  }
+
+  ASS_Style *getStyle(int i) {
+    return &track->styles[i];
   }
 };
 
-int main(int argc, char *argv[]) {
-  return 0;
+static uint32_t getDuration(const ASS_Event &evt) {
+  return (uint32_t)evt.Duration;
 }
 
-#ifdef __EMSCRIPTEN__
-#include "./JASSUBInterface.cpp"
-#endif
+static void setDuration(ASS_Event &evt, const long ms) {
+  evt.Duration = ms;
+}
+
+static uint32_t getStart(const ASS_Event &evt) {
+  return (uint32_t)evt.Start;
+}
+
+static void setStart(ASS_Event &evt, const long ms) {
+  evt.Start = ms;
+}
+
+static std::string getEventName(const ASS_Event &evt) {
+  return evt.Name;
+}
+
+static void setEventName(ASS_Event &evt, const std::string &str){
+  evt.Name = (char *)str.c_str();
+}
+
+static std::string getText(const ASS_Event &evt) {
+  return evt.Text;
+}
+
+static void setText(ASS_Event &evt, const std::string &str){
+  evt.Text = (char *)str.c_str();
+}
+
+static std::string getEffect(const ASS_Event &evt) {
+  return evt.Effect;
+}
+
+static void setEffect(ASS_Event &evt, const std::string &str){
+  evt.Effect = (char *)str.c_str();
+}
+
+static std::string getStyleName(const ASS_Style &style) {
+  return style.Name;
+}
+
+static void setStyleName(ASS_Style &style, const std::string &str){
+  style.Name = (char *)str.c_str();
+}
+
+static std::string getFontName(const ASS_Style &style) {
+  return style.FontName;
+}
+
+static void setFontName(ASS_Style &style, const std::string &str){
+  style.FontName = (char *)str.c_str();
+}
+
+static RenderResult getNext(const RenderResult &res) {
+  return *res.next;
+}
+
+
+EMSCRIPTEN_BINDINGS(JASSUB) {
+  emscripten::register_vector<RenderResult>("vector<RenderResult>");
+
+  emscripten::class_<RenderResult>("RenderResult")
+    .property("time", &RenderResult::time)
+    .property("x", &RenderResult::x)
+    .property("y", &RenderResult::y)
+    .property("w", &RenderResult::w)
+    .property("h", &RenderResult::h)
+    .property("next", &getNext)
+    .property("image", &RenderResult::image);
+
+  emscripten::class_<ASS_Style>("ASS_Style")
+    .property("Name", &getStyleName, &setStyleName)    
+    .property("FontName", &getFontName, &setFontName) 
+    .property("FontSize", &ASS_Style::FontSize)
+    .property("PrimaryColour", &ASS_Style::PrimaryColour)
+    .property("SecondaryColour", &ASS_Style::SecondaryColour)
+    .property("OutlineColour", &ASS_Style::OutlineColour)
+    .property("BackColour", &ASS_Style::BackColour)
+    .property("Bold", &ASS_Style::Bold)     
+    .property("Italic", &ASS_Style::Italic)   
+    .property("Underline", &ASS_Style::Underline) 
+    .property("StrikeOut", &ASS_Style::StrikeOut)
+    .property("ScaleX", &ASS_Style::ScaleX) 
+    .property("ScaleY", &ASS_Style::ScaleY) 
+    .property("Spacing", &ASS_Style::Spacing)
+    .property("Angle", &ASS_Style::Angle)
+    .property("BorderStyle", &ASS_Style::BorderStyle)
+    .property("Outline", &ASS_Style::Outline)
+    .property("Shadow", &ASS_Style::Shadow)
+    .property("Alignment", &ASS_Style::Alignment) 
+    .property("MarginL", &ASS_Style::MarginL)
+    .property("MarginR", &ASS_Style::MarginR)
+    .property("MarginV", &ASS_Style::MarginV)
+    .property("Encoding", &ASS_Style::Encoding)
+    .property("treat_fontname_as_pattern", &ASS_Style::treat_fontname_as_pattern) 
+    .property("Blur", &ASS_Style::Blur) 
+    .property("Justify", &ASS_Style::Justify);
+
+  emscripten::class_<ASS_Event>("ASS_Event")
+    .property("Start", &getStart, &setStart)
+    .property("Duration", &getDuration, &setDuration)
+    .property("Name", &getEventName, &setEventName)
+    .property("Effect", &getEffect, &setEffect)
+    .property("Text", &getText, &setText)
+    .property("ReadOrder", &ASS_Event::ReadOrder)
+    .property("Layer", &ASS_Event::Layer)
+    .property("Style", &ASS_Event::Style)
+    .property("MarginL", &ASS_Event::MarginL)
+    .property("MarginR", &ASS_Event::MarginR)
+    .property("MarginV", &ASS_Event::MarginV);
+
+  emscripten::class_<JASSUB>("JASSUB")
+    .constructor<int, int, std::string>()
+    .function("setLogLevel", &JASSUB::setLogLevel)
+    .function("setDropAnimations", &JASSUB::setDropAnimations)
+    .function("createTrackMem", &JASSUB::createTrackMem)
+    .function("removeTrack", &JASSUB::removeTrack)
+    .function("resizeCanvas", &JASSUB::resizeCanvas)
+    .function("quitLibrary", &JASSUB::quitLibrary)
+    .function("addFont", &JASSUB::addFont)
+    .function("reloadFonts", &JASSUB::reloadFonts)
+    .function("setMargin", &JASSUB::setMargin)
+    .function("getEventCount", &JASSUB::getEventCount)
+    .function("allocEvent", &JASSUB::allocEvent)
+    .function("allocStyle", &JASSUB::allocStyle)
+    .function("removeEvent", &JASSUB::removeEvent)
+    .function("getStyleCount", &JASSUB::getStyleCount)
+    .function("removeStyle", &JASSUB::removeStyle)
+    .function("removeAllEvents", &JASSUB::removeAllEvents)
+    .function("setMemoryLimits", &JASSUB::setMemoryLimits)
+    .function("renderBlend", &JASSUB::renderBlend, emscripten::allow_raw_pointers())
+    .function("renderImage", &JASSUB::renderImage, emscripten::allow_raw_pointers())
+    .function("getEvent", &JASSUB::getEvent, emscripten::allow_raw_pointers())
+    .function("getStyle", &JASSUB::getStyle, emscripten::allow_raw_pointers())
+    .property("changed", &JASSUB::changed)
+    .property("count", &JASSUB::count);
+}

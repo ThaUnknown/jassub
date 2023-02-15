@@ -1,17 +1,22 @@
 /* eslint-disable no-global-assign */
 /* eslint no-extend-native: 0 */
+// eslint-disable-next-line no-unused-vars
+function assert (c, m) {
+  if (!c) throw m
+}
+
 if (!String.prototype.startsWith) {
-  String.prototype.startsWith = function (search, pos) {
-    if (pos === undefined) {
-      pos = 0
+  String.prototype.startsWith = function (s, p) {
+    if (p === undefined) {
+      p = 0
     }
-    return this.substring(pos, search.length) === search
+    return this.substring(p, s.length) === s
   }
 }
 
 if (!String.prototype.includes) {
-  String.prototype.includes = function (search, pos) {
-    return this.indexOf(search, pos) !== -1
+  String.prototype.includes = function (s, p) {
+    return this.indexOf(s, p) !== -1
   }
 }
 
@@ -28,54 +33,42 @@ if (!ArrayBuffer.isView) {
     Float64Array
   ]
 
-  ArrayBuffer.isView = function (obj) {
-    return obj && obj.constructor && typedArrays.indexOf(obj.constructor) !== -1
-  }
+  ArrayBuffer.isView = o => o && o.constructor && typedArrays.indexOf(o.constructor) !== -1
 }
 
 if (!Uint8Array.prototype.slice) {
-  Uint8Array.prototype.slice = function (begin, end) {
-    return new Uint8Array(this.subarray(begin, end))
+  Uint8Array.prototype.slice = function (b, e) {
+    return new Uint8Array(this.subarray(b, e))
   }
 }
 
-Date.now = (Date.now || function () {
-  return new Date().getTime()
-})
+Date.now = Date.now || (() => new Date().getTime())
 
 // implement console methods if they're missing
-function makeCustomConsole () {
-  const console = (function () {
-    function postConsoleMessage (command, args) {
-      postMessage({
-        target: 'console',
-        command,
-        content: JSON.stringify(Array.prototype.slice.call(args))
-      })
-    }
-
-    return {
-      log: function () {
-        postConsoleMessage('log', arguments)
-      },
-      debug: function () {
-        postConsoleMessage('debug', arguments)
-      },
-      info: function () {
-        postConsoleMessage('info', arguments)
-      },
-      warn: function () {
-        postConsoleMessage('warn', arguments)
-      },
-      error: function () {
-        postConsoleMessage('error', arguments)
-      }
-    }
-  })()
-
-  return console
-}
 if (typeof console === 'undefined') {
-  console = makeCustomConsole()
+  const postConsoleMessage = (command, a) => {
+    postMessage({
+      target: 'console',
+      command,
+      content: JSON.stringify(Array.prototype.slice.call(a))
+    })
+  }
+  console = {
+    log: function () {
+      postConsoleMessage('log', arguments)
+    },
+    debug: function () {
+      postConsoleMessage('debug', arguments)
+    },
+    info: function () {
+      postConsoleMessage('info', arguments)
+    },
+    warn: function () {
+      postConsoleMessage('warn', arguments)
+    },
+    error: function () {
+      postConsoleMessage('error', arguments)
+    }
+  }
   console.log('overridden console')
 }

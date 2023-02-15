@@ -1,37 +1,40 @@
-/* global Module, HEAPU8, readAsync, read_, calledMain, addRunDependency, removeRunDependency, buffer */
-
-const encoder = new TextEncoder()
-const textByteLength = (input) => encoder.encode(input).buffer.byteLength
-
-Module.onRuntimeInitialized = () => {
-  self.jassubObj = new Module.JASSUB()
-
-  self.jassubObj.initLibrary(self.width, self.height, self.fallbackFont || null)
-
-  if (self.fallbackFont) self.findAvailableFonts(self.fallbackFont)
-
-  if (!self.subContent) self.subContent = read_(self.subUrl)
-
-  self.processAvailableFonts(self.subContent)
-
-  for (const font of self.fontFiles || []) self.asyncWrite(font)
-
-  self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
-  self.jassubObj.setDropAnimations(self.dropAllAnimations)
-
-  if (self.libassMemoryLimit > 0 || self.libassGlyphLimit > 0) {
-    self.jassubObj.setMemoryLimits(self.libassGlyphLimit, self.libassMemoryLimit)
+/* global Module, HEAPU8, _malloc, buffer */
+const read_ = (url, ab) => {
+  const xhr = new XMLHttpRequest()
+  xhr.open('GET', url, false)
+  xhr.responseType = ab ? 'arraybuffer' : 'text'
+  xhr.send(null)
+  return xhr.response
+}
+const readAsync = (url, load, err) => {
+  const xhr = new XMLHttpRequest()
+  xhr.open('GET', url, true)
+  xhr.responseType = 'arraybuffer'
+  xhr.onload = () => {
+    if ((xhr.status === 200 || xhr.status === 0) && xhr.response) {
+      return load(xhr.response)
+    }
+    err()
   }
+  xhr.onerror = err
+  xhr.send(null)
+}
+// eslint-disable-next-line no-global-assign
+Module = {
+  wasm: !WebAssembly.instantiateStreaming && read_('jassub-worker.wasm', true)
 }
 
-self.out = function (text) {
+// ran when WASM is compiled
+self.ready = () => postMessage({ target: 'ready' })
+
+self.out = text => {
   if (text === 'libass: No usable fontconfig configuration file found, using fallback.') {
     console.debug(text)
   } else {
     console.log(text)
   }
 }
-self.err = function (text) {
+self.err = text => {
   if (text === 'Fontconfig error: Cannot load default config file: No such file: (null)') {
     console.debug(text)
   } else {
@@ -39,99 +42,89 @@ self.err = function (text) {
   }
 }
 
-self.delay = 0 // approximate delay (time of render + postMessage + drawImage), for example 1/60 or 0
-self.lastCurrentTime = 0
-self.rate = 1
-self.rafId = null
-self.nextIsRaf = false
-self.lastCurrentTimeReceivedAt = Date.now()
-self.targetFps = 24
-self.libassMemoryLimit = 0 // in MiB
-self.dropAllAnimations = false
+let lastCurrentTime = 0
+const rate = 1
+let rafId = null
+let nextIsRaf = false
+let lastCurrentTimeReceivedAt = Date.now()
+let targetFps = 24
+let useLocalFonts = false
+let blendMode = 'js'
+let availableFonts = {}
+const fontMap_ = {}
+let fontId = 0
+let debug
 
 self.width = 0
 self.height = 0
 
-self.fontMap_ = {}
-self.fontId = 0
-
 let asyncRender = false
 
-self.addFont = (data) => {
-  self.asyncWrite(data.font)
-}
+self.addFont = ({ font }) => asyncWrite(font)
 
-self.findAvailableFonts = (font) => {
+const findAvailableFonts = font => {
   font = font.trim().toLowerCase()
 
-  if (font.startsWith('@')) {
-    font = font.substring(1)
+  if (font.startsWith('@')) font = font.substring(1)
+
+  if (fontMap_[font]) return
+
+  fontMap_[font] = true
+
+  if (!availableFonts[font] && useLocalFonts) {
+    return postMessage({ target: 'getLocalFont', font })
   }
 
-  if (self.fontMap_[font]) return
-
-  self.fontMap_[font] = true
-
-  if (!self.availableFonts[font]) {
-    if (self.useLocalFonts) {
-      postMessage({ target: 'getLocalFont', font })
-    }
-    return
-  }
-
-  self.asyncWrite(self.availableFonts[font])
+  asyncWrite(availableFonts[font])
 }
 
-self.asyncWrite = (font) => {
+const asyncWrite = font => {
   if (ArrayBuffer.isView(font)) {
-    self.allocFont(font)
+    allocFont(font)
   } else {
     readAsync(font, fontData => {
-      self.allocFont(new Uint8Array(fontData))
+      allocFont(new Uint8Array(fontData))
     }, console.error)
   }
 }
 
 // TODO: this should re-draw last frame!
-self.allocFont = (uint8) => {
-  const ptr = Module._malloc(uint8.byteLength)
+const allocFont = uint8 => {
+  const ptr = _malloc(uint8.byteLength)
   HEAPU8.set(uint8, ptr)
-  self.jassubObj.addFont('font-' + (self.fontId++), ptr, uint8.byteLength)
+  self.jassubObj.addFont('font-' + (fontId++), ptr, uint8.byteLength)
   self.jassubObj.reloadFonts()
 }
 
-self.processAvailableFonts = (content) => {
-  if (!self.availableFonts) return
+const processAvailableFonts = content => {
+  if (!availableFonts) return
 
   const sections = parseAss(content)
 
   for (let i = 0; i < sections.length; i++) {
     for (let j = 0; j < sections[i].body.length; j++) {
       if (sections[i].body[j].key === 'Style') {
-        self.findAvailableFonts(sections[i].body[j].value.Fontname)
+        findAvailableFonts(sections[i].body[j].value.Fontname)
       }
     }
   }
 
   const regex = /\\fn([^\\}]*?)[\\}]/g
   let matches
-  while ((matches = regex.exec(self.subContent)) !== null) {
-    self.findAvailableFonts(matches[1])
+  while ((matches = regex.exec(content)) !== null) {
+    findAvailableFonts(matches[1])
   }
 }
 /**
  * Set the subtitle track.
  * @param {!string} content the content of the subtitle file.
  */
-self.setTrack = (data) => {
+self.setTrack = ({ content }) => {
   // Make sure that the fonts are loaded
-  self.processAvailableFonts(data.content)
-
-  self.subContent = data.content
+  processAvailableFonts(content)
 
   // Tell libass to render the new track
-  self.jassubObj.createTrackMem(self.subContent, textByteLength(self.subContent))
-  self.renderLoop()
+  self.jassubObj.createTrackMem(content)
 }
 
 /**
@@ -139,129 +132,121 @@ self.setTrack = (data) => {
  */
 self.freeTrack = () => {
   self.jassubObj.removeTrack()
-  self.renderLoop()
 }
 
 /**
  * Set the subtitle track.
  * @param {!string} url the URL of the subtitle file.
  */
-self.setTrackByUrl = (data) => {
-  const content = read_(data.url)
-
-  self.setTrack({ content })
+self.setTrackByUrl = ({ url }) => {
+  self.setTrack({ content: read_(url) })
 }
 
-self.resize = (width, height) => {
+const resize = (width, height) => {
   self.width = width
   self.height = height
   self.jassubObj.resizeCanvas(width, height)
 }
 
-self.getCurrentTime = () => {
-  const diff = (Date.now() - self.lastCurrentTimeReceivedAt) / 1000
-  if (self._isPaused) {
-    return self.lastCurrentTime
+const getCurrentTime = () => {
+  const diff = (Date.now() - lastCurrentTimeReceivedAt) / 1000
+  if (_isPaused) {
+    return lastCurrentTime
   } else {
     if (diff > 5) {
       console.error('Didn\'t received currentTime > 5 seconds. Assuming video was paused.')
-      self.setIsPaused(true)
+      setIsPaused(true)
     }
-    return self.lastCurrentTime + (diff * self.rate)
+    return lastCurrentTime + (diff * rate)
   }
 }
-self.setCurrentTime = (currentTime) => {
-  self.lastCurrentTime = currentTime
-  self.lastCurrentTimeReceivedAt = Date.now()
-  if (!self.rafId) {
-    if (self.nextIsRaf) {
-      self.rafId = self.requestAnimationFrame(self.renderLoop)
+const setCurrentTime = currentTime => {
+  lastCurrentTime = currentTime
+  lastCurrentTimeReceivedAt = Date.now()
+  if (!rafId) {
+    if (nextIsRaf) {
+      rafId = requestAnimationFrame(renderLoop)
     } else {
-      self.renderLoop()
+      renderLoop()
 
       // Give onmessage chance to receive all queued messages
       setTimeout(() => {
-        self.nextIsRaf = false
+        nextIsRaf = false
       }, 20)
     }
   }
 }
 
-self._isPaused = true
-self.setIsPaused = (isPaused) => {
-  if (isPaused !== self._isPaused) {
-    self._isPaused = isPaused
+let _isPaused = true
+const setIsPaused = isPaused => {
+  if (isPaused !== _isPaused) {
+    _isPaused = isPaused
     if (isPaused) {
-      if (self.rafId) {
-        clearTimeout(self.rafId)
-        self.rafId = null
+      if (rafId) {
+        clearTimeout(rafId)
+        rafId = null
       }
     } else {
-      self.lastCurrentTimeReceivedAt = Date.now()
-      self.rafId = self.requestAnimationFrame(self.renderLoop)
+      lastCurrentTimeReceivedAt = Date.now()
+      rafId = requestAnimationFrame(renderLoop)
     }
   }
 }
 
-self.renderImageData = (time, force) => {
+const render = (time, force) => {
   const renderStartTime = Date.now()
   let result = null
-  if (self.blendMode === 'wasm') {
+  if (blendMode === 'wasm') {
     result = self.jassubObj.renderBlend(time, force)
-    result.times = {
-      renderTime: Date.now() - renderStartTime - result.time | 0,
-      blendTime: result.time | 0
+    if (result) {
+      result.times = {
+        renderTime: Date.now() - renderStartTime - (result && result.time) | 0,
+        blendTime: (result && result.time) | 0
+      }
     }
   } else {
     result = self.jassubObj.renderImage(time, force)
-    result.times = {
-      renderTime: Date.now() - renderStartTime - result.time | 0,
-      cppDecodeTime: result.time | 0
+    if (result) {
+      result.times = {
+        renderTime: Date.now() - renderStartTime - (result && result.time) | 0,
+        cppDecodeTime: (result && result.time) | 0
+      }
     }
   }
-  return result
-}
-
-self.processRender = (result) => {
-  const images = []
-  let buffers = []
-  const decodeStartTime = Date.now()
-  // use callback to not rely on async/await
-  if (asyncRender) {
-    const promises = []
-    for (let image = result; image.ptr !== 0; image = image.next) {
-      if (image.image) {
-        images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
-        promises.push(createImageBitmap(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
-      }
-    }
-    Promise.all(promises).then(bitmaps => {
-      for (let i = 0; i < images.length; i++) {
-        images[i].image = bitmaps[i]
-      }
-      buffers = bitmaps
-      self.paintImages({ images, buffers, times: result.times, decodeStartTime })
-    })
-  } else {
-    for (let image = result; image.ptr !== 0; image = image.next) {
-      if (image.image) {
-        const img = { w: image.w, h: image.h, x: image.x, y: image.y, image: image.image }
-        if (!self.offscreenCanvasCtx) {
-          const buf = buffer.slice(image.image, image.image + image.w * image.h * 4)
-          buffers.push(buf)
-          img.image = buf
+  if (result && (self.jassubObj.changed !== 0 || force)) {
+    const images = []
+    let buffers = []
+    const decodeStartTime = Date.now()
+    // use callback to not rely on async/await
+    if (asyncRender) {
+      const promises = []
+      for (let image = result, i = 0; i < self.jassubObj.count; image = image.next, ++i) {
+        if (image.image) {
+          images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
+          promises.push(createImageBitmap(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
         }
-        images.push(img)
       }
+      Promise.all(promises).then(bitmaps => {
+        for (let i = 0; i < images.length; i++) {
+          images[i].image = bitmaps[i]
+        }
+        buffers = bitmaps
+        paintImages({ images, buffers, times: result.times, decodeStartTime })
+      })
+    } else {
+      for (let image = result, i = 0; i < self.jassubObj.count; image = image.next, ++i) {
+        if (image.image) {
+          const img = { w: image.w, h: image.h, x: image.x, y: image.y, image: image.image }
+          if (!offCanvasCtx) {
+            const buf = buffer.slice(image.image, image.image + image.w * image.h * 4)
+            buffers.push(buf)
+            img.image = buf
+          }
+          images.push(img)
+        }
+      }
+      paintImages({ images, buffers, times: result.times, decodeStartTime })
     }
-    self.paintImages({ images, buffers, times: result.times, decodeStartTime })
-  }
-}
-
-self.render = (time, force) => {
-  const result = self.renderImageData(time, force)
-  if (result.changed !== 0 || force) {
-    self.processRender(result)
   } else {
     postMessage({
       target: 'unbusy'
@@ -269,49 +254,48 @@ self.render = (time, force) => {
   }
 }
 
-self.demand = data => {
-  self.lastCurrentTime = data.time
-  self.render(data.time)
+self.demand = ({ time }) => {
+  lastCurrentTime = time
+  render(time)
 }
 
-self.renderLoop = (force) => {
-  self.rafId = 0
-  self.renderPending = false
-  self.render(self.getCurrentTime() + self.delay, force)
-  if (!self._isPaused) {
-    self.rafId = self.requestAnimationFrame(self.renderLoop)
+const renderLoop = force => {
+  rafId = 0
+  render(getCurrentTime(), force)
+  if (!_isPaused) {
+    rafId = requestAnimationFrame(renderLoop)
   }
 }
 
-self.paintImages = (data) => {
-  data.times.decodeTime = Date.now() - data.decodeStartTime
-  if (self.offscreenCanvasCtx) {
+const paintImages = ({ times, images, decodeStartTime, buffers }) => {
+  times.decodeTime = Date.now() - decodeStartTime
+  if (offCanvasCtx) {
     const drawStartTime = Date.now()
     // force updates
-    self.offscreenCanvas.width = self.width
-    if (self.offscreenCanvas.height !== self.height) {
-      self.offscreenCanvas.height = self.height
+    offCanvas.width = self.width
+    if (offCanvas.height !== self.height) {
+      offCanvas.height = self.height
     } else {
-      self.offscreenCanvasCtx.clearRect(0, 0, self.width, self.height)
+      offCanvasCtx.clearRect(0, 0, self.width, self.height)
     }
-    for (const image of data.images) {
+    for (const image of images) {
       if (image.image) {
         if (asyncRender) {
-          self.offscreenCanvasCtx.drawImage(image.image, image.x, image.y)
+          offCanvasCtx.drawImage(image.image, image.x, image.y)
           image.image.close()
         } else {
           self.bufferCanvas.width = image.w
           self.bufferCanvas.height = image.h
           self.bufferCtx.putImageData(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h), 0, 0)
-          self.offscreenCanvasCtx.drawImage(self.bufferCanvas, image.x, image.y)
+          offCanvasCtx.drawImage(self.bufferCanvas, image.x, image.y)
         }
       }
     }
-    if (self.debug) {
-      data.times.drawTime = Date.now() - drawStartTime
+    if (debug) {
+      times.drawTime = Date.now() - drawStartTime
       let total = 0
-      for (const key in data.times) total += data.times[key]
-      console.log('Bitmaps: ' + data.images.length + ' Total: ' + Math.round(total) + 'ms', data.times)
+      for (const key in times) total += times[key]
+      console.log('Bitmaps: ' + images.length + ' Total: ' + Math.round(total) + 'ms', times)
     }
     postMessage({
       target: 'unbusy'
@@ -320,11 +304,11 @@ self.paintImages = (data) => {
     postMessage({
       target: 'render',
       async: asyncRender,
-      images: data.images,
-      times: data.times,
+      images,
+      times,
       width: self.width,
       height: self.height
-    }, data.buffers)
+    }, buffers)
   }
 }
 
@@ -332,7 +316,7 @@ self.paintImages = (data) => {
  * Parse the content of an .ass file.
  * @param {!string} content the content of the file
  */
-function parseAss (content) {
+const parseAss = content => {
   let m, format, lastPart, parts, key, value, tmp, i, j, body
   const sections = []
   const lines = content.split(/[\r\n]+/g)
@@ -387,19 +371,19 @@ function parseAss (content) {
   }
 
   return sections
-};
+}
 
-self.requestAnimationFrame = (() => {
+const requestAnimationFrame = (() => {
   // similar to Browser.requestAnimationFrame
   let nextRAF = 0
   return func => {
     // try to keep target fps (30fps) between calls to here
     const now = Date.now()
     if (nextRAF === 0) {
-      nextRAF = now + 1000 / self.targetFps
+      nextRAF = now + 1000 / targetFps
     } else {
       while (now + 2 >= nextRAF) { // fudge a little, to avoid timer jitter causing us to do lots of delay:0
-        nextRAF += 1000 / self.targetFps
+        nextRAF += 1000 / targetFps
       }
     }
     const delay = Math.max(nextRAF - now, 0)
@@ -410,47 +394,17 @@ self.requestAnimationFrame = (() => {
 
 // Frame throttling
 
-// Wait to start running until we receive some info from the client
-addRunDependency('worker-init')
-
-// buffer messages until the program starts to run
-
-let messageBuffer = null
-let messageResenderTimeout = null
-
-function messageResender () {
-  if (calledMain) {
-    if (messageBuffer && messageBuffer.length > 0) {
-      messageResenderTimeout = null
-      messageBuffer.forEach(message => {
-        onmessage(message)
-      })
-      messageBuffer = null
-    }
-  } else {
-    messageResenderTimeout = setTimeout(messageResender, 50)
-  }
-}
-
-function _applyKeys (input, output) {
-  const vargs = Object.keys(input)
-
-  for (let i = 0; i < vargs.length; i++) {
-    output[vargs[i]] = input[vargs[i]]
+const _applyKeys = (input, output) => {
+  for (const v of Object.keys(input)) {
+    output[v] = input[v]
   }
 }
 
 self.init = data => {
   self.width = data.width
   self.height = data.height
-  self.subUrl = data.subUrl
-  self.subContent = data.subContent
-  self.fontFiles = data.fonts
-  self.fallbackFont = data.fallbackFont.toLowerCase()
-  self.blendMode = data.blendMode
+  blendMode = data.blendMode
   asyncRender = data.asyncRender
-  self.onDemandRender = data.onDemandRender
-  self.dropAllAnimations = !!data.dropAllAnimations || self.dropAllAnimations
   // Force fallback if engine does not support 'lossy' mode.
   // We only use createImageBitmap in the worker and historic WebKit versions supported
   // the API in the normal but not the worker scope, so we can't check this earlier.
@@ -459,33 +413,48 @@ self.init = data => {
     console.error("'createImageBitmap' needed for 'asyncRender' unsupported!")
   }
 
-  self.availableFonts = data.availableFonts
-  self.debug = data.debug
-  self.targetFps = data.targetFps || self.targetFps
-  self.libassMemoryLimit = data.libassMemoryLimit || self.libassMemoryLimit
-  self.libassGlyphLimit = data.libassGlyphLimit || 0
-  self.useLocalFonts = data.useLocalFonts
-  removeRunDependency('worker-init')
-  postMessage({
-    target: 'ready'
-  })
+  availableFonts = data.availableFonts
+  debug = data.debug
+  targetFps = data.targetFps || targetFps
+  useLocalFonts = data.useLocalFonts
+
+  const fallbackFont = data.fallbackFont.toLowerCase()
+  self.jassubObj = new Module.JASSUB(self.width, self.height, fallbackFont || null)
+
+  if (fallbackFont) findAvailableFonts(fallbackFont)
+
+  let subContent = data.subContent
+  if (!subContent) subContent = read_(data.subUrl)
+
+  processAvailableFonts(subContent)
+
+  for (const font of data.fonts || []) asyncWrite(font)
+
+  self.jassubObj.createTrackMem(subContent)
+  self.jassubObj.setDropAnimations(data.dropAllAnimations)
+
+  if (data.libassMemoryLimit > 0 || data.libassGlyphLimit > 0) {
+    self.jassubObj.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)
+  }
 }
 
-self.canvas = data => {
-  if (data.width == null) throw new Error('Invalid canvas size specified')
-  self.resize(data.width, data.height, data.force)
-  if (data.force) self.render(self.lastCurrentTime)
+self.canvas = ({ width, height, force }) => {
+  if (width == null) throw new Error('Invalid canvas size specified')
+  resize(width, height, force)
+  if (force) render(lastCurrentTime)
 }
 
-self.video = data => {
-  if (data.currentTime != null) self.setCurrentTime(data.currentTime)
-  if (data.isPaused != null) self.setIsPaused(data.isPaused)
-  self.rate = data.rate || self.rate
+self.video = ({ currentTime, isPaused, rate }) => {
+  if (currentTime != null) setCurrentTime(currentTime)
+  if (isPaused != null) setIsPaused(isPaused)
+  rate = rate || rate
 }
 
-self.offscreenCanvas = data => {
-  self.offscreenCanvas = data.transferable[0]
-  self.offscreenCanvasCtx = self.offscreenCanvas.getContext('2d', { desynchronized: true })
+let offCanvas
+let offCanvasCtx
+self.offscreenCanvas = ({ transferable }) => {
+  offCanvas = transferable[0]
+  offCanvasCtx = offCanvas.getContext('2d', { desynchronized: true })
   if (!asyncRender) {
     self.bufferCanvas = new OffscreenCanvas(self.height, self.width)
     self.bufferCtx = self.bufferCanvas.getContext('2d', { desynchronized: true })
@@ -496,27 +465,15 @@ self.destroy = () => {
   self.jassubObj.quitLibrary()
 }
 
-self.createEvent = data => {
-  _applyKeys(data.event, self.jassubObj.track.get_events(self.jassubObj.allocEvent()))
+self.createEvent = ({ event }) => {
+  _applyKeys(event, self.jassubObj.getEvent(self.jassubObj.allocEvent()))
 }
 
 self.getEvents = () => {
   const events = []
   for (let i = 0; i < self.jassubObj.getEventCount(); i++) {
-    const evntPtr = self.jassubObj.track.get_events(i)
-    events.push({
-      Start: evntPtr.get_Start(),
-      Duration: evntPtr.get_Duration(),
-      ReadOrder: evntPtr.get_ReadOrder(),
-      Layer: evntPtr.get_Layer(),
-      Style: evntPtr.get_Style(),
-      Name: evntPtr.get_Name(),
-      MarginL: evntPtr.get_MarginL(),
-      MarginR: evntPtr.get_MarginR(),
-      MarginV: evntPtr.get_MarginV(),
-      Effect: evntPtr.get_Effect(),
-      Text: evntPtr.get_Text()
-    })
+    const { Start, Duration, ReadOrder, Layer, Style, MarginL, MarginR, MarginV, Name, Text, Effect } = self.jassubObj.getEvent(i)
+    events.push({ Start, Duration, ReadOrder, Layer, Style, MarginL, MarginR, MarginV, Name, Text, Effect })
   }
   postMessage({
     target: 'getEvents',
@@ -524,50 +481,25 @@ self.getEvents = () => {
   })
 }
 
-self.setEvent = data => {
-  _applyKeys(data.event, self.jassubObj.track.get_events(data.index))
+self.setEvent = ({ event, index }) => {
+  _applyKeys(event, self.jassubObj.getEvent(index))
 }
 
-self.removeEvent = data => {
-  self.jassubObj.removeEvent(data.index)
+self.removeEvent = ({ index }) => {
+  self.jassubObj.removeEvent(index)
 }
 
-self.createStyle = data => {
-  _applyKeys(data.style, self.jassubObj.track.get_styles(self.jassubObj.allocStyle()))
+self.createStyle = ({ style }) => {
+  _applyKeys(style, self.jassubObj.getStyle(self.jassubObj.allocStyle()))
 }
 
 self.getStyles = () => {
   const styles = []
   for (let i = 0; i < self.jassubObj.getStyleCount(); i++) {
-    const stylPtr = self.jassubObj.track.get_styles(i)
-    styles.push({
-      Name: stylPtr.get_Name(),
-      FontName: stylPtr.get_FontName(),
-      FontSize: stylPtr.get_FontSize(),
-      PrimaryColour: stylPtr.get_PrimaryColour(),
-      SecondaryColour: stylPtr.get_SecondaryColour(),
-      OutlineColour: stylPtr.get_OutlineColour(),
-      BackColour: stylPtr.get_BackColour(),
-      Bold: stylPtr.get_Bold(),
-      Italic: stylPtr.get_Italic(),
-      Underline: stylPtr.get_Underline(),
-      StrikeOut: stylPtr.get_StrikeOut(),
-      ScaleX: stylPtr.get_ScaleX(),
-      ScaleY: stylPtr.get_ScaleY(),
-      Spacing: stylPtr.get_Spacing(),
-      Angle: stylPtr.get_Angle(),
-      BorderStyle: stylPtr.get_BorderStyle(),
-      Outline: stylPtr.get_Outline(),
-      Shadow: stylPtr.get_Shadow(),
-      Alignment: stylPtr.get_Alignment(),
-      MarginL: stylPtr.get_MarginL(),
-      MarginR: stylPtr.get_MarginR(),
-      MarginV: stylPtr.get_MarginV(),
-      Encoding: stylPtr.get_Encoding(),
-      treat_fontname_as_pattern: stylPtr.get_treat_fontname_as_pattern(),
-      Blur: stylPtr.get_Blur(),
-      Justify: stylPtr.get_Justify()
-    })
+    // eslint-disable-next-line camelcase
+    const { Name, FontName, FontSize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding, treat_fontname_as_pattern, Blur, Justify } = self.jassubObj.getStyle(i)
+    // eslint-disable-next-line camelcase
+    styles.push({ Name, FontName, FontSize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding, treat_fontname_as_pattern, Blur, Justify })
   }
   postMessage({
     target: 'getStyles',
@@ -576,32 +508,19 @@ self.getStyles = () => {
   })
 }
 
-self.setStyle = data => {
-  _applyKeys(data.style, self.jassubObj.track.get_styles(data.index))
+self.setStyle = ({ style, index }) => {
+  _applyKeys(style, self.jassubObj.getStyle(index))
 }
 
-self.removeStyle = data => {
-  self.jassubObj.removeStyle(data.index)
+self.removeStyle = ({ index }) => {
+  self.jassubObj.removeStyle(index)
 }
 
-onmessage = message => {
-  if (!calledMain && !message.data.preMain) {
-    if (!messageBuffer) {
-      messageBuffer = []
-      messageResenderTimeout = setTimeout(messageResender, 50)
-    }
-    messageBuffer.push(message)
-    return
-  }
-  if (calledMain && messageResenderTimeout) {
-    clearTimeout(messageResenderTimeout)
-    messageResender()
-  }
-  const data = message.data
+onmessage = ({ data }) => {
   if (self[data.target]) {
     self[data.target](data)
   } else {
-    throw new Error('Unknown event target ' + message.data.target)
+    throw new Error('Unknown event target ' + data.target)
   }
 }
 

@@ -143,11 +143,6 @@ OCTP_DEPS = \
 	$(DIST_DIR)/lib/libfontconfig.a \
 	$(DIST_DIR)/lib/libass.a
 
-# src/jassub-worker.bc: $(OCTP_DEPS) all-src
-# .PHONY: all-src
-# all-src:
-# $(MAKE) -C src all
-
 # Dist Files https://github.com/emscripten-core/emscripten/blob/3.1.24/src/settings.js
 EMCC_COMMON_ARGS = \
 	-s ENVIRONMENT=worker \
@@ -180,7 +175,7 @@ EMCC_COMMON_ARGS = \
 	#--memory-init-file 0
 
 
-dist: dist/js/jassub-worker.js dist/js/jassub-worker-legacy.js
+dist: $(OCTP_DEPS) dist/js/jassub-worker.js dist/js/jassub-worker-legacy.js dist/js/jassub.js
 
 dist/js/jassub-worker.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 	mkdir -p dist/js
@@ -204,9 +199,9 @@ dist/js/jassub-worker-legacy.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 		-s MIN_SAFARI_VERSION=60005 \
 		$(EMCC_COMMON_ARGS)
 
-# dist/js/jassub.js: dist/license/all src/jassub.js
-# 	mkdir -p dist/js
-# 	awk '1 {print "// "$$0}' dist/license/all | cat - src/jassub.js > $@
+dist/js/jassub.js: src/jassub.js
+	mkdir -p dist/js
+	cp src/jassub.js $@
 
 # dist/license/all:
 # 	@#FIXME: allow -j in toplevel Makefile and reintegrate licence extraction into this file

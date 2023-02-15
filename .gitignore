@@ -3,7 +3,6 @@ a.out.wasm
 a.out.js.mem
 a.out
 a.wasm
-src/WebIDLGrammar.pkl
 src/parser.out
 lib/expat/xmlwf/xmlwf
 .libs/
@@ -15,7 +14,7 @@ lib/expat/xmlwf/xmlwf
 *.tgz
 venv/
 node_modules/
-build/lib
+build/lib/*
 src/JASSUBInterface.cpp
 src/JASSUBInterface.js
 dist/js

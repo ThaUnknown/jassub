@@ -84,7 +84,7 @@ export default class JASSUB extends EventTarget {
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
 
-    this._ready = new Promise(resolve => {
+    this._loaded = new Promise(resolve => {
       this._init = () => {
         if (this._destroyed) return
         this._worker.postMessage({
@@ -599,7 +599,7 @@ export default class JASSUB extends EventTarget {
    * @param  {Transferable[]} [transferable] Array of transferables.
    */
   async sendMessage (target, data = {}, transferable) {
-    await this._ready
+    await this._loaded
     if (transferable) {
       this._worker.postMessage({
         target,

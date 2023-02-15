@@ -85,7 +85,7 @@ const _JASSUB = class extends EventTarget {
     this._worker = new Worker(_JASSUB._supportsWebAssembly ? options.workerUrl || "jassub-worker.js" : options.legacyWorkerUrl || "jassub-worker-legacy.js");
     this._worker.onmessage = (e) => this._onmessage(e);
     this._worker.onerror = (e) => this._error(e);
-    this._ready = new Promise((resolve) => {
+    this._loaded = new Promise((resolve) => {
       this._init = () => {
         var _a2, _b2;
         if (this._destroyed)
@@ -426,7 +426,7 @@ const _JASSUB = class extends EventTarget {
     this.dispatchEvent(new CustomEvent("ready"));
   }
   async sendMessage(target, data = {}, transferable) {
-    await this._ready;
+    await this._loaded;
     if (transferable) {
       this._worker.postMessage({
         target,

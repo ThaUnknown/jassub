@@ -15,6 +15,3 @@ lib/expat/xmlwf/xmlwf
 venv/
 node_modules/
 build/lib/*
-dist/js
-dist/libraries
-dist/license

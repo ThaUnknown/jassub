@@ -53,7 +53,7 @@ build/lib/brotli/configured: lib/brotli $(wildcard $(BASE_DIR)build/patches/brot
 $(DIST_DIR)/lib/libbrotlidec.a: $(DIST_DIR)/lib/libbrotlicommon.a
 $(DIST_DIR)/lib/libbrotlicommon.a: build/lib/brotli/configured
 	cd build/lib/brotli && \
-    $(call CONFIGURE_CMAKE) && \
+	$(call CONFIGURE_CMAKE) && \
 	$(JSO_MAKE) install
 	# Normalise static lib names
 	cd $(DIST_DIR)/lib/ && \
@@ -146,7 +146,7 @@ OCTP_DEPS = \
 # src/jassub-worker.bc: $(OCTP_DEPS) all-src
 # .PHONY: all-src
 # all-src:
-# 	$(MAKE) -C src all
+# $(MAKE) -C src all
 
 # Dist Files https://github.com/emscripten-core/emscripten/blob/3.1.24/src/settings.js
 EMCC_COMMON_ARGS = \
@@ -170,9 +170,9 @@ EMCC_COMMON_ARGS = \
 	-flto \
 	-fno-exceptions \
 	-o $@ \
-  -O3
+	-O3
 	# -s STRICT=1 \
-  #--js-opts 0 -O0 -gsource-map 
+	#--js-opts 0 -O0 -gsource-map 
 	#--js-opts 0 -O0 -g3 
 	#--closure 1 \
 	#-s USE_CLOSURE_COMPILER=1 \
@@ -185,7 +185,7 @@ dist: dist/js/jassub-worker.js dist/js/jassub-worker-legacy.js
 dist/js/jassub-worker.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 	mkdir -p dist/js
 	emcc src/JASSUB.cpp $(OCTP_DEPS) \
-	  --pre-js src/polyfill.js \
+		--pre-js src/polyfill.js \
 		--pre-js src/worker.js \
 		-s EVAL_CTORS=2 \
 		-s TEXTDECODER=2 \
@@ -195,7 +195,7 @@ dist/js/jassub-worker.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 dist/js/jassub-worker-legacy.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 	mkdir -p dist/js
 	emcc src/JASSUB.cpp $(OCTP_DEPS) \
-	  --pre-js src/polyfill.js \
+		--pre-js src/polyfill.js \
 		--pre-js src/worker.js \
 		-s WASM=0 \
 		--closure=0 \

@@ -1,5 +1,3 @@
-// visit ./COPYRIGHT for copyright information
-
 import 'rvfc-polyfill'
 
 /**
@@ -86,38 +84,41 @@ export default class JASSUB extends EventTarget {
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
 
-    this._worker.postMessage({
-      target: 'init',
-      asyncRender,
-      onDemandRender: this._onDemandRender,
-      width: this._canvasctrl.width,
-      height: this._canvasctrl.height,
-      preMain: true,
-      blendMode,
-      subUrl: options.subUrl,
-      subContent: options.subContent || null,
-      fonts: options.fonts || [],
-      availableFonts: options.availableFonts || { 'liberation sans': './default.woff2' },
-      fallbackFont: options.fallbackFont || 'liberation sans',
-      debug: this.debug,
-      targetFps: options.targetFps || 24,
-      dropAllAnimations: options.dropAllAnimations,
-      libassMemoryLimit: options.libassMemoryLimit || 0,
-      libassGlyphLimit: options.libassGlyphLimit || 0,
-      hasAlphaBug: JASSUB._hasAlphaBug,
-      useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)
-    })
-    if (offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
+    this._init = () => {
+      if (this._destroyed) return
+      this._worker.postMessage({
+        target: 'init',
+        asyncRender,
+        onDemandRender: this._onDemandRender,
+        width: this._canvasctrl.width,
+        height: this._canvasctrl.height,
+        preMain: true,
+        blendMode,
+        subUrl: options.subUrl,
+        subContent: options.subContent || null,
+        fonts: options.fonts || [],
+        availableFonts: options.availableFonts || { 'liberation sans': './default.woff2' },
+        fallbackFont: options.fallbackFont || 'liberation sans',
+        debug: this.debug,
+        targetFps: options.targetFps || 24,
+        dropAllAnimations: options.dropAllAnimations,
+        libassMemoryLimit: options.libassMemoryLimit || 0,
+        libassGlyphLimit: options.libassGlyphLimit || 0,
+        hasAlphaBug: JASSUB._hasAlphaBug,
+        useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)
+      })
+      if (offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
 
-    this._boundResize = this.resize.bind(this)
-    this._boundTimeUpdate = this._timeupdate.bind(this)
-    this._boundSetRate = this.setRate.bind(this)
-    if (this._video) this.setVideo(options.video)
+      this._boundResize = this.resize.bind(this)
+      this._boundTimeUpdate = this._timeupdate.bind(this)
+      this._boundSetRate = this.setRate.bind(this)
+      if (this._video) this.setVideo(options.video)
 
-    if (this._onDemandRender) {
-      this.busy = false
-      this._lastDemandTime = null
-      this._video?.requestVideoFrameCallback(this._handleRVFC.bind(this))
+      if (this._onDemandRender) {
+        this.busy = false
+        this._lastDemandTime = null
+        this._video?.requestVideoFrameCallback(this._handleRVFC.bind(this))
+      }
     }
   }
 
@@ -584,6 +585,7 @@ export default class JASSUB extends EventTarget {
   }
 
   _ready () {
+    this._init()
     this.dispatchEvent(new CustomEvent('ready'))
   }
 

@@ -42,11 +42,11 @@ if (!Uint8Array.prototype.slice) {
   }
 }
 
-Date.now = Date.now || (() => new Date().getTime())
+if (!Date.now) Date.now = () => new Date().getTime()
 
 // implement console methods if they're missing
 if (typeof console === 'undefined') {
-  const postConsoleMessage = (command, a) => {
+  const msg = (command, a) => {
     postMessage({
       target: 'console',
       command,
@@ -55,19 +55,19 @@ if (typeof console === 'undefined') {
   }
   console = {
     log: function () {
-      postConsoleMessage('log', arguments)
+      msg('log', arguments)
     },
     debug: function () {
-      postConsoleMessage('debug', arguments)
+      msg('debug', arguments)
     },
     info: function () {
-      postConsoleMessage('info', arguments)
+      msg('info', arguments)
     },
     warn: function () {
-      postConsoleMessage('warn', arguments)
+      msg('warn', arguments)
     },
     error: function () {
-      postConsoleMessage('error', arguments)
+      msg('error', arguments)
     }
   }
   console.log('overridden console')

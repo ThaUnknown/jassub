@@ -652,7 +652,7 @@ export default class JASSUB extends EventTarget {
   }
 
   _error (err) {
-    this.dispatchEvent(err instanceof ErrorEvent ? err : new ErrorEvent('error', { cause: err instanceof Error ? err.cause : err }))
+    this.dispatchEvent(err instanceof ErrorEvent ? new ErrorEvent(err.type, err) : new ErrorEvent('error', { cause: err instanceof Error ? err.cause : err }))
     if (!(err instanceof Error)) {
       if (err instanceof ErrorEvent) {
         err = err.error

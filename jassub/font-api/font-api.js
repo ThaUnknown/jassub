@@ -12,6 +12,7 @@ fontselect.addEventListener('change', async ({ detail }) => {
     subUrl: '../../subtitles/test.ass',
     workerUrl: '../assets/jassub-worker.js',
     fallbackFont: detail[0].fullName,
+    useLocalFonts: false,
     availableFonts: {
       [detail[0].fullName.toLowerCase()]: uint8
     }

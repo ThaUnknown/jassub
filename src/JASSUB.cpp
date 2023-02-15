@@ -581,6 +581,12 @@ public:
   }
 };
 
+static char* copyString(const std::string &str) {
+  char *result = new char[str.length() + 1];
+  strcpy(result, str.data());
+  return result;
+}
+
 static uint32_t getDuration(const ASS_Event &evt) {
   return (uint32_t)evt.Duration;
 }
@@ -601,40 +607,40 @@ static std::string getEventName(const ASS_Event &evt) {
   return evt.Name;
 }
 
-static void setEventName(ASS_Event &evt, const std::string &str){
-  evt.Name = (char *)str.c_str();
+static void setEventName(ASS_Event &evt, const std::string &str) {
+  evt.Name = copyString(str);
 }
 
 static std::string getText(const ASS_Event &evt) {
   return evt.Text;
 }
 
-static void setText(ASS_Event &evt, const std::string &str){
-  evt.Text = (char *)str.c_str();
+static void setText(ASS_Event &evt, const std::string &str) {
+  evt.Text = copyString(str);
 }
 
 static std::string getEffect(const ASS_Event &evt) {
   return evt.Effect;
 }
 
-static void setEffect(ASS_Event &evt, const std::string &str){
-  evt.Effect = (char *)str.c_str();
+static void setEffect(ASS_Event &evt, const std::string &str) {
+  evt.Effect = copyString(str);
 }
 
 static std::string getStyleName(const ASS_Style &style) {
   return style.Name;
 }
 
-static void setStyleName(ASS_Style &style, const std::string &str){
-  style.Name = (char *)str.c_str();
+static void setStyleName(ASS_Style &style, const std::string &str) {
+  style.Name = copyString(str);
 }
 
 static std::string getFontName(const ASS_Style &style) {
   return style.FontName;
 }
 
-static void setFontName(ASS_Style &style, const std::string &str){
-  style.FontName = (char *)str.c_str();
+static void setFontName(ASS_Style &style, const std::string &str) {
+  style.FontName = copyString(str);
 }
 
 static RenderResult getNext(const RenderResult &res) {

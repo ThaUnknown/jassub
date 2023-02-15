@@ -273,11 +273,8 @@ const paintImages = ({ times, images, decodeStartTime, buffers }) => {
     const drawStartTime = Date.now()
     // force updates
     offCanvas.width = self.width
-    if (offCanvas.height !== self.height) {
-      offCanvas.height = self.height
-    } else {
-      offCanvasCtx.clearRect(0, 0, self.width, self.height)
-    }
+    if (offCanvas.height !== self.height) offCanvas.height = self.height
+    offCanvasCtx.clearRect(0, 0, self.width, self.height)
     for (const image of images) {
       if (image.image) {
         if (asyncRender) {

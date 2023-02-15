@@ -84,42 +84,45 @@ export default class JASSUB extends EventTarget {
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
 
-    this._init = () => {
-      if (this._destroyed) return
-      this._worker.postMessage({
-        target: 'init',
-        asyncRender,
-        onDemandRender: this._onDemandRender,
-        width: this._canvasctrl.width,
-        height: this._canvasctrl.height,
-        preMain: true,
-        blendMode,
-        subUrl: options.subUrl,
-        subContent: options.subContent || null,
-        fonts: options.fonts || [],
-        availableFonts: options.availableFonts || { 'liberation sans': './default.woff2' },
-        fallbackFont: options.fallbackFont || 'liberation sans',
-        debug: this.debug,
-        targetFps: options.targetFps || 24,
-        dropAllAnimations: options.dropAllAnimations,
-        libassMemoryLimit: options.libassMemoryLimit || 0,
-        libassGlyphLimit: options.libassGlyphLimit || 0,
-        hasAlphaBug: JASSUB._hasAlphaBug,
-        useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)
-      })
-      if (offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
+    this._loaded = new Promise(resolve => {
+      this._init = () => {
+        if (this._destroyed) return
+        this._worker.postMessage({
+          target: 'init',
+          asyncRender,
+          onDemandRender: this._onDemandRender,
+          width: this._canvasctrl.width,
+          height: this._canvasctrl.height,
+          preMain: true,
+          blendMode,
+          subUrl: options.subUrl,
+          subContent: options.subContent || null,
+          fonts: options.fonts || [],
+          availableFonts: options.availableFonts || { 'liberation sans': './default.woff2' },
+          fallbackFont: options.fallbackFont || 'liberation sans',
+          debug: this.debug,
+          targetFps: options.targetFps || 24,
+          dropAllAnimations: options.dropAllAnimations,
+          libassMemoryLimit: options.libassMemoryLimit || 0,
+          libassGlyphLimit: options.libassGlyphLimit || 0,
+          hasAlphaBug: JASSUB._hasAlphaBug,
+          useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)
+        })
+        if (offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
 
-      this._boundResize = this.resize.bind(this)
-      this._boundTimeUpdate = this._timeupdate.bind(this)
-      this._boundSetRate = this.setRate.bind(this)
-      if (this._video) this.setVideo(options.video)
+        this._boundResize = this.resize.bind(this)
+        this._boundTimeUpdate = this._timeupdate.bind(this)
+        this._boundSetRate = this.setRate.bind(this)
+        if (this._video) this.setVideo(options.video)
 
-      if (this._onDemandRender) {
-        this.busy = false
-        this._lastDemandTime = null
-        this._video?.requestVideoFrameCallback(this._handleRVFC.bind(this))
+        if (this._onDemandRender) {
+          this.busy = false
+          this._lastDemandTime = null
+          this._video?.requestVideoFrameCallback(this._handleRVFC.bind(this))
+        }
+        resolve()
       }
-    }
+    })
   }
 
   // test support for WASM, ImageData, alphaBug, but only once, on init so it doesn't run when first running the page
@@ -551,9 +554,8 @@ export default class JASSUB extends EventTarget {
     if (this._canvasctrl.width !== width || this._canvasctrl.height !== height) {
       this._canvasctrl.width = width
       this._canvasctrl.height = height
-    } else {
-      this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
     }
+    this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
     for (const image of images) {
       if (image.image) {
         if (async) {
@@ -595,7 +597,8 @@ export default class JASSUB extends EventTarget {
    * @param  {Object} [data] Data for function.
    * @param  {Transferable[]} [transferable] Array of transferables.
    */
-  sendMessage (target, data = {}, transferable) {
+  async sendMessage (target, data = {}, transferable) {
+    await this._loaded
     if (transferable) {
       this._worker.postMessage({
         target,
@@ -652,7 +655,7 @@ export default class JASSUB extends EventTarget {
   }
 
   _error (err) {
-    this.dispatchEvent(err instanceof ErrorEvent ? err : new ErrorEvent('error', { cause: err instanceof Error ? err.cause : err }))
+    this.dispatchEvent(err instanceof ErrorEvent ? new ErrorEvent(err.type, err) : new ErrorEvent('error', { cause: err instanceof Error ? err.cause : err }))
     if (!(err instanceof Error)) {
       if (err instanceof ErrorEvent) {
         err = err.error

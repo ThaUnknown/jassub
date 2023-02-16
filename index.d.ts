@@ -74,6 +74,8 @@ interface JassubOptions {
 
 	libassMemoryLimit?: number;
 	libassGlyphLimit?: number;
+
+	publicPath?: string;
 }
 
 type ASS_EventCallback = (error: Error | null, event: ASS_Event) => void;

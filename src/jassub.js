@@ -1,4 +1,5 @@
 import 'rvfc-polyfill'
+import './polyfill'
 
 /**
  * New JASSUB instance.
@@ -30,6 +31,7 @@ export default class JASSUB extends EventTarget {
    * @param {Boolean} [options.useLocalFonts=false] If the Local Font Access API is enabled [chrome://flags/#font-access], the library will query for permissions to use local fonts and use them if any are missing. The permission can be queried beforehand using navigator.permissions.request({ name: 'local-fonts' }).
    * @param {Number} [options.libassMemoryLimit] libass bitmap cache memory limit in MiB (approximate).
    * @param {Number} [options.libassGlyphLimit] libass glyph cache memory limit in MiB (approximate).
+   * @param {String} [options.publicPath=options.publicPath] The public path for the worker to load WASM and other assets from.
    */
   constructor (options = {}) {
     super()
@@ -79,10 +81,13 @@ export default class JASSUB extends EventTarget {
     this.prescaleFactor = options.prescaleFactor || 1.0
     this.prescaleHeightLimit = options.prescaleHeightLimit || 1080
     this.maxRenderHeight = options.maxRenderHeight || 0 // 0 - no limit.
-
+  
     this._worker = new Worker(JASSUB._supportsWebAssembly ? options.workerUrl || 'jassub-worker.js' : options.legacyWorkerUrl || 'jassub-worker-legacy.js')
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
+
+    this.sendMessage('preInit', { publicPath: options.publicPath || null })
+
 
     this._loaded = new Promise(resolve => {
       this._init = () => {
@@ -106,7 +111,8 @@ export default class JASSUB extends EventTarget {
           libassMemoryLimit: options.libassMemoryLimit || 0,
           libassGlyphLimit: options.libassGlyphLimit || 0,
           hasAlphaBug: JASSUB._hasAlphaBug,
-          useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)
+          useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true),
+          publicPath: options.publicPath || null
         })
         if (offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
 

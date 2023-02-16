@@ -158,9 +158,8 @@ EMCC_COMMON_ARGS = \
 	-s STRICT_JS=1 \
 	-s DISABLE_EXCEPTION_CATCHING=1 \
 	-s EXPORTED_FUNCTIONS="['_malloc']" \
-	-s MINIMAL_RUNTIME=1 \
-	-s MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION=1 \
-	-s INCOMING_MODULE_JS_API="[]" \
+	-s INCOMING_MODULE_JS_API="['locateFile']" \
+	-s MODULARIZE=1 \
 	--no-heap-copy \
 	-flto \
 	-fno-exceptions \
@@ -180,8 +179,6 @@ dist: $(OCTP_DEPS) dist/js/jassub-worker.js dist/js/jassub-worker-legacy.js dist
 dist/js/jassub-worker.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 	mkdir -p dist/js
 	emcc src/JASSUB.cpp $(OCTP_DEPS) \
-		--pre-js src/polyfill.js \
-		--pre-js src/worker.js \
 		-s EVAL_CTORS=2 \
 		-s TEXTDECODER=2 \
 		-s WASM=1 \
@@ -190,8 +187,6 @@ dist/js/jassub-worker.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 dist/js/jassub-worker-legacy.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 	mkdir -p dist/js
 	emcc src/JASSUB.cpp $(OCTP_DEPS) \
-		--pre-js src/polyfill.js \
-		--pre-js src/worker.js \
 		-s WASM=0 \
 		--closure=0 \
 		-s LEGACY_VM_SUPPORT=1 \

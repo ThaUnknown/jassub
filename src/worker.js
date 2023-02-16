@@ -1,4 +1,6 @@
-/* global Module, HEAPU8, _malloc, buffer */
+import './polyfill'
+import WASMModule from 'jassub-wasm'
+
 const read_ = (url, ab) => {
   const xhr = new XMLHttpRequest()
   xhr.open('GET', url, false)
@@ -19,13 +21,6 @@ const readAsync = (url, load, err) => {
   xhr.onerror = err
   xhr.send(null)
 }
-// eslint-disable-next-line no-global-assign
-Module = {
-  wasm: !WebAssembly.instantiateStreaming && read_('jassub-worker.wasm', true)
-}
-
-// ran when WASM is compiled
-self.ready = () => postMessage({ target: 'ready' })
 
 self.out = text => {
   if (text === 'libass: No usable fontconfig configuration file found, using fallback.') {
@@ -90,8 +85,8 @@ const asyncWrite = font => {
 
 // TODO: this should re-draw last frame!
 const allocFont = uint8 => {
-  const ptr = _malloc(uint8.byteLength)
-  HEAPU8.set(uint8, ptr)
+  const ptr = Module._malloc(uint8.byteLength)
+  Module.HEAPU8.set(uint8, ptr)
   self.jassubObj.addFont('font-' + (fontId++), ptr, uint8.byteLength)
   self.jassubObj.reloadFonts()
 }
@@ -223,7 +218,7 @@ const render = (time, force) => {
       for (let image = result, i = 0; i < self.jassubObj.count; image = image.next, ++i) {
         if (image.image) {
           images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
-          promises.push(createImageBitmap(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
+          promises.push(createImageBitmap(new ImageData(new Uint8ClampedArray(Module.HEAPU8).subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
         }
       }
       Promise.all(promises).then(bitmaps => {
@@ -283,7 +278,7 @@ const paintImages = ({ times, images, decodeStartTime, buffers }) => {
         } else {
           self.bufferCanvas.width = image.w
           self.bufferCanvas.height = image.h
-          self.bufferCtx.putImageData(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h), 0, 0)
+          self.bufferCtx.putImageData(new ImageData(new Uint8ClampedArray(Module.HEAPU8).subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h), 0, 0)
           offCanvasCtx.drawImage(self.bufferCanvas, image.x, image.y)
         }
       }
@@ -397,7 +392,19 @@ const _applyKeys = (input, output) => {
   }
 }
 
+let publicPath
+
+self.preInit = async (data) => {
+  publicPath = data.publicPath
+  globalThis.Module = await WASMModule({
+    locateFile: (path) => `${publicPath}${path.replace('/dist', '')}`
+  })
+  postMessage({ target: 'ready' })
+
+}
+
 self.init = data => {
+  self.publicPath = data.publicPath
   self.width = data.width
   self.height = data.height
   blendMode = data.blendMode
@@ -520,13 +527,3 @@ onmessage = ({ data }) => {
     throw new Error('Unknown event target ' + data.target)
   }
 }
-
-let HEAPU8C = null
-
-// patch EMS function to include Uint8Clamped, but call old function too
-self.updateGlobalBufferAndViews = (_super => {
-  return buf => {
-    _super(buf)
-    HEAPU8C = new Uint8ClampedArray(buf)
-  }
-})(self.updateGlobalBufferAndViews)

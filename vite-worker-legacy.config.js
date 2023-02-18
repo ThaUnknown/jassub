@@ -1,7 +1,5 @@
 const { defineConfig } = require('vite')
-const { writeFileSync } = require('fs')
-
-writeFileSync('./dist/package.json', JSON.stringify({"name": "jassub-wasm","main": "js/jassub-worker-legacy.js"}))
+const commonjs = require('@rollup/plugin-commonjs')
 
 module.exports = defineConfig({
   build: {
@@ -13,5 +11,8 @@ module.exports = defineConfig({
       entry: 'src/worker.js',
       formats: ['cjs']
     }
-  }
+  },
+  plugins: [
+    commonjs()
+  ]
 })

@@ -9,9 +9,10 @@
     "index.d.ts"
   ],
   "scripts": {
-    "bundle": "vite build && npm run bundle-worker && npm run bundle-worker-legacy && node set-dist-pkg.js -c",
+    "bundle": "vite build && npm run bundle-worker && npm run bundle-worker-legacy && node set-dist-pkg.js -c && npm run copy-files",
     "bundle-worker": "node set-dist-pkg.js && npm i ./dist && vite build --config vite-worker.config.js && npm remove jassub-wasm",
-    "bundle-worker-legacy": "node set-dist-pkg.js -2 && npm i ./dist && vite build --config vite-worker-legacy.config.js && npm remove jassub-wasm"
+    "bundle-worker-legacy": "node set-dist-pkg.js -2 && npm i ./dist && vite build --config vite-worker-legacy.config.js && npm remove jassub-wasm",
+    "copy-files": "shx cp dist/jassub*.js dist/js && shx cp dist/js/jassub-worker.wasm dist && shx cp dist/js/jassub-worker-legacy.js.mem dist/jassub-worker-legacy.mem"
   },
   "repository": {
     "type": "git",
@@ -36,6 +37,8 @@
     "rvfc-polyfill": "^1.0.4"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^24.0.1",
+    "shx": "^0.3.4",
     "vite": "^4.1.1"
   }
 }

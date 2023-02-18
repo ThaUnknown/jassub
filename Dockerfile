@@ -1,4 +1,4 @@
-FROM docker.io/emscripten/emsdk:3.1.24
+FROM docker.io/emscripten/emsdk:3.1.24 as emscripten
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
@@ -19,5 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         licensecheck \
     && rm -rf /var/lib/apt/lists/*
 
+RUN curl -fsSL https://deb.nodesource.com/setup_19.x | sudo -E bash - && sudo apt-get install -y nodejs
+
 WORKDIR /code
-CMD ["make"]
+
+CMD ["bash", "-c", "make; npm i; npm run test; cat dist/package.json; cat ./package.json; npm run bundle"]

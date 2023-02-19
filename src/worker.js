@@ -397,7 +397,7 @@ let publicPath
 self.preInit = async (data) => {
   publicPath = data.publicPath
   globalThis.Module = await WASMModule({
-    locateFile: (path) => `${publicPath}${path.replace('/dist', '')}`
+    locateFile: (path) => `${publicPath || ''}${path.replace('/dist', '')}`
   })
   postMessage({ target: 'ready' })
 

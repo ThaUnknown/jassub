@@ -2,6 +2,11 @@ const { defineConfig } = require('vite')
 const commonjs = require('@rollup/plugin-commonjs')
 
 module.exports = defineConfig({
+  resolve: {
+    alias: {
+      'jassub-wasm': 'dist/js/jassub-worker.js'
+    }
+  },
   build: {
     emptyOutDir: false,
     target: 'esnext',

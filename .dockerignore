@@ -1,8 +1,2 @@
 # Ignore everything for build image step, /code is passed via a volume
-node_modules/
-emscripten
-.vscode
-.github
-dist/js
-dist/libraries
-dist/license
+*

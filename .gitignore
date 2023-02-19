@@ -18,4 +18,3 @@ build/lib/*
 dist/js
 dist/libraries
 dist/license
-emscripten

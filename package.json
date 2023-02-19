@@ -2,10 +2,17 @@
   "name": "jassub",
   "version": "1.4.5",
   "description": "libass Subtitle Renderer and Parser library for browsers",
-  "main": "src/jassub.js",
+  "main": "",
+  "exports": {
+    ".": {
+      "require": "./src/jassub.js",
+      "import": "./dist/jassub.es.js"
+    }
+  },
   "files": [
     "dist/*",
     "src/jassub.js",
+    "src/polyfill.js",
     "index.d.ts"
   ],
   "scripts": {

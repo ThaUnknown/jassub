@@ -1,5 +1,5 @@
 import 'rvfc-polyfill'
-import './polyfill'
+import './polyfill.js'
 
 /**
  * New JASSUB instance.

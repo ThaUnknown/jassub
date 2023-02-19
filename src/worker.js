@@ -1,4 +1,4 @@
-import './polyfill'
+import './polyfill.js'
 import WASMModule from 'jassub-wasm'
 
 const read_ = (url, ab) => {

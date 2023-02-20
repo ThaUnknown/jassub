@@ -70,7 +70,7 @@ const findAvailableFonts = font => {
     return postMessage({ target: 'getLocalFont', font })
   }
 
-  asyncWrite(availableFonts[font])
+  if (availableFonts[font]) asyncWrite(availableFonts[font])
 }
 
 const asyncWrite = font => {

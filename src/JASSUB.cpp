@@ -8,22 +8,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
+
 #include <emscripten.h>
 #include <emscripten/bind.h>
 
 int log_level = 3;
 
-class ReusableBuffer2D {
+class ReusableBuffer {
 private:
   void *buffer;
-  size_t size;
-  int lessen_counter;
+  size_t lessen_counter;
 
 public:
-  ReusableBuffer2D() : buffer(NULL), size(0), lessen_counter(0) {
+  size_t size;
+  ReusableBuffer() : buffer(NULL), size(0), lessen_counter(0) {
   }
 
-  ~ReusableBuffer2D() {
+  ~ReusableBuffer() {
     free(buffer);
   }
 
@@ -34,21 +36,7 @@ public:
     lessen_counter = 0;
   }
 
-  /*
-   * Request a raw pointer to a buffer being able to hold at least
-   * x times y values of size member_size.
-   * If zero is set to true, the requested region will be zero-initialised.
-   * On failure NULL is returned.
-   * The pointer is valid during the lifetime of the ReusableBuffer
-   * object until the next call to get_rawbuf or clear.
-   */
-  void *get_rawbuf(size_t x, size_t y, size_t member_size, bool zero) {
-    if (x > SIZE_MAX / member_size / y)
-      return NULL;
-
-    size_t new_size = x * y * member_size;
-    if (!new_size)
-      new_size = 1;
+  void *take(size_t new_size) {
     if (size >= new_size) {
       if (size >= 1.3 * new_size) {
         // big reduction request
@@ -58,8 +46,7 @@ public:
       }
       if (lessen_counter < 10) {
         // not reducing the buffer yet
-        if (zero)
-          memset(buffer, 0, new_size);
+        memset(buffer, 0, new_size);
         return buffer;
       }
     }
@@ -95,11 +82,60 @@ const float MAX_UINT8_CAST = 255.9 / 255;
 
 typedef struct RenderResult {
 public:
-  double time;
   int x, y, w, h;
   uint32_t image;
   RenderResult *next;
 } RenderResult;
+
+// maximum regions - a grid of 3x3
+#define MAX_BLEND_STORAGES (3 * 3)
+struct RenderBlendStorage {
+  RenderResult next;
+  ReusableBuffer buf;
+  bool taken;
+};
+
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+
+class BoundingBox {
+public:
+  int min_x, max_x, min_y, max_y;
+
+  BoundingBox() : min_x(-1), max_x(-1), min_y(-1), max_y(-1) {
+  }
+
+  bool empty() const {
+    return min_x == -1;
+  }
+
+  void add(int x1, int y1, int w, int h) {
+    int x2 = x1 + w - 1, y2 = y1 + h - 1;
+    min_x = (min_x < 0) ? x1 : MIN(min_x, x1);
+    min_y = (min_y < 0) ? y1 : MIN(min_y, y1);
+    max_x = (max_x < 0) ? x2 : MAX(max_x, x2);
+    max_y = (max_y < 0) ? y2 : MAX(max_y, y2);
+  }
+
+  bool intersets(const BoundingBox &other) const {
+    return !(other.min_x > max_x || other.max_x < min_x || other.min_y > max_y || other.max_y < min_y);
+  }
+
+  bool tryMerge(BoundingBox &other) {
+    if (!intersets(other))
+      return false;
+
+    min_x = MIN(min_x, other.min_x);
+    min_y = MIN(min_y, other.min_y);
+    max_x = MAX(max_x, other.max_x);
+    max_y = MAX(max_y, other.max_y);
+    return true;
+  }
+
+  void clear() {
+    min_x = max_x = min_y = max_y = -1;
+  }
+};
 
 /**
  * \brief Overwrite tag with whitespace to nullify its effect
@@ -226,8 +262,8 @@ static bool _is_event_animated(ASS_Event *event, bool drop_animations) {
 
 class JASSUB {
 private:
-  ReusableBuffer2D m_buffer;
-  RenderResult m_renderResult;
+  ReusableBuffer m_buffer;
+  RenderBlendStorage m_blendParts[MAX_BLEND_STORAGES];
   bool drop_animations;
   int scanned_events; // next unscanned event index
   ASS_Library *ass_library;
@@ -244,6 +280,7 @@ public:
   ASS_Track *track;
   int changed = 0;
   int count = 0;
+  int time = 0;
   JASSUB(int frame_w, int frame_h, const std::string &df) {
     status = 0;
     ass_library = NULL;
@@ -340,7 +377,6 @@ public:
     return size;
   }
   void processImages(RenderResult *&renderResult, ASS_Image *img, char *rawbuffer) {
-    count = 0;
     for (RenderResult *tmp = renderResult; img; img = img->next) {
       int w = img->w, h = img->h;
       if (w == 0 || h == 0) {
@@ -382,24 +418,24 @@ public:
     }
   }
 
-  RenderResult *renderImage(double time, int force) {
-    m_renderResult.time = 0.0;
-    m_renderResult.image = NULL;
-    ASS_Image *img = ass_render_frame(ass_renderer, track, (int)(time * 1000), &changed);
+  RenderResult *renderImage(double tm, int force) {
+    time = 0;
+    count = 0;
 
-    RenderResult *renderResult;
+    ASS_Image *img = ass_render_frame(ass_renderer, track, (int)(tm * 1000), &changed);
     if (img == NULL || (changed == 0 && !force)) {
-      return &m_renderResult;
+      return NULL;
     }
     double start_decode_time = emscripten_get_now();
     int size = getBufferSize(img);
-    char *rawbuffer = (char *)m_buffer.get_rawbuf(1, 1, size, true);
+    char *rawbuffer = (char *)m_buffer.take(size);
     if (rawbuffer == NULL) {
       fprintf(stderr, "jso: cannot allocate buffer for rendering\n");
-      return renderResult;
+      return NULL;
     }
+    RenderResult *renderResult;
     processImages(renderResult, img, rawbuffer);
-    renderResult->time = emscripten_get_now() - start_decode_time;
+    time = emscripten_get_now() - start_decode_time;
     return renderResult;
   }
 
@@ -415,7 +451,7 @@ public:
   }
 
   void addFont(const std::string &name, int data, unsigned long data_size) {
-    ass_add_font(ass_library, name.c_str(), (char*)data, (size_t)data_size);
+    ass_add_font(ass_library, name.c_str(), (char *)data, (size_t)data_size);
   }
 
   void setMargin(int top, int bottom, int left, int right) {
@@ -456,61 +492,107 @@ public:
   }
 
   RenderResult *renderBlend(double tm, int force) {
-    m_renderResult.time = 0.0;
-    m_renderResult.image = NULL;
-    count = 1;
+    time = 0;
+    count = 0;
 
     ASS_Image *img = ass_render_frame(ass_renderer, track, (int)(tm * 1000), &changed);
     if (img == NULL || (changed == 0 && !force)) {
-      return &m_renderResult;
+      return NULL;
     }
 
     double start_blend_time = emscripten_get_now();
+    for (int i = 0; i < MAX_BLEND_STORAGES; i++) {
+      m_blendParts[i].taken = false;
+    }
 
-    // find bounding rect first
-    int min_x = img->dst_x, min_y = img->dst_y;
-    int max_x = img->dst_x + img->w - 1, max_y = img->dst_y + img->h - 1;
-    ASS_Image *cur;
-    for (cur = img->next; cur != NULL; cur = cur->next) {
+    // split rendering region in 9 pieces (as on 3x3 grid)
+    int split_x_low = canvas_w / 3, split_x_high = 2 * canvas_w / 3;
+    int split_y_low = canvas_h / 3, split_y_high = 2 * canvas_h / 3;
+    BoundingBox boxes[MAX_BLEND_STORAGES];
+    for (ASS_Image *cur = img; cur != NULL; cur = cur->next) {
       if (cur->w == 0 || cur->h == 0)
         continue; // skip empty images
-      if (cur->dst_x < min_x)
-        min_x = cur->dst_x;
-      if (cur->dst_y < min_y)
-        min_y = cur->dst_y;
-      int right = cur->dst_x + cur->w - 1;
-      int bottom = cur->dst_y + cur->h - 1;
-      if (right > max_x)
-        max_x = right;
-      if (bottom > max_y)
-        max_y = bottom;
+      int index = 0;
+      int middle_x = cur->dst_x + (cur->w >> 1), middle_y = cur->dst_y + (cur->h >> 1);
+      if (middle_y > split_y_high) {
+        index += 2 * 3;
+      } else if (middle_y > split_y_low) {
+        index += 1 * 3;
+      }
+      if (middle_x > split_x_high) {
+        index += 2;
+      } else if (middle_y > split_x_low) {
+        index += 1;
+      }
+      boxes[index].add(cur->dst_x, cur->dst_y, cur->w, cur->h);
     }
 
-    int width = max_x - min_x + 1, height = max_y - min_y + 1;
-
-    if (width == 0 || height == 0) {
-      // all images are empty
-      return &m_renderResult;
+    // now merge regions as long as there are intersecting regions
+    for (;;) {
+      bool merged = false;
+      for (int box1 = 0; box1 < MAX_BLEND_STORAGES - 1; box1++) {
+        if (boxes[box1].empty())
+          continue;
+        for (int box2 = box1 + 1; box2 < MAX_BLEND_STORAGES; box2++) {
+          if (boxes[box2].empty())
+            continue;
+          if (boxes[box1].tryMerge(boxes[box2])) {
+            boxes[box2].clear();
+            merged = true;
+          }
+        }
+      }
+      if (!merged)
+        break;
     }
+
+    RenderResult *renderResult = NULL;
+    for (int box = 0; box < MAX_BLEND_STORAGES; box++) {
+      if (boxes[box].empty()) {
+        continue;
+      }
+      RenderResult *part = renderBlendPart(boxes[box], img);
+      if (part == NULL) {
+        break; // memory allocation error
+      }
+      if (renderResult) {
+        part->next = renderResult->next;
+        renderResult->next = part;
+      } else {
+        renderResult = part;
+      }
+
+      ++count;
+    }
+    time = emscripten_get_now() - start_blend_time;
+
+    return renderResult;
+  }
+
+  RenderResult *renderBlendPart(const BoundingBox &rect, ASS_Image *img) {
+    int width = rect.max_x - rect.min_x + 1, height = rect.max_y - rect.min_y + 1;
 
     // make float buffer for blending
-    float *buf = (float *)m_buffer.get_rawbuf(width, height, sizeof(float) * 4, true);
+    const size_t buffer_size = width * height * 4 * sizeof(float);
+    float *buf = (float *)m_buffer.take(buffer_size);
     if (buf == NULL) {
       fprintf(stderr, "jso: cannot allocate buffer for blending\n");
-      return &m_renderResult;
+      return NULL;
     }
 
     // blend things in
-    for (cur = img; cur != NULL; cur = cur->next) {
+    for (ASS_Image *cur = img; cur != NULL; cur = cur->next) {
+      if (cur->dst_x < rect.min_x || cur->dst_y < rect.min_y)
+        continue; // skip images not fully within render region
       int curw = cur->w, curh = cur->h;
-      if (curw == 0 || curh == 0)
-        continue; // skip empty images
+      if (curw == 0 || curh == 0 || cur->dst_x + curw - 1 > rect.max_x || cur->dst_y + curh - 1 > rect.max_y)
+        continue; // skip empty images or images outside render region
       int a = (255 - (cur->color & 0xFF));
       if (a == 0)
         continue; // skip transparent images
 
       int curs = (cur->stride >= curw) ? cur->stride : curw;
-      int curx = cur->dst_x - min_x, cury = cur->dst_y - min_y;
+      int curx = cur->dst_x - rect.min_x, cury = cur->dst_y - rect.min_y;
 
       unsigned char *bitmap = cur->bitmap;
       float normalized_a = a / 255.0;
@@ -539,10 +621,38 @@ public:
       }
     }
 
+    // find closest free buffer
+    size_t needed = sizeof(unsigned int) * width * height;
+    RenderBlendStorage *storage = m_blendParts, *bigBuffer = NULL, *smallBuffer = NULL;
+    for (int buffer_index = 0; buffer_index < MAX_BLEND_STORAGES; buffer_index++, storage++) {
+      if (storage->taken)
+        continue;
+      if (storage->buf.size >= needed) {
+        if (bigBuffer == NULL || bigBuffer->buf.size > storage->buf.size)
+          bigBuffer = storage;
+      } else {
+        if (smallBuffer == NULL || smallBuffer->buf.size > storage->buf.size)
+          smallBuffer = storage;
+      }
+    }
+
+    if (bigBuffer != NULL) {
+      storage = bigBuffer;
+    } else if (smallBuffer != NULL) {
+      storage = smallBuffer;
+    } else {
+      printf("jso: cannot get a buffer for rendering part!\n");
+      return NULL;
+    }
+
+    unsigned int *result = (unsigned int *)storage->buf.take(needed);
+    if (result == NULL) {
+      printf("jso: cannot make a buffer for rendering part!\n");
+      return NULL;
+    }
+    storage->taken = true;
+
     // now build the result;
-    // NOTE: we use a "view" over [float,float,float,float] array of pixels,
-    // so we _must_ go left-right top-bottom to not mangle the result
-    unsigned int *result = (unsigned int *)buf;
     for (int y = 0, buf_line_coord = 0; y < height; y++, buf_line_coord += width) {
       for (int x = 0; x < width; x++) {
         unsigned int pixel = 0;
@@ -563,15 +673,16 @@ public:
     }
 
     // return the thing
-    m_renderResult.x = min_x;
-    m_renderResult.y = min_y;
-    m_renderResult.w = width;
-    m_renderResult.h = height;
-    m_renderResult.time = emscripten_get_now() - start_blend_time;
-    m_renderResult.image = (uint32_t)result;
-    return &m_renderResult;
+    storage->next.x = rect.min_x;
+    storage->next.y = rect.min_y;
+    storage->next.w = width;
+    storage->next.h = height;
+    storage->next.image = (uint32_t)result;
+
+    return &storage->next;
   }
 
+  // BINDING
   ASS_Event *getEvent(int i) {
     return &track->events[i];
   }
@@ -581,7 +692,7 @@ public:
   }
 };
 
-static char* copyString(const std::string &str) {
+static char *copyString(const std::string &str) {
   char *result = new char[str.length() + 1];
   strcpy(result, str.data());
   return result;
@@ -647,12 +758,10 @@ static RenderResult getNext(const RenderResult &res) {
   return *res.next;
 }
 
-
 EMSCRIPTEN_BINDINGS(JASSUB) {
   emscripten::register_vector<RenderResult>("vector<RenderResult>");
 
   emscripten::class_<RenderResult>("RenderResult")
-    .property("time", &RenderResult::time)
     .property("x", &RenderResult::x)
     .property("y", &RenderResult::y)
     .property("w", &RenderResult::w)
@@ -724,6 +833,6 @@ EMSCRIPTEN_BINDINGS(JASSUB) {
     .function("renderImage", &JASSUB::renderImage, emscripten::allow_raw_pointers())
     .function("getEvent", &JASSUB::getEvent, emscripten::allow_raw_pointers())
     .function("getStyle", &JASSUB::getStyle, emscripten::allow_raw_pointers())
-    .property("changed", &JASSUB::changed)
-    .property("count", &JASSUB::count);
+    .property("changed", &JASSUB::changed).property("count", &JASSUB::count)
+    .property("time", &JASSUB::time);
 }

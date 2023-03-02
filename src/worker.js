@@ -195,28 +195,18 @@ const setIsPaused = isPaused => {
 
 const render = (time, force) => {
   const renderStartTime = Date.now()
-  let result = null
-  if (blendMode === 'wasm') {
-    result = self.jassubObj.renderBlend(time, force)
-    if (result) {
-      result.times = {
-        renderTime: Date.now() - renderStartTime - (result && result.time) | 0,
-        blendTime: (result && result.time) | 0
-      }
-    }
-  } else {
-    result = self.jassubObj.renderImage(time, force)
-    if (result) {
-      result.times = {
-        renderTime: Date.now() - renderStartTime - (result && result.time) | 0,
-        cppDecodeTime: (result && result.time) | 0
-      }
+  const result = blendMode === 'wasm' ? self.jassubObj.renderBlend(time, force) : self.jassubObj.renderImage(time, force)
+  if (result) {
+    result.times = {
+      renderTime: Date.now() - renderStartTime - self.jassubObj.time | 0,
+      decodeTime: self.jassubObj.time | 0
     }
   }
-  if (result && (self.jassubObj.changed !== 0 || force)) {
+  if (self.jassubObj.changed !== 0 || force) {
     const images = []
     let buffers = []
     const decodeStartTime = Date.now()
+    if (!result) return paintImages({ images, buffers, times: {}, decodeStartTime })
     // use callback to not rely on async/await
     if (asyncRender) {
       const promises = []

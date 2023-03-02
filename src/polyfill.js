@@ -43,6 +43,7 @@ if (!Uint8Array.prototype.slice) {
 }
 
 if (!Date.now) Date.now = () => new Date().getTime()
+if (!('performance' in self)) self.performance = { now: () => Date.now() }
 
 // implement console methods if they're missing
 if (typeof console === 'undefined') {

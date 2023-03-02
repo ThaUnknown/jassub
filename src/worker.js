@@ -194,48 +194,42 @@ const setIsPaused = isPaused => {
 }
 
 const render = (time, force) => {
-  const renderStartTime = Date.now()
+  const renderStartTime = performance.now()
   const result = blendMode === 'wasm' ? self.jassubObj.renderBlend(time, force) : self.jassubObj.renderImage(time, force)
-  if (result) {
-    result.times = {
-      renderTime: Date.now() - renderStartTime - self.jassubObj.time | 0,
-      decodeTime: self.jassubObj.time | 0
-    }
+  const times = {
+    renderTime: performance.now() - renderStartTime - self.jassubObj.time,
+    decodeTime: self.jassubObj.time
   }
   if (self.jassubObj.changed !== 0 || force) {
     const images = []
     let buffers = []
-    const decodeStartTime = Date.now()
-    if (!result) return paintImages({ images, buffers, times: {}, decodeStartTime })
+    const decodeStartTime = performance.now()
+    if (!result) return paintImages({ images, buffers, times, decodeStartTime })
     // use callback to not rely on async/await
     if (asyncRender) {
       const promises = []
       for (let image = result, i = 0; i < self.jassubObj.count; image = image.next, ++i) {
-        if (image.image) {
-          images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
-          promises.push(createImageBitmap(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
-        }
+        images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
+        promises.push(createImageBitmap(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
       }
       Promise.all(promises).then(bitmaps => {
         for (let i = 0; i < images.length; i++) {
           images[i].image = bitmaps[i]
         }
         buffers = bitmaps
-        paintImages({ images, buffers, times: result.times, decodeStartTime })
+        paintImages({ images, buffers, times, decodeStartTime })
       })
     } else {
       for (let image = result, i = 0; i < self.jassubObj.count; image = image.next, ++i) {
-        if (image.image) {
-          const img = { w: image.w, h: image.h, x: image.x, y: image.y, image: image.image }
-          if (!offCanvasCtx) {
-            const buf = buffer.slice(image.image, image.image + image.w * image.h * 4)
-            buffers.push(buf)
-            img.image = buf
-          }
-          images.push(img)
+        const img = { w: image.w, h: image.h, x: image.x, y: image.y, image: image.image }
+        if (!offCanvasCtx) {
+          const buf = buffer.slice(image.image, image.image + image.w * image.h * 4)
+          buffers.push(buf)
+          img.image = buf
         }
+        images.push(img)
       }
-      paintImages({ images, buffers, times: result.times, decodeStartTime })
+      paintImages({ images, buffers, times, decodeStartTime })
     }
   } else {
     postMessage({
@@ -258,9 +252,9 @@ const renderLoop = force => {
 }
 
 const paintImages = ({ times, images, decodeStartTime, buffers }) => {
-  times.decodeTime = Date.now() - decodeStartTime
+  times.decodeTime = performance.now() - decodeStartTime
   if (offCanvasCtx) {
-    const drawStartTime = Date.now()
+    const drawStartTime = performance.now()
     // force updates
     offCanvas.width = self.width
     if (offCanvas.height !== self.height) offCanvas.height = self.height
@@ -279,7 +273,7 @@ const paintImages = ({ times, images, decodeStartTime, buffers }) => {
       }
     }
     if (debug) {
-      times.drawTime = Date.now() - drawStartTime
+      times.drawTime = performance.now() - drawStartTime
       let total = 0
       for (const key in times) total += times[key]
       console.log('Bitmaps: ' + images.length + ' Total: ' + Math.round(total) + 'ms', times)

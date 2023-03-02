@@ -1,7 +1,3 @@
-/*
-    JASSUB.js
-*/
-
 #include "../lib/libass/libass/ass.h"
 #include <cstdint>
 #include <stdarg.h>
@@ -70,7 +66,7 @@ void msg_callback(int level, const char *fmt, va_list va, void *data) {
   const int ERR_LEVEL = 1;
   FILE *stream = level <= ERR_LEVEL ? stderr : stdout;
 
-  fprintf(stream, "libass: ");
+  fprintf(stream, "JASSUB: ");
   vfprintf(stream, fmt, va);
   fprintf(stream, "\n");
 }
@@ -395,6 +391,7 @@ public:
       result->x = img->dst_x;
       result->y = img->dst_y;
       result->image = (uint32_t)data;
+      result->next = NULL;
       if (tmp) {
         tmp->next = result;
       } else {
@@ -433,7 +430,7 @@ public:
       fprintf(stderr, "jso: cannot allocate buffer for rendering\n");
       return NULL;
     }
-    RenderResult *renderResult;
+    RenderResult *renderResult = NULL;
     processImages(renderResult, img, rawbuffer);
     time = emscripten_get_now() - start_decode_time;
     return renderResult;
@@ -833,6 +830,7 @@ EMSCRIPTEN_BINDINGS(JASSUB) {
     .function("renderImage", &JASSUB::renderImage, emscripten::allow_raw_pointers())
     .function("getEvent", &JASSUB::getEvent, emscripten::allow_raw_pointers())
     .function("getStyle", &JASSUB::getStyle, emscripten::allow_raw_pointers())
-    .property("changed", &JASSUB::changed).property("count", &JASSUB::count)
+    .property("changed", &JASSUB::changed)
+    .property("count", &JASSUB::count)
     .property("time", &JASSUB::time);
 }

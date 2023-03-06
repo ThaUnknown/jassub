@@ -238,6 +238,8 @@ export default class JASSUB extends EventTarget {
     const scalefactor = this.prescaleFactor <= 0 ? 1.0 : this.prescaleFactor
     const ratio = self.devicePixelRatio || 1
 
+    width = width * ratio
+    height = height * ratio
     if (height <= 0 || width <= 0) {
       width = 0
       height = 0
@@ -252,7 +254,7 @@ export default class JASSUB extends EventTarget {
 
       if (this.maxRenderHeight > 0 && newH > this.maxRenderHeight) newH = this.maxRenderHeight
 
-      width *= ratio * newH / height
+      width *= newH / height
       height = newH
     }
 

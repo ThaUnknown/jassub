@@ -39,6 +39,96 @@ if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPla
     delete this._rvfcpolyfillmap[handle];
   };
 }
+var commonjsGlobal = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : {};
+const root = typeof globalThis !== "undefined" && globalThis || typeof self !== "undefined" && self || typeof commonjsGlobal !== "undefined" && commonjsGlobal;
+function isConstructor(fn) {
+  try {
+    new fn();
+  } catch (error) {
+    return false;
+  }
+  return true;
+}
+if (typeof root.Event !== "function" || !isConstructor(root.Event)) {
+  root.Event = function() {
+    function Event2(type, options) {
+      this.bubbles = !!options && !!options.bubbles;
+      this.cancelable = !!options && !!options.cancelable;
+      this.composed = !!options && !!options.composed;
+      this.type = type;
+    }
+    return Event2;
+  }();
+}
+if (typeof root.EventTarget === "undefined" || !isConstructor(root.Event)) {
+  root.EventTarget = function() {
+    function EventTarget2() {
+      this.__listeners = /* @__PURE__ */ new Map();
+    }
+    EventTarget2.prototype = Object.create(Object.prototype);
+    EventTarget2.prototype.addEventListener = function(type, listener, options) {
+      if (arguments.length < 2) {
+        throw new TypeError(
+          `TypeError: Failed to execute 'addEventListener' on 'EventTarget': 2 arguments required, but only ${arguments.length} present.`
+        );
+      }
+      const __listeners = this.__listeners;
+      const actualType = type.toString();
+      if (!__listeners.has(actualType)) {
+        __listeners.set(actualType, /* @__PURE__ */ new Map());
+      }
+      const listenersForType = __listeners.get(actualType);
+      if (!listenersForType.has(listener)) {
+        listenersForType.set(listener, options);
+      }
+    };
+    EventTarget2.prototype.removeEventListener = function(type, listener, _options) {
+      if (arguments.length < 2) {
+        throw new TypeError(
+          `TypeError: Failed to execute 'addEventListener' on 'EventTarget': 2 arguments required, but only ${arguments.length} present.`
+        );
+      }
+      const __listeners = this.__listeners;
+      const actualType = type.toString();
+      if (__listeners.has(actualType)) {
+        const listenersForType = __listeners.get(actualType);
+        if (listenersForType.has(listener)) {
+          listenersForType.delete(listener);
+        }
+      }
+    };
+    EventTarget2.prototype.dispatchEvent = function(event) {
+      if (!(event instanceof Event)) {
+        throw new TypeError(
+          `Failed to execute 'dispatchEvent' on 'EventTarget': parameter 1 is not of type 'Event'.`
+        );
+      }
+      const type = event.type;
+      const __listeners = this.__listeners;
+      const listenersForType = __listeners.get(type);
+      if (listenersForType) {
+        for (const [listener, options] of listenersForType.entries()) {
+          try {
+            if (typeof listener === "function") {
+              listener.call(this, event);
+            } else if (listener && typeof listener.handleEvent === "function") {
+              listener.handleEvent(event);
+            }
+          } catch (err) {
+            setTimeout(() => {
+              throw err;
+            });
+          }
+          if (options && options.once) {
+            listenersForType.delete(listener);
+          }
+        }
+      }
+      return true;
+    };
+    return EventTarget2;
+  }();
+}
 const _JASSUB = class extends EventTarget {
   constructor(options = {}) {
     var _a, _b, _c;

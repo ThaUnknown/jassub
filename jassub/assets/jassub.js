@@ -1,4 +1,5 @@
 import 'rvfc-polyfill'
+import 'event-target-polyfill'
 
 /**
  * New JASSUB instance.

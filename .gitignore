@@ -19,3 +19,4 @@ dist/js
 dist/libraries
 dist/license
 test
+.pnpm-store

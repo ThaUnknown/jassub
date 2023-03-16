@@ -418,7 +418,8 @@ const h = class extends EventTarget {
     this["_" + e.target] && this["_" + e.target](e);
   }
   _error(e) {
-    this.dispatchEvent(e instanceof ErrorEvent ? new ErrorEvent(e.type, e) : new ErrorEvent("error", { cause: e instanceof Error ? e.cause : e })), e instanceof Error || (e instanceof ErrorEvent ? e = e.error : e = new Error("error", { cause: e })), console.error(e);
+    const t = e instanceof Error ? e : e instanceof ErrorEvent ? e.error : new Error(e), s = e instanceof Event ? new ErrorEvent(e.type, e) : new ErrorEvent("error", { error: t });
+    this.dispatchEvent(s), console.error(t);
   }
   _removeListeners() {
     this._video && (this._ro && this._ro.unobserve(this._video), this._video.removeEventListener("timeupdate", this._boundTimeUpdate), this._video.removeEventListener("progress", this._boundTimeUpdate), this._video.removeEventListener("waiting", this._boundTimeUpdate), this._video.removeEventListener("seeking", this._boundTimeUpdate), this._video.removeEventListener("playing", this._boundTimeUpdate), this._video.removeEventListener("ratechange", this._boundSetRate), this._video.removeEventListener("resize", this._boundResize));

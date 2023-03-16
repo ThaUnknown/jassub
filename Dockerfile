@@ -17,7 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         m4 \
         gperf \
         licensecheck \
+        nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /code
-CMD ["make"]
+CMD ["bash", "-c", "make; npx pnpm i; npm run bundle"]

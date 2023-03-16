@@ -1,5 +1,4 @@
 import 'rvfc-polyfill'
-import 'event-target-polyfill'
 
 /**
  * New JASSUB instance.
@@ -658,15 +657,19 @@ export default class JASSUB extends EventTarget {
   }
 
   _error (err) {
-    this.dispatchEvent(err instanceof ErrorEvent ? new ErrorEvent(err.type, err) : new ErrorEvent('error', { cause: err instanceof Error ? err.cause : err }))
-    if (!(err instanceof Error)) {
-      if (err instanceof ErrorEvent) {
-        err = err.error
-      } else {
-        err = new Error('error', { cause: err })
-      }
-    }
-    console.error(err)
+    const error = err instanceof Error
+      ? err // pass
+      : err instanceof ErrorEvent
+        ? err.error // ErrorEvent has error property which is an Error object
+        : new Error(err) // construct Error
+
+    const event = err instanceof Event
+      ? new ErrorEvent(err.type, err) // clone event
+      : new ErrorEvent('error', { error }) // construct Event
+
+    this.dispatchEvent(event)
+
+    console.error(error)
   }
 
   _removeListeners () {

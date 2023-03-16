@@ -1,12 +1,13 @@
 // vite.config.js
-const path = require('path')
+const { resolve } = require('path')
 const { defineConfig } = require('vite')
 
 module.exports = defineConfig({
   build: {
     emptyOutDir: false,
+    minify: 'esbuild',
     lib: {
-      entry: path.resolve(__dirname, 'src/jassub.js'),
+      entry: resolve(__dirname, 'src/jassub.js'),
       name: 'JASSUB',
       fileName: (format) => `jassub.${format}.js`
     }

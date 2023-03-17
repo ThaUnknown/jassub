@@ -1,4 +1,4 @@
-FROM docker.io/emscripten/emsdk:3.1.24
+FROM docker.io/emscripten/emsdk:3.1.34
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \

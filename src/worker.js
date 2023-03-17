@@ -1,6 +1,6 @@
 /* eslint-disable no-global-assign */
 // eslint-disable-next-line no-unused-vars
-/* global Module, HEAPU8, _malloc, buffer, out, err, ready, updateGlobalBufferAndViews */
+/* global Module, HEAPU8, _malloc, buffer, out, err, ready, updateMemoryViews, wasmMemory */
 const read_ = (url, ab) => {
   const xhr = new XMLHttpRequest()
   xhr.open('GET', url, false)
@@ -509,9 +509,9 @@ onmessage = ({ data }) => {
 let HEAPU8C = null
 
 // patch EMS function to include Uint8Clamped, but call old function too
-updateGlobalBufferAndViews = (_super => {
-  return buf => {
-    _super(buf)
-    HEAPU8C = new Uint8ClampedArray(buf)
+updateMemoryViews = (_super => {
+  return () => {
+    _super()
+    HEAPU8C = new Uint8ClampedArray(wasmMemory.buffer)
   }
-})(updateGlobalBufferAndViews)
+})(updateMemoryViews)

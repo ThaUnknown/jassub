@@ -1,4 +1,6 @@
-/* global Module, HEAPU8, _malloc, buffer */
+/* eslint-disable no-global-assign */
+// eslint-disable-next-line no-unused-vars
+/* global Module, HEAPU8, _malloc, buffer, out, err, ready, updateGlobalBufferAndViews */
 const read_ = (url, ab) => {
   const xhr = new XMLHttpRequest()
   xhr.open('GET', url, false)
@@ -19,22 +21,21 @@ const readAsync = (url, load, err) => {
   xhr.onerror = err
   xhr.send(null)
 }
-// eslint-disable-next-line no-global-assign
 Module = {
   wasm: !WebAssembly.instantiateStreaming && read_('jassub-worker.wasm', true)
 }
 
 // ran when WASM is compiled
-self.ready = () => postMessage({ target: 'ready' })
+ready = () => postMessage({ target: 'ready' })
 
-self.out = text => {
+out = text => {
   if (text === 'libass: No usable fontconfig configuration file found, using fallback.') {
     console.debug(text)
   } else {
     console.log(text)
   }
 }
-self.err = text => {
+err = text => {
   if (text === 'Fontconfig error: Cannot load default config file: No such file: (null)') {
     console.debug(text)
   } else {
@@ -508,9 +509,9 @@ onmessage = ({ data }) => {
 let HEAPU8C = null
 
 // patch EMS function to include Uint8Clamped, but call old function too
-self.updateGlobalBufferAndViews = (_super => {
+updateGlobalBufferAndViews = (_super => {
   return buf => {
     _super(buf)
     HEAPU8C = new Uint8ClampedArray(buf)
   }
-})(self.updateGlobalBufferAndViews)
+})(updateGlobalBufferAndViews)

@@ -22,7 +22,7 @@ const readAsync = (url, load, err) => {
   xhr.send(null)
 }
 Module = {
-  wasm: !WebAssembly.instantiateStreaming && read_('jassub-worker.wasm', true)
+  wasm: WebAssembly && !WebAssembly.instantiateStreaming && read_('jassub-worker.wasm', true)
 }
 
 // ran when WASM is compiled
@@ -196,7 +196,7 @@ const setIsPaused = isPaused => {
 
 const render = (time, force) => {
   const renderStartTime = performance.now()
-  const result = blendMode === 'wasm' ? self.jassubObj.renderBlend(time, force) : self.jassubObj.renderImage(time, force)
+  const result = blendMode === 'wasm' ? self.jassubObj.renderBlend(time, force || 0) : self.jassubObj.renderImage(time, force || 0)
   const times = {
     renderTime: performance.now() - renderStartTime - self.jassubObj.time,
     decodeTime: self.jassubObj.time
@@ -413,7 +413,7 @@ self.init = data => {
   for (const font of data.fonts || []) asyncWrite(font)
 
   self.jassubObj.createTrackMem(subContent)
-  self.jassubObj.setDropAnimations(data.dropAllAnimations)
+  self.jassubObj.setDropAnimations(data.dropAllAnimations || 0)
 
   if (data.libassMemoryLimit > 0 || data.libassGlyphLimit > 0) {
     self.jassubObj.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)

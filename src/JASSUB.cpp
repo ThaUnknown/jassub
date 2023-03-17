@@ -756,8 +756,6 @@ static RenderResult getNext(const RenderResult &res) {
 }
 
 EMSCRIPTEN_BINDINGS(JASSUB) {
-  emscripten::register_vector<RenderResult>("vector<RenderResult>");
-
   emscripten::class_<RenderResult>("RenderResult")
     .property("x", &RenderResult::x)
     .property("y", &RenderResult::y)

@@ -164,8 +164,7 @@ EMCC_COMMON_ARGS = \
 	--no-heap-copy \
 	-flto \
 	-fno-exceptions \
-	-o $@ \
-	-O3
+	-o $@
 	# -s STRICT=1 \
 	#--js-opts 0 -O0 -gsource-map 
 	#--js-opts 0 -O0 -g3 
@@ -182,6 +181,7 @@ dist/js/jassub-worker.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 	emcc src/JASSUB.cpp $(OCTP_DEPS) \
 		--pre-js src/polyfill.js \
 		--pre-js src/worker.js \
+		-O3 \
 		-s EVAL_CTORS=2 \
 		-s TEXTDECODER=2 \
 		-s WASM=1 \
@@ -193,6 +193,7 @@ dist/js/jassub-worker-legacy.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 		--pre-js src/polyfill.js \
 		--pre-js src/worker.js \
 		-s WASM=0 \
+		-O1 \
 		--closure=0 \
 		-s LEGACY_VM_SUPPORT=1 \
 		-s MIN_CHROME_VERSION=27 \

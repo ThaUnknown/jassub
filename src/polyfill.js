@@ -1,8 +1,10 @@
 /* eslint-disable no-global-assign */
 /* eslint no-extend-native: 0 */
-// eslint-disable-next-line no-unused-vars
-function assert (c, m) {
-  if (!c) throw m
+// eslint-disable-next-line no-undef
+if (!self.assert) {
+  self.assert = (c, m) => {
+    if (!c) throw m
+  }
 }
 
 if (!String.prototype.startsWith) {

@@ -193,7 +193,8 @@ dist/js/jassub-worker-legacy.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 		--pre-js src/polyfill.js \
 		--pre-js src/worker.js \
 		-s WASM=0 \
-		-O1 \
+		--memory-init-file 0 \
+		-O3 \
 		--closure=0 \
 		-s LEGACY_VM_SUPPORT=1 \
 		-s MIN_CHROME_VERSION=27 \

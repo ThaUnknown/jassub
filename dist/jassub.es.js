@@ -87,7 +87,7 @@ const h = class extends EventTarget {
       try {
         new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1);
       } catch {
-        console.log("detected that ImageData is not constructable despite browser saying so"), self.ImageData = function(o, c, l) {
+        console.log("Detected that ImageData is not constructable despite browser saying so"), self.ImageData = function(o, c, l) {
           const m = t.createImageData(c, l);
           return o && m.data.set(o), m;
         };

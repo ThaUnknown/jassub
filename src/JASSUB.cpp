@@ -295,7 +295,7 @@ public:
     strcpy(m_defaultFont, defaultFont);
     ass_library = ass_library_init();
     if (!ass_library) {
-      fprintf(stderr, "jso: ass_library_init failed!\n");
+      fprintf(stderr, "JASSUB: ass_library_init failed!\n");
       exit(2);
     }
 
@@ -303,7 +303,7 @@ public:
 
     ass_renderer = ass_renderer_init(ass_library);
     if (!ass_renderer) {
-      fprintf(stderr, "jso: ass_renderer_init failed!\n");
+      fprintf(stderr, "JASSUB: ass_renderer_init failed!\n");
       exit(3);
     }
     ass_set_extract_fonts(ass_library, true);
@@ -342,7 +342,7 @@ public:
     removeTrack();
     track = ass_read_memory(ass_library, buf.data(), buf.size(), NULL);
     if (!track) {
-      fprintf(stderr, "jso: Failed to start a track\n");
+      fprintf(stderr, "JASSUB: Failed to start a track\n");
       exit(4);
     }
     scanAnimations(0);
@@ -427,7 +427,7 @@ public:
     int size = getBufferSize(img);
     char *rawbuffer = (char *)m_buffer.take(size);
     if (rawbuffer == NULL) {
-      fprintf(stderr, "jso: cannot allocate buffer for rendering\n");
+      fprintf(stderr, "JASSUB: cannot allocate buffer for rendering\n");
       return NULL;
     }
     RenderResult *renderResult = NULL;
@@ -484,7 +484,7 @@ public:
   }
 
   void setMemoryLimits(int glyph_limit, int bitmap_cache_limit) {
-    printf("jso: setting total libass memory limits to: glyph=%d MiB, bitmap cache=%d MiB\n", glyph_limit, bitmap_cache_limit);
+    printf("JASSUB: setting total libass memory limits to: glyph=%d MiB, bitmap cache=%d MiB\n", glyph_limit, bitmap_cache_limit);
     ass_set_cache_limits(ass_renderer, glyph_limit, bitmap_cache_limit);
   }
 
@@ -573,7 +573,7 @@ public:
     const size_t buffer_size = width * height * 4 * sizeof(float);
     float *buf = (float *)m_buffer.take(buffer_size);
     if (buf == NULL) {
-      fprintf(stderr, "jso: cannot allocate buffer for blending\n");
+      fprintf(stderr, "JASSUB: cannot allocate buffer for blending\n");
       return NULL;
     }
 
@@ -638,13 +638,13 @@ public:
     } else if (smallBuffer != NULL) {
       storage = smallBuffer;
     } else {
-      printf("jso: cannot get a buffer for rendering part!\n");
+      printf("JASSUB: cannot get a buffer for rendering part!\n");
       return NULL;
     }
 
     unsigned int *result = (unsigned int *)storage->buf.take(needed);
     if (result == NULL) {
-      printf("jso: cannot make a buffer for rendering part!\n");
+      printf("JASSUB: cannot make a buffer for rendering part!\n");
       return NULL;
     }
     storage->taken = true;

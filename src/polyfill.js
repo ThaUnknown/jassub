@@ -73,5 +73,5 @@ if (typeof console === 'undefined') {
       msg('error', arguments)
     }
   }
-  console.log('overridden console')
+  console.log('Detected lack of console, overridden console')
 }

@@ -1,6 +1,6 @@
 /* eslint-disable no-global-assign */
 // eslint-disable-next-line no-unused-vars
-/* global Module, HEAPU8, _malloc, buffer, out, err, ready, updateMemoryViews, wasmMemory */
+/* global Module, HEAPU8, _malloc, out, err, ready, updateMemoryViews, wasmMemory */
 const read_ = (url, ab) => {
   const xhr = new XMLHttpRequest()
   xhr.open('GET', url, false)
@@ -29,7 +29,7 @@ Module = {
 ready = () => postMessage({ target: 'ready' })
 
 out = text => {
-  if (text === 'libass: No usable fontconfig configuration file found, using fallback.') {
+  if (text === 'JASSUB: No usable fontconfig configuration file found, using fallback.') {
     console.debug(text)
   } else {
     console.log(text)
@@ -224,7 +224,7 @@ const render = (time, force) => {
       for (let image = result, i = 0; i < self.jassubObj.count; image = image.next, ++i) {
         const img = { w: image.w, h: image.h, x: image.x, y: image.y, image: image.image }
         if (!offCanvasCtx) {
-          const buf = buffer.slice(image.image, image.image + image.w * image.h * 4)
+          const buf = wasmMemory.buffer.slice(image.image, image.image + image.w * image.h * 4)
           buffers.push(buf)
           img.image = buf
         }

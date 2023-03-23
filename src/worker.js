@@ -1,6 +1,6 @@
 /* eslint-disable no-global-assign */
 // eslint-disable-next-line no-unused-vars
-/* global Module, HEAPU8, _malloc, out, err, ready, updateMemoryViews, wasmMemory */
+/* global Module, HEAPU8, _malloc, out, err, ready, buffer, updateGlobalBufferAndViews */
 const read_ = (url, ab) => {
   const xhr = new XMLHttpRequest()
   xhr.open('GET', url, false)
@@ -224,7 +224,7 @@ const render = (time, force) => {
       for (let image = result, i = 0; i < self.jassubObj.count; image = image.next, ++i) {
         const img = { w: image.w, h: image.h, x: image.x, y: image.y, image: image.image }
         if (!offCanvasCtx) {
-          const buf = wasmMemory.buffer.slice(image.image, image.image + image.w * image.h * 4)
+          const buf = buffer.slice(image.image, image.image + image.w * image.h * 4)
           buffers.push(buf)
           img.image = buf
         }
@@ -509,9 +509,9 @@ onmessage = ({ data }) => {
 let HEAPU8C = null
 
 // patch EMS function to include Uint8Clamped, but call old function too
-updateMemoryViews = (_super => {
-  return () => {
-    _super()
-    HEAPU8C = new Uint8ClampedArray(wasmMemory.buffer)
+updateGlobalBufferAndViews = (_super => {
+  return buf => {
+    _super(buf)
+    HEAPU8C = new Uint8ClampedArray(buffer)
   }
-})(updateMemoryViews)
+})(updateGlobalBufferAndViews)

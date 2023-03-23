@@ -143,7 +143,7 @@ export default class JASSUB extends EventTarget {
         // eslint-disable-next-line no-new
         new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1)
       } catch (e) {
-        console.log('detected that ImageData is not constructable despite browser saying so')
+        console.log('Detected that ImageData is not constructable despite browser saying so')
 
         self.ImageData = function (data, width, height) {
           const imageData = ctx1.createImageData(width, height)

@@ -211,7 +211,7 @@ const render = (time, force) => {
       const promises = []
       for (let image = result, i = 0; i < self.jassubObj.count; image = image.next, ++i) {
         images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
-        promises.push(createImageBitmap(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
+        promises.push(createImageBitmap(new ImageData(HEAPU8C.slice(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
       }
       Promise.all(promises).then(bitmaps => {
         for (let i = 0; i < images.length; i++) {

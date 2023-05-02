@@ -21,4 +21,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /code
-CMD ["bash", "-c", "make; npx pnpm i; npm run bundle"]
+CMD ["bash", "-c", "make; npm i; npm run bundle"]

@@ -1,5 +1,30 @@
 import 'rvfc-polyfill'
 
+const webYCbCrMap = {
+  bt709: 'BT.709',
+  // these might not be exactly correct? oops?
+  bt470bg: 'BT.601', // alias BT.601 PAL... whats the difference?
+  smpte170m: 'BT.601'// alias BT.601 NTSC... whats the difference?
+}
+
+const colorMatrixConversionMap = {
+  'BT.601': {
+    'BT.709': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'1.0863 -0.0723 -0.014 0 0 0.0965 0.8451 0.0584 0 0 -0.0141 -0.0277 1.0418 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+  },
+  'BT.709': {
+    'BT.601': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'0.9137 0.0784 0.0079 0 0 -0.1049 1.1722 -0.0671 0 0 0.0096 0.0322 0.9582 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+  },
+  FCC: {
+    'BT.709': `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='f'><feColorMatrix type='matrix' values='1.0873 -0.0736 -0.0137 0 0 0.0974 0.8494 0.0531 0 0 -0.0127 -0.0251 
+1.0378 0 0 0 0 0 1 0'/></filter></svg>#f")`,
+    'BT.601': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'1.001 -0.0008 -0.0002 0 0 0.0009 1.005 -0.006 0 0 0.0013 0.0027 0.996 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+  },
+  SMPTE240M: {
+    'BT.709': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'0.9993 0.0006 0.0001 0 0 -0.0004 0.9812 0.0192 0 0 -0.0034 -0.0114 1.0148 0 0 0 0 0 1 0\'/></filter></svg>#f")',
+    'BT.601': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'0.913 0.0774 0.0096 0 0 -0.1051 1.1508 -0.0456 0 0 0.0063 0.0207 0.973 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+  }
+}
+
 /**
  * New JASSUB instance.
  * @class
@@ -37,15 +62,13 @@ export default class JASSUB extends EventTarget {
       this.destroy('Worker not supported')
     }
     JASSUB._test()
-    const blendMode = options.blendMode || 'js'
-    const asyncRender = typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true)
-    const offscreenRender = typeof OffscreenCanvas !== 'undefined' && (options.offscreenRender ?? true)
     this._onDemandRender = 'requestVideoFrameCallback' in HTMLVideoElement.prototype && (options.onDemandRender ?? true)
 
     this.timeOffset = options.timeOffset || 0
     this._video = options.video
     this._videoHeight = 0
     this._videoWidth = 0
+    this._videoColorSpace = null
     this._canvas = options.canvas
     if (this._video && !this._canvas) {
       this._canvasParent = document.createElement('div')
@@ -70,8 +93,8 @@ export default class JASSUB extends EventTarget {
     this._bufferCanvas = document.createElement('canvas')
     this._bufferCtx = this._bufferCanvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
 
-    this._canvasctrl = offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas
-    this._ctx = !offscreenRender && this._canvasctrl.getContext('2d', { desynchronized: true })
+    this._canvasctrl = this._canvas
+    this._ctx = this._canvasctrl.getContext('2d', { desynchronized: true })
 
     this._lastRenderTime = 0
     this.debug = !!options.debug
@@ -89,12 +112,12 @@ export default class JASSUB extends EventTarget {
         if (this._destroyed) return
         this._worker.postMessage({
           target: 'init',
-          asyncRender,
+          asyncRender: typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true),
           onDemandRender: this._onDemandRender,
-          width: this._canvasctrl.width,
-          height: this._canvasctrl.height,
+          width: this._canvasctrl.width || 0,
+          height: this._canvasctrl.height || 0,
           preMain: true,
-          blendMode,
+          blendMode: options.blendMode || 'js',
           subUrl: options.subUrl,
           subContent: options.subContent || null,
           fonts: options.fonts || [],
@@ -106,19 +129,19 @@ export default class JASSUB extends EventTarget {
           libassMemoryLimit: options.libassMemoryLimit || 0,
           libassGlyphLimit: options.libassGlyphLimit || 0,
           hasAlphaBug: JASSUB._hasAlphaBug,
+          offscreenRender: typeof OffscreenCanvas !== 'undefined' && (options.offscreenRender ?? true),
           useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)
         })
-        if (offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
 
         this._boundResize = this.resize.bind(this)
         this._boundTimeUpdate = this._timeupdate.bind(this)
         this._boundSetRate = this.setRate.bind(this)
+        this._boundUpdateColorSpace = this._updateColorSpace.bind(this)
         if (this._video) this.setVideo(options.video)
 
         if (this._onDemandRender) {
           this.busy = false
           this._lastDemandTime = null
-          this._video?.requestVideoFrameCallback(this._handleRVFC.bind(this))
         }
         resolve()
       }
@@ -272,6 +295,15 @@ export default class JASSUB extends EventTarget {
     this.setCurrentTime(this._video.paused || this._playstate, this._video.currentTime + this.timeOffset)
   }
 
+  _updateColorSpace () {
+    this._video.requestVideoFrameCallback(() => {
+    // eslint-disable-next-line no-undef
+      const frame = new VideoFrame(this._video)
+      this._videoColorSpace = webYCbCrMap[frame.colorSpace.matrix]
+      frame.close()
+    })
+  }
+
   /**
    * Change the video to use as target for event listeners.
    * @param  {HTMLVideoElement} video
@@ -291,7 +323,12 @@ export default class JASSUB extends EventTarget {
         video.addEventListener('seeking', this._boundTimeUpdate, false)
         video.addEventListener('playing', this._boundTimeUpdate, false)
         video.addEventListener('ratechange', this._boundSetRate, false)
-        video.addEventListener('resize', this._boundResize)
+        video.addEventListener('resize', this._boundResize, false)
+      }
+      // everything else is unreliable for this, loadedmetadata and loadeddata included.
+      if ('VideoFrame' in window) {
+        video.addEventListener('loadedmetadata', this._boundUpdateColorSpace, false)
+        if (video.readyState > 2) this._updateColorSpace()
       }
       if (video.videoWidth > 0) this.resize()
       // Support Element Resize Observer
@@ -550,12 +587,24 @@ export default class JASSUB extends EventTarget {
     this.sendMessage('demand', { time: mediaTime + this.timeOffset })
   }
 
-  _render ({ images, async, times, width, height }) {
+  /**
+   * Veryify the color spaces for subtitles and videos, then apply filters to correct the color of subtitles.
+   * @param  {String} subtitleColorSpace Subtitle color space. One of: BT.601 BT.709 SMPTE240M FCC
+   * @param  {String} videoColorSpace Video color space. One of: BT.601 BT.709
+   */
+  verifyColorSpace (subtitleColorSpace, videoColorSpace = this._videoColorSpace) {
+    if (!subtitleColorSpace || !videoColorSpace) return
+    if (subtitleColorSpace === videoColorSpace) return
+    this._ctx.filter = colorMatrixConversionMap[subtitleColorSpace][videoColorSpace]
+  }
+
+  _render ({ images, async, times, width, height, colorSpace }) {
     this._unbusy()
     const drawStartTime = Date.now()
     if (this._canvasctrl.width !== width || this._canvasctrl.height !== height) {
       this._canvasctrl.width = width
       this._canvasctrl.height = height
+      this.verifyColorSpace(colorSpace)
     }
     this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
     for (const image of images) {
@@ -675,6 +724,7 @@ export default class JASSUB extends EventTarget {
   _removeListeners () {
     if (this._video) {
       if (this._ro) this._ro.unobserve(this._video)
+      this._ctx.filter = 'none'
       this._video.removeEventListener('timeupdate', this._boundTimeUpdate)
       this._video.removeEventListener('progress', this._boundTimeUpdate)
       this._video.removeEventListener('waiting', this._boundTimeUpdate)
@@ -682,6 +732,7 @@ export default class JASSUB extends EventTarget {
       this._video.removeEventListener('playing', this._boundTimeUpdate)
       this._video.removeEventListener('ratechange', this._boundSetRate)
       this._video.removeEventListener('resize', this._boundResize)
+      this._video.removeEventListener('loadedmetadata', this._boundUpdateColorSpace)
     }
   }
 

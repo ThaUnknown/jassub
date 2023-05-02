@@ -93,8 +93,8 @@ const asyncWrite = font => {
 const allocFont = uint8 => {
   const ptr = _malloc(uint8.byteLength)
   HEAPU8.set(uint8, ptr)
-  self.jassubObj.addFont('font-' + (fontId++), ptr, uint8.byteLength)
-  self.jassubObj.reloadFonts()
+  jassubObj.addFont('font-' + (fontId++), ptr, uint8.byteLength)
+  jassubObj.reloadFonts()
 }
 
 const processAvailableFonts = content => {
@@ -125,14 +125,16 @@ self.setTrack = ({ content }) => {
   processAvailableFonts(content)
 
   // Tell libass to render the new track
-  self.jassubObj.createTrackMem(content)
+  jassubObj.createTrackMem(content)
+
+  trackColorSpace = libassYCbCrMap[jassubObj.getTrackColorSpace()]
 }
 
 /**
  * Remove subtitle track.
  */
 self.freeTrack = () => {
-  self.jassubObj.removeTrack()
+  jassubObj.removeTrack()
 }
 
 /**
@@ -141,12 +143,6 @@ self.freeTrack = () => {
  */
 self.setTrackByUrl = ({ url }) => {
   self.setTrack({ content: read_(url) })
-}
-
-const resize = (width, height) => {
-  self.width = width
-  self.height = height
-  self.jassubObj.resizeCanvas(width, height)
 }
 
 const getCurrentTime = () => {
@@ -194,14 +190,20 @@ const setIsPaused = isPaused => {
   }
 }
 
+const a = 'BT.601'
+const b = 'BT.709'
+const c = 'SMPTE240M'
+
+const libassYCbCrMap = [a, a, a, a, a, b, b, c, c, 'FCC', 'FCC']
+
 const render = (time, force) => {
   const renderStartTime = performance.now()
-  const result = blendMode === 'wasm' ? self.jassubObj.renderBlend(time, force || 0) : self.jassubObj.renderImage(time, force || 0)
+  const result = blendMode === 'wasm' ? jassubObj.renderBlend(time, force || 0) : jassubObj.renderImage(time, force || 0)
   const times = {
-    renderTime: performance.now() - renderStartTime - self.jassubObj.time,
-    decodeTime: self.jassubObj.time
+    renderTime: performance.now() - renderStartTime - jassubObj.time,
+    decodeTime: jassubObj.time
   }
-  if (self.jassubObj.changed !== 0 || force) {
+  if (jassubObj.changed !== 0 || force) {
     const images = []
     let buffers = []
     const decodeStartTime = performance.now()
@@ -209,7 +211,7 @@ const render = (time, force) => {
     // use callback to not rely on async/await
     if (asyncRender) {
       const promises = []
-      for (let image = result, i = 0; i < self.jassubObj.count; image = image.next, ++i) {
+      for (let image = result, i = 0; i < jassubObj.count; image = image.next, ++i) {
         images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
         promises.push(createImageBitmap(new ImageData(HEAPU8C.slice(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
       }
@@ -221,7 +223,7 @@ const render = (time, force) => {
         paintImages({ images, buffers, times, decodeStartTime })
       })
     } else {
-      for (let image = result, i = 0; i < self.jassubObj.count; image = image.next, ++i) {
+      for (let image = result, i = 0; i < jassubObj.count; image = image.next, ++i) {
         const img = { w: image.w, h: image.h, x: image.x, y: image.y, image: image.image }
         if (!offCanvasCtx) {
           const buf = buffer.slice(image.image, image.image + image.w * image.h * 4)
@@ -254,11 +256,23 @@ const renderLoop = force => {
 
 const paintImages = ({ times, images, decodeStartTime, buffers }) => {
   times.decodeTime = performance.now() - decodeStartTime
+
+  const resultObject = {
+    target: 'render',
+    async: asyncRender,
+    images,
+    times,
+    width: self.width,
+    height: self.height,
+    colorSpace: trackColorSpace
+  }
+
   if (offCanvasCtx) {
     const drawStartTime = performance.now()
-    // force updates
-    offCanvas.width = self.width
-    if (offCanvas.height !== self.height) offCanvas.height = self.height
+    if (offCanvas.height !== self.height || offCanvas.width !== self.width) {
+      offCanvas.width = self.width
+      offCanvas.height = self.height
+    }
     offCanvasCtx.clearRect(0, 0, self.width, self.height)
     for (const image of images) {
       if (image.image) {
@@ -266,10 +280,10 @@ const paintImages = ({ times, images, decodeStartTime, buffers }) => {
           offCanvasCtx.drawImage(image.image, image.x, image.y)
           image.image.close()
         } else {
-          self.bufferCanvas.width = image.w
-          self.bufferCanvas.height = image.h
-          self.bufferCtx.putImageData(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h), 0, 0)
-          offCanvasCtx.drawImage(self.bufferCanvas, image.x, image.y)
+          bufferCanvas.width = image.w
+          bufferCanvas.height = image.h
+          bufferCtx.putImageData(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h), 0, 0)
+          offCanvasCtx.drawImage(bufferCanvas, image.x, image.y)
         }
       }
     }
@@ -279,18 +293,16 @@ const paintImages = ({ times, images, decodeStartTime, buffers }) => {
       for (const key in times) total += times[key]
       console.log('Bitmaps: ' + images.length + ' Total: ' + Math.round(total) + 'ms', times)
     }
-    postMessage({
-      target: 'unbusy'
-    })
+    try {
+      const image = offCanvas.transferToImageBitmap()
+      resultObject.images = [{ image, x: 0, y: 0 }]
+      resultObject.async = true
+      postMessage(resultObject, [image])
+    } catch (e) {
+      postMessage({ target: 'unbusy' })
+    }
   } else {
-    postMessage({
-      target: 'render',
-      async: asyncRender,
-      images,
-      times,
-      width: self.width,
-      height: self.height
-    }, buffers)
+    postMessage(resultObject, buffers)
   }
 }
 
@@ -381,6 +393,12 @@ const _applyKeys = (input, output) => {
     output[v] = input[v]
   }
 }
+let offCanvas
+let offCanvasCtx
+let bufferCanvas
+let bufferCtx
+let jassubObj
+let trackColorSpace
 
 self.init = data => {
   self.width = data.width
@@ -401,7 +419,7 @@ self.init = data => {
   useLocalFonts = data.useLocalFonts
 
   const fallbackFont = data.fallbackFont.toLowerCase()
-  self.jassubObj = new Module.JASSUB(self.width, self.height, fallbackFont || null)
+  jassubObj = new Module.JASSUB(self.width, self.height, fallbackFont || null)
 
   if (fallbackFont) findAvailableFonts(fallbackFont)
 
@@ -412,17 +430,30 @@ self.init = data => {
 
   for (const font of data.fonts || []) asyncWrite(font)
 
-  self.jassubObj.createTrackMem(subContent)
-  self.jassubObj.setDropAnimations(data.dropAllAnimations || 0)
+  jassubObj.createTrackMem(subContent)
+
+  trackColorSpace = libassYCbCrMap[jassubObj.trackColorSpace]
+
+  jassubObj.setDropAnimations(data.dropAllAnimations || 0)
 
   if (data.libassMemoryLimit > 0 || data.libassGlyphLimit > 0) {
-    self.jassubObj.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)
+    jassubObj.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)
+  }
+  if (data.offscreenRender) {
+    offCanvas = new OffscreenCanvas(self.height, self.width)
+    offCanvasCtx = offCanvas.getContext('2d', { desynchronized: true })
+    if (!asyncRender) {
+      bufferCanvas = new OffscreenCanvas(self.height, self.width)
+      bufferCtx = bufferCanvas.getContext('2d', { desynchronized: true })
+    }
   }
 }
 
 self.canvas = ({ width, height, force }) => {
   if (width == null) throw new Error('Invalid canvas size specified')
-  resize(width, height, force)
+  self.width = width
+  self.height = height
+  jassubObj.resizeCanvas(width, height)
   if (force) render(lastCurrentTime)
 }
 
@@ -432,29 +463,18 @@ self.video = ({ currentTime, isPaused, rate }) => {
   rate = rate || rate
 }
 
-let offCanvas
-let offCanvasCtx
-self.offscreenCanvas = ({ transferable }) => {
-  offCanvas = transferable[0]
-  offCanvasCtx = offCanvas.getContext('2d', { desynchronized: true })
-  if (!asyncRender) {
-    self.bufferCanvas = new OffscreenCanvas(self.height, self.width)
-    self.bufferCtx = self.bufferCanvas.getContext('2d', { desynchronized: true })
-  }
-}
-
 self.destroy = () => {
-  self.jassubObj.quitLibrary()
+  jassubObj.quitLibrary()
 }
 
 self.createEvent = ({ event }) => {
-  _applyKeys(event, self.jassubObj.getEvent(self.jassubObj.allocEvent()))
+  _applyKeys(event, jassubObj.getEvent(jassubObj.allocEvent()))
 }
 
 self.getEvents = () => {
   const events = []
-  for (let i = 0; i < self.jassubObj.getEventCount(); i++) {
-    const { Start, Duration, ReadOrder, Layer, Style, MarginL, MarginR, MarginV, Name, Text, Effect } = self.jassubObj.getEvent(i)
+  for (let i = 0; i < jassubObj.getEventCount(); i++) {
+    const { Start, Duration, ReadOrder, Layer, Style, MarginL, MarginR, MarginV, Name, Text, Effect } = jassubObj.getEvent(i)
     events.push({ Start, Duration, ReadOrder, Layer, Style, MarginL, MarginR, MarginV, Name, Text, Effect })
   }
   postMessage({
@@ -464,22 +484,22 @@ self.getEvents = () => {
 }
 
 self.setEvent = ({ event, index }) => {
-  _applyKeys(event, self.jassubObj.getEvent(index))
+  _applyKeys(event, jassubObj.getEvent(index))
 }
 
 self.removeEvent = ({ index }) => {
-  self.jassubObj.removeEvent(index)
+  jassubObj.removeEvent(index)
 }
 
 self.createStyle = ({ style }) => {
-  _applyKeys(style, self.jassubObj.getStyle(self.jassubObj.allocStyle()))
+  _applyKeys(style, jassubObj.getStyle(jassubObj.allocStyle()))
 }
 
 self.getStyles = () => {
   const styles = []
-  for (let i = 0; i < self.jassubObj.getStyleCount(); i++) {
+  for (let i = 0; i < jassubObj.getStyleCount(); i++) {
     // eslint-disable-next-line camelcase
-    const { Name, FontName, FontSize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding, treat_fontname_as_pattern, Blur, Justify } = self.jassubObj.getStyle(i)
+    const { Name, FontName, FontSize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding, treat_fontname_as_pattern, Blur, Justify } = jassubObj.getStyle(i)
     // eslint-disable-next-line camelcase
     styles.push({ Name, FontName, FontSize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding, treat_fontname_as_pattern, Blur, Justify })
   }
@@ -491,11 +511,11 @@ self.getStyles = () => {
 }
 
 self.setStyle = ({ style, index }) => {
-  _applyKeys(style, self.jassubObj.getStyle(index))
+  _applyKeys(style, jassubObj.getStyle(index))
 }
 
 self.removeStyle = ({ index }) => {
-  self.jassubObj.removeStyle(index)
+  jassubObj.removeStyle(index)
 }
 
 onmessage = ({ data }) => {

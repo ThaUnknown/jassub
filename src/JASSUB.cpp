@@ -274,6 +274,8 @@ private:
 
 public:
   ASS_Track *track;
+
+  int trackColorSpace;
   int changed = 0;
   int count = 0;
   int time = 0;
@@ -346,6 +348,8 @@ public:
       exit(4);
     }
     scanAnimations(0);
+
+    trackColorSpace = track->YCbCrMatrix;
   }
 
   void removeTrack() {
@@ -828,6 +832,7 @@ EMSCRIPTEN_BINDINGS(JASSUB) {
     .function("renderImage", &JASSUB::renderImage, emscripten::allow_raw_pointers())
     .function("getEvent", &JASSUB::getEvent, emscripten::allow_raw_pointers())
     .function("getStyle", &JASSUB::getStyle, emscripten::allow_raw_pointers())
+    .property("trackColorSpace", &JASSUB::trackColorSpace)
     .property("changed", &JASSUB::changed)
     .property("count", &JASSUB::count)
     .property("time", &JASSUB::time);

@@ -91,10 +91,10 @@ export default class JASSUB extends EventTarget {
     }
 
     this._bufferCanvas = document.createElement('canvas')
-    this._bufferCtx = this._bufferCanvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
+    this._bufferCtx = this._bufferCanvas.getContext('2d')
 
     this._canvasctrl = this._canvas
-    this._ctx = this._canvasctrl.getContext('2d', { desynchronized: true })
+    this._ctx = this._canvasctrl.getContext('2d')
 
     this._lastRenderTime = 0
     this.debug = !!options.debug

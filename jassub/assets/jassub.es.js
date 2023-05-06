@@ -1,24 +1,24 @@
 var _ = Object.defineProperty;
 var u = (d, e, t) => e in d ? _(d, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : d[e] = t;
-var v = (d, e, t) => (u(d, typeof e != "symbol" ? e + "" : e, t), t);
+var f = (d, e, t) => (u(d, typeof e != "symbol" ? e + "" : e, t), t);
 !("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPlaybackQuality" in HTMLVideoElement.prototype && (HTMLVideoElement.prototype._rvfcpolyfillmap = {}, HTMLVideoElement.prototype.requestVideoFrameCallback = function(d) {
-  const e = performance.now(), t = this.getVideoPlaybackQuality(), s = this.mozPresentedFrames || this.mozPaintedFrames || t.totalVideoFrames - t.droppedVideoFrames, i = (n, r) => {
-    const o = this.getVideoPlaybackQuality(), a = this.mozPresentedFrames || this.mozPaintedFrames || o.totalVideoFrames - o.droppedVideoFrames;
-    if (a > s) {
-      const h = this.mozFrameDelay || o.totalFrameDelay - t.totalFrameDelay || 0, c = r - n;
+  const e = this.getVideoPlaybackQuality(), t = this.mozPresentedFrames || this.mozPaintedFrames || e.totalVideoFrames - e.droppedVideoFrames, s = (n, r) => {
+    const a = this.getVideoPlaybackQuality(), h = this.mozPresentedFrames || this.mozPaintedFrames || a.totalVideoFrames - a.droppedVideoFrames;
+    if (h > t) {
+      const c = this.mozFrameDelay || a.totalFrameDelay - e.totalFrameDelay || 0, m = r - n;
       d(r, {
-        presentationTime: r + h * 1e3,
-        expectedDisplayTime: r + c,
+        presentationTime: r + c * 1e3,
+        expectedDisplayTime: r + m,
         width: this.videoWidth,
         height: this.videoHeight,
-        mediaTime: Math.max(0, this.currentTime || 0) + c / 1e3,
-        presentedFrames: a,
-        processingDuration: h
-      }), delete this._rvfcpolyfillmap[e];
+        mediaTime: Math.max(0, this.currentTime || 0) + m / 1e3,
+        presentedFrames: h,
+        processingDuration: c
+      }), delete this._rvfcpolyfillmap[i];
     } else
-      this._rvfcpolyfillmap[e] = requestAnimationFrame((h) => i(r, h));
-  };
-  return this._rvfcpolyfillmap[e] = requestAnimationFrame((n) => i(e, n)), e;
+      this._rvfcpolyfillmap[i] = requestAnimationFrame((c) => s(r, c));
+  }, i = Date.now(), o = performance.now();
+  return this._rvfcpolyfillmap[i] = requestAnimationFrame((n) => s(o, n)), i;
 }, HTMLVideoElement.prototype.cancelVideoFrameCallback = function(d) {
   cancelAnimationFrame(this._rvfcpolyfillmap[d]), delete this._rvfcpolyfillmap[d];
 });
@@ -109,24 +109,24 @@ const g = {
         new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1);
       } catch {
         console.log("Detected that ImageData is not constructable despite browser saying so"), self.ImageData = function(a, h, c) {
-          const f = t.createImageData(h, c);
-          return a && f.data.set(a), f;
+          const m = t.createImageData(h, c);
+          return a && m.data.set(a), m;
         };
       }
     try {
       if (typeof WebAssembly == "object" && typeof WebAssembly.instantiate == "function") {
-        const o = new WebAssembly.Module(Uint8Array.of(0, 97, 115, 109, 1, 0, 0, 0));
-        o instanceof WebAssembly.Module && (l._supportsWebAssembly = new WebAssembly.Instance(o) instanceof WebAssembly.Instance);
+        const r = new WebAssembly.Module(Uint8Array.of(0, 97, 115, 109, 1, 0, 0, 0));
+        r instanceof WebAssembly.Module && (l._supportsWebAssembly = new WebAssembly.Instance(r) instanceof WebAssembly.Instance);
       }
     } catch {
       l._supportsWebAssembly = !1;
     }
     const s = document.createElement("canvas"), i = s.getContext("2d", { willReadFrequently: !0 });
     e.width = s.width = 1, e.height = s.height = 1, t.clearRect(0, 0, 1, 1), i.clearRect(0, 0, 1, 1);
-    const n = i.getImageData(0, 0, 1, 1).data;
+    const o = i.getImageData(0, 0, 1, 1).data;
     t.putImageData(new ImageData(new Uint8ClampedArray([0, 255, 0, 0]), 1, 1), 0, 0), i.drawImage(e, 0, 0);
-    const r = i.getImageData(0, 0, 1, 1).data;
-    l._hasAlphaBug = n[1] !== r[1], l._hasAlphaBug && console.log("Detected a browser having issue with transparent pixels, applying workaround"), e.remove(), s.remove();
+    const n = i.getImageData(0, 0, 1, 1).data;
+    l._hasAlphaBug = o[1] !== n[1], l._hasAlphaBug && console.log("Detected a browser having issue with transparent pixels, applying workaround"), e.remove(), s.remove();
   }
   /**
    * Resize the canvas to given parameters. Auto-generated if values are ommited.
@@ -136,33 +136,33 @@ const g = {
    * @param  {Number} [left=0]
    * @param  {Boolean} [force=false]
    */
-  resize(e = 0, t = 0, s = 0, i = 0, n = ((r) => (r = this._video) == null ? void 0 : r.paused)()) {
+  resize(e = 0, t = 0, s = 0, i = 0, o = ((n) => (n = this._video) == null ? void 0 : n.paused)()) {
     if ((!e || !t) && this._video) {
-      const o = this._getVideoPosition();
+      const r = this._getVideoPosition();
       let a = null;
       if (this._videoWidth) {
         const h = this._video.videoWidth / this._videoWidth, c = this._video.videoHeight / this._videoHeight;
-        a = this._computeCanvasSize((o.width || 0) / h, (o.height || 0) / c);
+        a = this._computeCanvasSize((r.width || 0) / h, (r.height || 0) / c);
       } else
-        a = this._computeCanvasSize(o.width || 0, o.height || 0);
-      e = a.width, t = a.height, this._canvasParent && (s = o.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top), i = o.x), this._canvas.style.width = o.width + "px", this._canvas.style.height = o.height + "px";
+        a = this._computeCanvasSize(r.width || 0, r.height || 0);
+      e = a.width, t = a.height, this._canvasParent && (s = r.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top), i = r.x), this._canvas.style.width = r.width + "px", this._canvas.style.height = r.height + "px";
     }
-    this._canvas.style.top = s + "px", this._canvas.style.left = i + "px", this.sendMessage("canvas", { width: e, height: t, force: n && this.busy === !1 });
+    this._canvas.style.top = s + "px", this._canvas.style.left = i + "px", this.sendMessage("canvas", { width: e, height: t, force: o && this.busy === !1 });
   }
   _getVideoPosition(e = this._video.videoWidth, t = this._video.videoHeight) {
-    const s = e / t, { offsetWidth: i, offsetHeight: n } = this._video, r = i / n;
-    e = i, t = n, r > s ? e = Math.floor(n * s) : t = Math.floor(i / s);
-    const o = (i - e) / 2, a = (n - t) / 2;
-    return { width: e, height: t, x: o, y: a };
+    const s = e / t, { offsetWidth: i, offsetHeight: o } = this._video, n = i / o;
+    e = i, t = o, n > s ? e = Math.floor(o * s) : t = Math.floor(i / s);
+    const r = (i - e) / 2, a = (o - t) / 2;
+    return { width: e, height: t, x: r, y: a };
   }
   _computeCanvasSize(e = 0, t = 0) {
     const s = this.prescaleFactor <= 0 ? 1 : this.prescaleFactor, i = self.devicePixelRatio || 1;
     if (e = e * i, t = t * i, t <= 0 || e <= 0)
       e = 0, t = 0;
     else {
-      const n = s < 1 ? -1 : 1;
-      let r = t * i;
-      n * r * s <= n * this.prescaleHeightLimit ? r *= s : n * r < n * this.prescaleHeightLimit && (r = this.prescaleHeightLimit), this.maxRenderHeight > 0 && r > this.maxRenderHeight && (r = this.maxRenderHeight), e *= r / t, t = r;
+      const o = s < 1 ? -1 : 1;
+      let n = t * i;
+      o * n * s <= o * this.prescaleHeightLimit ? n *= s : o * n < o * this.prescaleHeightLimit && (n = this.prescaleHeightLimit), this.maxRenderHeight > 0 && n > this.maxRenderHeight && (n = this.maxRenderHeight), e *= n / t, t = n;
     }
     return { width: e, height: t };
   }
@@ -355,8 +355,8 @@ const g = {
       queryLocalFonts().then((t) => {
         const s = t == null ? void 0 : t.find((i) => i.fullName.toLowerCase() === e);
         s && s.blob().then((i) => {
-          i.arrayBuffer().then((n) => {
-            this.addFont(new Uint8Array(n));
+          i.arrayBuffer().then((o) => {
+            this.addFont(new Uint8Array(o));
           });
         });
       });
@@ -393,14 +393,14 @@ const g = {
   verifyColorSpace(e, t = this._videoColorSpace) {
     !e || !t || e !== t && (this._ctx.filter = p[e][t]);
   }
-  _render({ images: e, async: t, times: s, width: i, height: n, colorSpace: r }) {
+  _render({ images: e, async: t, times: s, width: i, height: o, colorSpace: n }) {
     this._unbusy();
-    const o = Date.now();
-    (this._canvasctrl.width !== i || this._canvasctrl.height !== n) && (this._canvasctrl.width = i, this._canvasctrl.height = n, this.verifyColorSpace(r)), this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height);
+    const r = Date.now();
+    (this._canvasctrl.width !== i || this._canvasctrl.height !== o) && (this._canvasctrl.width = i, this._canvasctrl.height = o, this.verifyColorSpace(n)), this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height);
     for (const a of e)
       a.image && (t ? (this._ctx.drawImage(a.image, a.x, a.y), a.image.close()) : (this._bufferCanvas.width = a.w, this._bufferCanvas.height = a.h, this._bufferCtx.putImageData(new ImageData(this._fixAlpha(new Uint8ClampedArray(a.image)), a.w, a.h), 0, 0), this._ctx.drawImage(this._bufferCanvas, a.x, a.y)));
     if (this.debug) {
-      s.drawTime = Date.now() - o;
+      s.drawTime = Date.now() - r;
       let a = 0;
       for (const h in s)
         a += s[h];
@@ -435,13 +435,13 @@ const g = {
   _fetchFromWorker(e, t) {
     try {
       const s = e.target, i = setTimeout(() => {
-        r(new Error("Error: Timeout while try to fetch " + s));
-      }, 5e3), n = ({ data: o }) => {
-        o.target === s && (t(null, o), this._worker.removeEventListener("message", n), this._worker.removeEventListener("error", r), clearTimeout(i));
-      }, r = (o) => {
-        t(o), this._worker.removeEventListener("message", n), this._worker.removeEventListener("error", r), clearTimeout(i);
+        n(new Error("Error: Timeout while try to fetch " + s));
+      }, 5e3), o = ({ data: r }) => {
+        r.target === s && (t(null, r), this._worker.removeEventListener("message", o), this._worker.removeEventListener("error", n), clearTimeout(i));
+      }, n = (r) => {
+        t(r), this._worker.removeEventListener("message", o), this._worker.removeEventListener("error", n), clearTimeout(i);
       };
-      this._worker.addEventListener("message", n), this._worker.addEventListener("error", r), this._worker.postMessage(e);
+      this._worker.addEventListener("message", o), this._worker.addEventListener("error", n), this._worker.postMessage(e);
     } catch (s) {
       this._error(s);
     }
@@ -467,9 +467,9 @@ const g = {
     e && this._error(e), this._video && this._canvasParent && this._video.parentNode.removeChild(this._canvasParent), this._destroyed = !0, this._removeListeners(), this.sendMessage("destroy"), this._worker.terminate();
   }
 };
-let m = l;
+let v = l;
 // test support for WASM, ImageData, alphaBug, but only once, on init so it doesn't run when first running the page
-v(m, "_supportsWebAssembly", null), v(m, "_hasAlphaBug", null);
+f(v, "_supportsWebAssembly", null), f(v, "_hasAlphaBug", null);
 export {
-  m as default
+  v as default
 };

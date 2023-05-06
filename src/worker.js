@@ -127,7 +127,7 @@ self.setTrack = ({ content }) => {
   // Tell libass to render the new track
   jassubObj.createTrackMem(content)
 
-  trackColorSpace = libassYCbCrMap[jassubObj.getTrackColorSpace()]
+  trackColorSpace = libassYCbCrMap[jassubObj.trackColorSpace]
 }
 
 /**

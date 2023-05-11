@@ -143,7 +143,8 @@ OCTP_DEPS = \
 	$(DIST_DIR)/lib/libfontconfig.a \
 	$(DIST_DIR)/lib/libass.a
 
-# Dist Files https://github.com/emscripten-core/emscripten/blob/3.1.24/src/settings.js
+# Dist Files https://github.com/emscripten-core/emscripten/blob/3.1.38/src/settings.js
+# https://github.com/emscripten-core/emscripten/issues/13899
 EMCC_COMMON_ARGS = \
 	-s ENVIRONMENT=worker \
 	-s NO_EXIT_RUNTIME=1 \
@@ -160,6 +161,8 @@ EMCC_COMMON_ARGS = \
 	-s EXPORTED_FUNCTIONS="['_malloc']" \
 	-s MINIMAL_RUNTIME=1 \
 	-s MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION=1 \
+	-s POLYFILL=0 \
+	-s BINARYEN_EXTRA_PASSES=--one-caller-inline-max-function-size=19306 \
 	-s INCOMING_MODULE_JS_API="[]" \
 	--no-heap-copy \
 	-flto \

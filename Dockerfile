@@ -1,6 +1,9 @@
-FROM docker.io/emscripten/emsdk:3.1.24
+FROM docker.io/emscripten/emsdk:3.1.38
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && \
+    apt-get install curl -y --no-install-recommends && \
+    curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash - &&\
+    apt-get install -y --no-install-recommends \
         build-essential \
         cmake \
         git \
@@ -21,4 +24,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /code
-CMD ["bash", "-c", "make; npm i; npm run bundle"]
+CMD ["bash", "-c", "make; sudo npm i; sudo npm run build-lib; sudo npm run build-worker"]

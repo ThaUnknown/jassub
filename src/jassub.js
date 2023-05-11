@@ -297,10 +297,15 @@ export default class JASSUB extends EventTarget {
 
   _updateColorSpace () {
     this._video.requestVideoFrameCallback(() => {
-    // eslint-disable-next-line no-undef
-      const frame = new VideoFrame(this._video)
-      this._videoColorSpace = webYCbCrMap[frame.colorSpace.matrix]
-      frame.close()
+      try {
+        // eslint-disable-next-line no-undef
+        const frame = new VideoFrame(this._video)
+        this._videoColorSpace = webYCbCrMap[frame.colorSpace.matrix]
+        frame.close()
+      } catch (e) {
+        // sources can be tainted
+        console.warn(e)
+      }
     })
   }
 

@@ -176,8 +176,12 @@ const g = {
   }
   _updateColorSpace() {
     this._video.requestVideoFrameCallback(() => {
-      const e = new VideoFrame(this._video);
-      this._videoColorSpace = g[e.colorSpace.matrix], e.close();
+      try {
+        const e = new VideoFrame(this._video);
+        this._videoColorSpace = g[e.colorSpace.matrix], e.close();
+      } catch (e) {
+        console.warn(e);
+      }
     });
   }
   /**

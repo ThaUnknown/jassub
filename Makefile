@@ -168,16 +168,8 @@ EMCC_COMMON_ARGS = \
 	-flto \
 	-fno-exceptions \
 	-o $@
-	# -s STRICT=1 \
-	#--js-opts 0 -O0 -gsource-map 
-	#--js-opts 0 -O0 -g3 
-	#--closure 1 \
-	#-s USE_CLOSURE_COMPILER=1 \
-	#-s IGNORE_CLOSURE_COMPILER_ERRORS=1 \
-	#--memory-init-file 0
 
-
-dist: $(OCTP_DEPS) dist/js/jassub-worker.js dist/js/jassub-worker-legacy.js dist/js/jassub.js
+dist: $(OCTP_DEPS) dist/js/jassub-worker.js dist/js/jassub.js
 
 dist/js/jassub-worker.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 	mkdir -p dist/js
@@ -185,21 +177,10 @@ dist/js/jassub-worker.js: src/JASSUB.cpp src/worker.js src/polyfill.js
 		--pre-js src/polyfill.js \
 		--pre-js src/worker.js \
 		-O3 \
-		-s EVAL_CTORS=2 \
-		-s TEXTDECODER=2 \
-		-s WASM=1 \
-		$(EMCC_COMMON_ARGS)
-		
-dist/js/jassub-worker-legacy.js: src/JASSUB.cpp src/worker.js src/polyfill.js
-	mkdir -p dist/js
-	emcc src/JASSUB.cpp $(OCTP_DEPS) \
-		--pre-js src/polyfill.js \
-		--pre-js src/worker.js \
-		-s WASM=0 \
+		-s TEXTDECODER=1 \
+		-s WASM=2 \
 		--memory-init-file 0 \
-		-O3 \
 		--closure=0 \
-		-s LEGACY_VM_SUPPORT=1 \
 		-s MIN_CHROME_VERSION=27 \
 		-s MIN_SAFARI_VERSION=60005 \
 		$(EMCC_COMMON_ARGS)
@@ -209,11 +190,11 @@ dist/js/jassub.js: src/jassub.js
 	cp src/jassub.js $@
 
 # dist/license/all:
-# 	@#FIXME: allow -j in toplevel Makefile and reintegrate licence extraction into this file
-# 	make -j "$$(nproc)" -f Makefile_licence all
+#	@#FIXME: allow -j in toplevel Makefile and reintegrate licence extraction into this file
+#	make -j "$$(nproc)" -f Makefile_licence all
 
 # dist/js/COPYRIGHT: dist/license/all
-# 	cp "$<" "$@"
+#	cp "$<" "$@"
 
 # Clean Tasks
 

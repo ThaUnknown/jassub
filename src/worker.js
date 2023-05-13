@@ -25,6 +25,16 @@ Module = {
   wasm: WebAssembly && !WebAssembly.instantiateStreaming && read_('jassub-worker.wasm', true)
 }
 
+try {
+  const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
+  if (!(module instanceof WebAssembly.Module) || !(new WebAssembly.Instance(module) instanceof WebAssembly.Instance)) throw new Error('WASM not supported')
+} catch (e) {
+  console.warn(e)
+  // load WASM2JS code if WASM is unsupported
+  // eslint-disable-next-line no-eval
+  eval(read_('jassub-worker.wasm.js'))
+}
+
 // ran when WASM is compiled
 ready = () => postMessage({ target: 'ready' })
 
@@ -190,37 +200,41 @@ const setIsPaused = isPaused => {
   }
 }
 
-const a = 'BT.601'
-const b = 'BT.709'
+const a = 'BT601'
+const b = 'BT709'
 const c = 'SMPTE240M'
+const d = 'FCC'
 
-const libassYCbCrMap = [a, a, a, a, a, b, b, c, c, 'FCC', 'FCC']
+const libassYCbCrMap = [a, a, a, a, a, b, b, c, c, d, d]
 
 const render = (time, force) => {
+  const times = {}
   const renderStartTime = performance.now()
   const result = blendMode === 'wasm' ? jassubObj.renderBlend(time, force || 0) : jassubObj.renderImage(time, force || 0)
-  const times = {
-    renderTime: performance.now() - renderStartTime - jassubObj.time,
-    decodeTime: jassubObj.time
+  if (debug) {
+    const decodeEndTime = performance.now()
+    const renderEndTime = jassubObj.time
+    times.WASMRenderTime = renderEndTime - renderStartTime
+    times.WASMBitmapDecodeTime = decodeEndTime - renderEndTime
+    times.JSRenderTime = decodeEndTime
   }
   if (jassubObj.changed !== 0 || force) {
     const images = []
     let buffers = []
-    const decodeStartTime = performance.now()
-    if (!result) return paintImages({ images, buffers, times, decodeStartTime })
-    // use callback to not rely on async/await
+    if (!result) return paintImages({ images, buffers, times })
     if (asyncRender) {
       const promises = []
       for (let image = result, i = 0; i < jassubObj.count; image = image.next, ++i) {
         images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
         promises.push(createImageBitmap(new ImageData(HEAPU8C.slice(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
       }
+      // use callback to not rely on async/await
       Promise.all(promises).then(bitmaps => {
         for (let i = 0; i < images.length; i++) {
           images[i].image = bitmaps[i]
         }
         buffers = bitmaps
-        paintImages({ images, buffers, times, decodeStartTime })
+        paintImages({ images, buffers, times })
       })
     } else {
       for (let image = result, i = 0; i < jassubObj.count; image = image.next, ++i) {
@@ -232,7 +246,7 @@ const render = (time, force) => {
         }
         images.push(img)
       }
-      paintImages({ images, buffers, times, decodeStartTime })
+      paintImages({ images, buffers, times })
     }
   } else {
     postMessage({
@@ -254,12 +268,10 @@ const renderLoop = force => {
   }
 }
 
-const paintImages = ({ times, images, decodeStartTime, buffers }) => {
-  times.decodeTime = performance.now() - decodeStartTime
-
+const paintImages = ({ times, images, buffers }) => {
   const resultObject = {
     target: 'render',
-    async: asyncRender,
+    asyncRender,
     images,
     times,
     width: self.width,
@@ -268,7 +280,6 @@ const paintImages = ({ times, images, decodeStartTime, buffers }) => {
   }
 
   if (offCanvasCtx) {
-    const drawStartTime = performance.now()
     if (offCanvas.height !== self.height || offCanvas.width !== self.width) {
       offCanvas.width = self.width
       offCanvas.height = self.height
@@ -287,12 +298,7 @@ const paintImages = ({ times, images, decodeStartTime, buffers }) => {
         }
       }
     }
-    if (debug) {
-      times.drawTime = performance.now() - drawStartTime
-      let total = 0
-      for (const key in times) total += times[key]
-      console.log('Bitmaps: ' + images.length + ' Total: ' + Math.round(total) + 'ms', times)
-    }
+    if (debug) times.bitmaps = images.length
     try {
       const image = offCanvas.transferToImageBitmap()
       resultObject.images = [{ image, x: 0, y: 0 }]
@@ -419,7 +425,7 @@ self.init = data => {
   useLocalFonts = data.useLocalFonts
 
   const fallbackFont = data.fallbackFont.toLowerCase()
-  jassubObj = new Module.JASSUB(self.width, self.height, fallbackFont || null)
+  jassubObj = new Module.JASSUB(self.width, self.height, fallbackFont || null, debug)
 
   if (fallbackFont) findAvailableFonts(fallbackFont)
 

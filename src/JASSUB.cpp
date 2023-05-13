@@ -79,7 +79,7 @@ const float MAX_UINT8_CAST = 255.9 / 255;
 typedef struct RenderResult {
 public:
   int x, y, w, h;
-  uint32_t image;
+  size_t image;
   RenderResult *next;
 } RenderResult;
 
@@ -264,6 +264,7 @@ private:
   int scanned_events; // next unscanned event index
   ASS_Library *ass_library;
   ASS_Renderer *ass_renderer;
+  bool debug;
 
   int canvas_w;
   int canvas_h;
@@ -279,7 +280,7 @@ public:
   int changed = 0;
   int count = 0;
   int time = 0;
-  JASSUB(int frame_w, int frame_h, const std::string &df) {
+  JASSUB(int frame_w, int frame_h, const std::string &df, bool debug) {
     status = 0;
     ass_library = NULL;
     ass_renderer = NULL;
@@ -288,6 +289,7 @@ public:
     canvas_h = 0;
     drop_animations = false;
     scanned_events = 0;
+    this->debug = debug;
 
     const char *defaultFont = df.c_str();
     if (strlen(defaultFont) >= sizeof(m_defaultFont)) {
@@ -376,37 +378,45 @@ public:
     }
     return size;
   }
-  void processImages(RenderResult *&renderResult, ASS_Image *img, char *rawbuffer) {
+  RenderResult *processImages(ASS_Image *img) {
+    RenderResult *renderResult = NULL;
+    char *rawbuffer = (char *)m_buffer.take(getBufferSize(img));
+    if (rawbuffer == NULL) {
+      fprintf(stderr, "JASSUB: cannot allocate buffer for rendering\n");
+      return NULL;
+    }
     for (RenderResult *tmp = renderResult; img; img = img->next) {
       int w = img->w, h = img->h;
-      if (w == 0 || h == 0) {
-        continue;
-      }
+      if (w == 0 || h == 0) continue;
+
       double alpha = (255 - (img->color & 255)) / 255.0;
-      if (alpha == 0.0) {
-        continue;
-      }
+      if (alpha == 0.0) continue;
+
       unsigned int datasize = sizeof(uint32_t) * w * h;
-      uint32_t *data = (uint32_t *)rawbuffer;
+      size_t *data = (size_t *)rawbuffer;
       decodeBitmap(alpha, data, img, w, h);
       RenderResult *result = (RenderResult *)(rawbuffer + datasize);
       result->w = w;
       result->h = h;
       result->x = img->dst_x;
       result->y = img->dst_y;
-      result->image = (uint32_t)data;
+      result->image = (size_t)data;
       result->next = NULL;
+
       if (tmp) {
         tmp->next = result;
       } else {
         renderResult = result;
       }
       tmp = result;
+
       rawbuffer += datasize + sizeof(RenderResult);
       ++count;
     }
+    return renderResult;
   }
-  void decodeBitmap(double alpha, uint32_t *data, ASS_Image *img, int w, int h) {
+
+  void decodeBitmap(double alpha, size_t *data, ASS_Image *img, int w, int h) {
     uint32_t color = ((img->color << 8) & 0xff0000) | ((img->color >> 8) & 0xff00) | ((img->color >> 24) & 0xff);
     uint8_t *pos = img->bitmap;
     uint32_t res = 0;
@@ -423,21 +433,12 @@ public:
     time = 0;
     count = 0;
 
-    ASS_Image *img = ass_render_frame(ass_renderer, track, (int)(tm * 1000), &changed);
-    if (img == NULL || (changed == 0 && !force)) {
-      return NULL;
-    }
-    double start_decode_time = emscripten_get_now();
-    int size = getBufferSize(img);
-    char *rawbuffer = (char *)m_buffer.take(size);
-    if (rawbuffer == NULL) {
-      fprintf(stderr, "JASSUB: cannot allocate buffer for rendering\n");
-      return NULL;
-    }
-    RenderResult *renderResult = NULL;
-    processImages(renderResult, img, rawbuffer);
-    time = emscripten_get_now() - start_decode_time;
-    return renderResult;
+    ASS_Image *imgs = ass_render_frame(ass_renderer, track, (int)(tm * 1000), &changed);
+    if (imgs == NULL || (changed == 0 && !force)) return NULL;
+
+    if (debug) time = emscripten_get_now();
+
+    return processImages(imgs);
   }
 
   void quitLibrary() {
@@ -501,7 +502,7 @@ public:
       return NULL;
     }
 
-    double start_blend_time = emscripten_get_now();
+    if (debug) time = emscripten_get_now();
     for (int i = 0; i < MAX_BLEND_STORAGES; i++) {
       m_blendParts[i].taken = false;
     }
@@ -565,7 +566,6 @@ public:
 
       ++count;
     }
-    time = emscripten_get_now() - start_blend_time;
 
     return renderResult;
   }
@@ -678,7 +678,7 @@ public:
     storage->next.y = rect.min_y;
     storage->next.w = width;
     storage->next.h = height;
-    storage->next.image = (uint32_t)result;
+    storage->next.image = (size_t)result;
 
     return &storage->next;
   }
@@ -810,7 +810,7 @@ EMSCRIPTEN_BINDINGS(JASSUB) {
     .property("MarginV", &ASS_Event::MarginV);
 
   emscripten::class_<JASSUB>("JASSUB")
-    .constructor<int, int, std::string>()
+    .constructor<int, int, std::string, bool>()
     .function("setLogLevel", &JASSUB::setLogLevel)
     .function("setDropAnimations", &JASSUB::setDropAnimations)
     .function("createTrackMem", &JASSUB::createTrackMem)

@@ -1,27 +1,26 @@
 import 'rvfc-polyfill'
 
 const webYCbCrMap = {
-  bt709: 'BT.709',
+  bt709: 'BT709',
   // these might not be exactly correct? oops?
-  bt470bg: 'BT.601', // alias BT.601 PAL... whats the difference?
-  smpte170m: 'BT.601'// alias BT.601 NTSC... whats the difference?
+  bt470bg: 'BT601', // alias BT.601 PAL... whats the difference?
+  smpte170m: 'BT601'// alias BT.601 NTSC... whats the difference?
 }
 
 const colorMatrixConversionMap = {
-  'BT.601': {
-    'BT.709': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'1.0863 -0.0723 -0.014 0 0 0.0965 0.8451 0.0584 0 0 -0.0141 -0.0277 1.0418 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+  BT601: {
+    BT709: '1.0863 -0.0723 -0.014 0 0 0.0965 0.8451 0.0584 0 0 -0.0141 -0.0277 1.0418'
   },
-  'BT.709': {
-    'BT.601': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'0.9137 0.0784 0.0079 0 0 -0.1049 1.1722 -0.0671 0 0 0.0096 0.0322 0.9582 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+  BT709: {
+    BT601: '0.9137 0.0784 0.0079 0 0 -0.1049 1.1722 -0.0671 0 0 0.0096 0.0322 0.9582'
   },
   FCC: {
-    'BT.709': `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='f'><feColorMatrix type='matrix' values='1.0873 -0.0736 -0.0137 0 0 0.0974 0.8494 0.0531 0 0 -0.0127 -0.0251 
-1.0378 0 0 0 0 0 1 0'/></filter></svg>#f")`,
-    'BT.601': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'1.001 -0.0008 -0.0002 0 0 0.0009 1.005 -0.006 0 0 0.0013 0.0027 0.996 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+    BT709: '1.0873 -0.0736 -0.0137 0 0 0.0974 0.8494 0.0531 0 0 -0.0127 -0.0251 1.0378',
+    BT601: '1.001 -0.0008 -0.0002 0 0 0.0009 1.005 -0.006 0 0 0.0013 0.0027 0.996'
   },
   SMPTE240M: {
-    'BT.709': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'0.9993 0.0006 0.0001 0 0 -0.0004 0.9812 0.0192 0 0 -0.0034 -0.0114 1.0148 0 0 0 0 0 1 0\'/></filter></svg>#f")',
-    'BT.601': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'0.913 0.0774 0.0096 0 0 -0.1051 1.1508 -0.0456 0 0 0.0063 0.0207 0.973 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+    BT709: '0.9993 0.0006 0.0001 0 0 -0.0004 0.9812 0.0192 0 0 -0.0034 -0.0114 1.0148',
+    BT601: '0.913 0.0774 0.0096 0 0 -0.1051 1.1508 -0.0456 0 0 0.0063 0.0207 0.973'
   }
 }
 
@@ -103,7 +102,7 @@ export default class JASSUB extends EventTarget {
     this.prescaleHeightLimit = options.prescaleHeightLimit || 1080
     this.maxRenderHeight = options.maxRenderHeight || 0 // 0 - no limit.
 
-    this._worker = new Worker(JASSUB._supportsWebAssembly ? options.workerUrl || 'jassub-worker.js' : options.legacyWorkerUrl || 'jassub-worker-legacy.js')
+    this._worker = new Worker(options.workerUrl || 'jassub-worker.js')
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
 
@@ -174,15 +173,6 @@ export default class JASSUB extends EventTarget {
           return imageData
         }
       }
-    }
-
-    try {
-      if (typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function') {
-        const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
-        if (module instanceof WebAssembly.Module) JASSUB._supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance)
-      }
-    } catch (e) {
-      JASSUB._supportsWebAssembly = false
     }
 
     // Test for alpha bug, where e.g. WebKit can render a transparent pixel
@@ -600,12 +590,12 @@ export default class JASSUB extends EventTarget {
   verifyColorSpace (subtitleColorSpace, videoColorSpace = this._videoColorSpace) {
     if (!subtitleColorSpace || !videoColorSpace) return
     if (subtitleColorSpace === videoColorSpace) return
-    this._ctx.filter = colorMatrixConversionMap[subtitleColorSpace][videoColorSpace]
+    this._ctx.filter = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='f'><feColorMatrix type='matrix' values='${colorMatrixConversionMap[subtitleColorSpace][videoColorSpace]} 0 0 0 0 0 1 0'/></filter></svg>#f")`
   }
 
-  _render ({ images, async, times, width, height, colorSpace }) {
+  _render ({ images, asyncRender, times, width, height, colorSpace }) {
     this._unbusy()
-    const drawStartTime = Date.now()
+    if (this.debug) times.IPCTime = performance.now() - times.JSRenderTime - (times.JSBitmapGenerationTime || 0)
     if (this._canvasctrl.width !== width || this._canvasctrl.height !== height) {
       this._canvasctrl.width = width
       this._canvasctrl.height = height
@@ -614,7 +604,7 @@ export default class JASSUB extends EventTarget {
     this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
     for (const image of images) {
       if (image.image) {
-        if (async) {
+        if (asyncRender) {
           this._ctx.drawImage(image.image, image.x, image.y)
           image.image.close()
         } else {
@@ -626,10 +616,13 @@ export default class JASSUB extends EventTarget {
       }
     }
     if (this.debug) {
-      times.drawTime = Date.now() - drawStartTime
+      times.JSRenderTime = performance.now() - times.JSRenderTime - (times.JSBitmapGenerationTime || 0)
       let total = 0
+      const count = times.bitmaps || images.length
+      delete times.bitmaps
       for (const key in times) total += times[key]
-      console.log('Bitmaps: ' + images.length + ' Total: ' + Math.round(total) + 'ms', times)
+      total -= times.IPCTime
+      console.log('Bitmaps: ' + count + ' Total: ' + (total | 0) + 'ms', times)
     }
   }
 

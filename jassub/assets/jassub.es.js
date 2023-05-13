@@ -1,21 +1,21 @@
 !("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPlaybackQuality" in HTMLVideoElement.prototype && (HTMLVideoElement.prototype._rvfcpolyfillmap = {}, HTMLVideoElement.prototype.requestVideoFrameCallback = function(m) {
-  const e = this.getVideoPlaybackQuality(), t = this.mozPresentedFrames || this.mozPaintedFrames || e.totalVideoFrames - e.droppedVideoFrames, s = (n, i) => {
+  const e = this.getVideoPlaybackQuality(), t = this.mozPresentedFrames || this.mozPaintedFrames || e.totalVideoFrames - e.droppedVideoFrames, s = (n, a) => {
     const o = this.getVideoPlaybackQuality(), h = this.mozPresentedFrames || this.mozPaintedFrames || o.totalVideoFrames - o.droppedVideoFrames;
     if (h > t) {
-      const l = this.mozFrameDelay || o.totalFrameDelay - e.totalFrameDelay || 0, c = i - n;
-      m(i, {
-        presentationTime: i + l * 1e3,
-        expectedDisplayTime: i + c,
+      const l = this.mozFrameDelay || o.totalFrameDelay - e.totalFrameDelay || 0, c = a - n;
+      m(a, {
+        presentationTime: a + l * 1e3,
+        expectedDisplayTime: a + c,
         width: this.videoWidth,
         height: this.videoHeight,
         mediaTime: Math.max(0, this.currentTime || 0) + c / 1e3,
         presentedFrames: h,
         processingDuration: l
-      }), delete this._rvfcpolyfillmap[a];
+      }), delete this._rvfcpolyfillmap[i];
     } else
-      this._rvfcpolyfillmap[a] = requestAnimationFrame((l) => s(i, l));
-  }, a = Date.now(), r = performance.now();
-  return this._rvfcpolyfillmap[a] = requestAnimationFrame((n) => s(r, n)), a;
+      this._rvfcpolyfillmap[i] = requestAnimationFrame((l) => s(a, l));
+  }, i = Date.now(), r = performance.now();
+  return this._rvfcpolyfillmap[i] = requestAnimationFrame((n) => s(r, n)), i;
 }, HTMLVideoElement.prototype.cancelVideoFrameCallback = function(m) {
   cancelAnimationFrame(this._rvfcpolyfillmap[m]), delete this._rvfcpolyfillmap[m];
 });
@@ -113,11 +113,11 @@ class d extends EventTarget {
           return o && c.data.set(o), c;
         };
       }
-    const s = document.createElement("canvas"), a = s.getContext("2d", { willReadFrequently: !0 });
-    e.width = s.width = 1, e.height = s.height = 1, t.clearRect(0, 0, 1, 1), a.clearRect(0, 0, 1, 1);
-    const r = a.getImageData(0, 0, 1, 1).data;
-    t.putImageData(new ImageData(new Uint8ClampedArray([0, 255, 0, 0]), 1, 1), 0, 0), a.drawImage(e, 0, 0);
-    const n = a.getImageData(0, 0, 1, 1).data;
+    const s = document.createElement("canvas"), i = s.getContext("2d", { willReadFrequently: !0 });
+    e.width = s.width = 1, e.height = s.height = 1, t.clearRect(0, 0, 1, 1), i.clearRect(0, 0, 1, 1);
+    const r = i.getImageData(0, 0, 1, 1).data;
+    t.putImageData(new ImageData(new Uint8ClampedArray([0, 255, 0, 0]), 1, 1), 0, 0), i.drawImage(e, 0, 0);
+    const n = i.getImageData(0, 0, 1, 1).data;
     d._hasAlphaBug = r[1] !== n[1], d._hasAlphaBug && console.log("Detected a browser having issue with transparent pixels, applying workaround"), e.remove(), s.remove();
   }
   /**
@@ -128,32 +128,32 @@ class d extends EventTarget {
    * @param  {Number} [left=0]
    * @param  {Boolean} [force=false]
    */
-  resize(e = 0, t = 0, s = 0, a = 0, r = this._video?.paused) {
+  resize(e = 0, t = 0, s = 0, i = 0, r = this._video?.paused) {
     if ((!e || !t) && this._video) {
       const n = this._getVideoPosition();
-      let i = null;
+      let a = null;
       if (this._videoWidth) {
         const o = this._video.videoWidth / this._videoWidth, h = this._video.videoHeight / this._videoHeight;
-        i = this._computeCanvasSize((n.width || 0) / o, (n.height || 0) / h);
+        a = this._computeCanvasSize((n.width || 0) / o, (n.height || 0) / h);
       } else
-        i = this._computeCanvasSize(n.width || 0, n.height || 0);
-      e = i.width, t = i.height, this._canvasParent && (s = n.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top), a = n.x), this._canvas.style.width = n.width + "px", this._canvas.style.height = n.height + "px";
+        a = this._computeCanvasSize(n.width || 0, n.height || 0);
+      e = a.width, t = a.height, this._canvasParent && (s = n.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top), i = n.x), this._canvas.style.width = n.width + "px", this._canvas.style.height = n.height + "px";
     }
-    this._canvas.style.top = s + "px", this._canvas.style.left = a + "px", this.sendMessage("canvas", { width: e, height: t, force: r && this.busy === !1 });
+    this._canvas.style.top = s + "px", this._canvas.style.left = i + "px", this.sendMessage("canvas", { width: e, height: t, force: r && this.busy === !1 });
   }
   _getVideoPosition(e = this._video.videoWidth, t = this._video.videoHeight) {
-    const s = e / t, { offsetWidth: a, offsetHeight: r } = this._video, n = a / r;
-    e = a, t = r, n > s ? e = Math.floor(r * s) : t = Math.floor(a / s);
-    const i = (a - e) / 2, o = (r - t) / 2;
-    return { width: e, height: t, x: i, y: o };
+    const s = e / t, { offsetWidth: i, offsetHeight: r } = this._video, n = i / r;
+    e = i, t = r, n > s ? e = Math.floor(r * s) : t = Math.floor(i / s);
+    const a = (i - e) / 2, o = (r - t) / 2;
+    return { width: e, height: t, x: a, y: o };
   }
   _computeCanvasSize(e = 0, t = 0) {
-    const s = this.prescaleFactor <= 0 ? 1 : this.prescaleFactor, a = self.devicePixelRatio || 1;
-    if (e = e * a, t = t * a, t <= 0 || e <= 0)
+    const s = this.prescaleFactor <= 0 ? 1 : this.prescaleFactor, i = self.devicePixelRatio || 1;
+    if (e = e * i, t = t * i, t <= 0 || e <= 0)
       e = 0, t = 0;
     else {
       const r = s < 1 ? -1 : 1;
-      let n = t * a;
+      let n = t * i;
       r * n * s <= r * this.prescaleHeightLimit ? n *= s : r * n < r * this.prescaleHeightLimit && (n = this.prescaleHeightLimit), this.maxRenderHeight > 0 && n > this.maxRenderHeight && (n = this.maxRenderHeight), e *= n / t, t = n;
     }
     return { width: e, height: t };
@@ -349,9 +349,9 @@ class d extends EventTarget {
   _sendLocalFont(e) {
     try {
       queryLocalFonts().then((t) => {
-        const s = t?.find((a) => a.fullName.toLowerCase() === e);
-        s && s.blob().then((a) => {
-          a.arrayBuffer().then((r) => {
+        const s = t?.find((i) => i.fullName.toLowerCase() === e);
+        s && s.blob().then((i) => {
+          i.arrayBuffer().then((r) => {
             this.addFont(new Uint8Array(r));
           });
         });
@@ -372,10 +372,10 @@ class d extends EventTarget {
   _unbusy() {
     this._lastDemandTime ? this._demandRender(this._lastDemandTime) : this.busy = !1;
   }
-  _handleRVFC(e, { mediaTime: t, width: s, height: a }) {
+  _handleRVFC(e, { mediaTime: t, width: s, height: i }) {
     if (this._destroyed)
       return null;
-    this.busy ? this._lastDemandTime = { mediaTime: t, width: s, height: a } : (this.busy = !0, this._demandRender({ mediaTime: t, width: s, height: a })), this._video.requestVideoFrameCallback(this._handleRVFC.bind(this));
+    this.busy ? this._lastDemandTime = { mediaTime: t, width: s, height: i } : (this.busy = !0, this._demandRender({ mediaTime: t, width: s, height: i })), this._video.requestVideoFrameCallback(this._handleRVFC.bind(this));
   }
   _demandRender({ mediaTime: e, width: t, height: s }) {
     this._lastDemandTime = null, (t !== this._videoWidth || s !== this._videoHeight) && (this._videoWidth = t, this._videoHeight = s, this.resize()), this.sendMessage("demand", { time: e + this.timeOffset });
@@ -388,18 +388,18 @@ class d extends EventTarget {
   verifyColorSpace(e, t = this._videoColorSpace) {
     !e || !t || e !== t && (this._ctx.filter = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='f'><feColorMatrix type='matrix' values='${v[e][t]} 0 0 0 0 0 1 0'/></filter></svg>#f")`);
   }
-  _render({ images: e, asyncRender: t, times: s, width: a, height: r, colorSpace: n }) {
-    this._unbusy(), this.debug && (s.IPCTime = performance.now() - s.JSRenderTime - (s.JSBitmapGenerationTime || 0)), (this._canvasctrl.width !== a || this._canvasctrl.height !== r) && (this._canvasctrl.width = a, this._canvasctrl.height = r, this.verifyColorSpace(n)), this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height);
-    for (const i of e)
-      i.image && (t ? (this._ctx.drawImage(i.image, i.x, i.y), i.image.close()) : (this._bufferCanvas.width = i.w, this._bufferCanvas.height = i.h, this._bufferCtx.putImageData(new ImageData(this._fixAlpha(new Uint8ClampedArray(i.image)), i.w, i.h), 0, 0), this._ctx.drawImage(this._bufferCanvas, i.x, i.y)));
+  _render({ images: e, asyncRender: t, times: s, width: i, height: r, colorSpace: n }) {
+    this._unbusy(), this.debug && (s.IPCTime = Date.now() - s.JSRenderTime), (this._canvasctrl.width !== i || this._canvasctrl.height !== r) && (this._canvasctrl.width = i, this._canvasctrl.height = r, this.verifyColorSpace(n)), this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height);
+    for (const a of e)
+      a.image && (t ? (this._ctx.drawImage(a.image, a.x, a.y), a.image.close()) : (this._bufferCanvas.width = a.w, this._bufferCanvas.height = a.h, this._bufferCtx.putImageData(new ImageData(this._fixAlpha(new Uint8ClampedArray(a.image)), a.w, a.h), 0, 0), this._ctx.drawImage(this._bufferCanvas, a.x, a.y)));
     if (this.debug) {
-      s.JSRenderTime = performance.now() - s.JSRenderTime - (s.JSBitmapGenerationTime || 0);
-      let i = 0;
+      s.JSRenderTime = Date.now() - s.JSRenderTime - s.IPCTime;
+      let a = 0;
       const o = s.bitmaps || e.length;
       delete s.bitmaps;
       for (const h in s)
-        i += s[h];
-      i -= s.IPCTime, console.log("Bitmaps: " + o + " Total: " + (i | 0) + "ms", s);
+        a += s[h];
+      console.log("Bitmaps: " + o + " Total: " + (a | 0) + "ms", s);
     }
   }
   _fixAlpha(e) {
@@ -429,12 +429,12 @@ class d extends EventTarget {
   }
   _fetchFromWorker(e, t) {
     try {
-      const s = e.target, a = setTimeout(() => {
+      const s = e.target, i = setTimeout(() => {
         n(new Error("Error: Timeout while try to fetch " + s));
-      }, 5e3), r = ({ data: i }) => {
-        i.target === s && (t(null, i), this._worker.removeEventListener("message", r), this._worker.removeEventListener("error", n), clearTimeout(a));
-      }, n = (i) => {
-        t(i), this._worker.removeEventListener("message", r), this._worker.removeEventListener("error", n), clearTimeout(a);
+      }, 5e3), r = ({ data: a }) => {
+        a.target === s && (t(null, a), this._worker.removeEventListener("message", r), this._worker.removeEventListener("error", n), clearTimeout(i));
+      }, n = (a) => {
+        t(a), this._worker.removeEventListener("message", r), this._worker.removeEventListener("error", n), clearTimeout(i);
       };
       this._worker.addEventListener("message", r), this._worker.addEventListener("error", n), this._worker.postMessage(e);
     } catch (s) {

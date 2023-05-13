@@ -595,7 +595,7 @@ export default class JASSUB extends EventTarget {
 
   _render ({ images, asyncRender, times, width, height, colorSpace }) {
     this._unbusy()
-    if (this.debug) times.IPCTime = performance.now() - times.JSRenderTime - (times.JSBitmapGenerationTime || 0)
+    if (this.debug) times.IPCTime = Date.now() - times.JSRenderTime
     if (this._canvasctrl.width !== width || this._canvasctrl.height !== height) {
       this._canvasctrl.width = width
       this._canvasctrl.height = height
@@ -616,12 +616,11 @@ export default class JASSUB extends EventTarget {
       }
     }
     if (this.debug) {
-      times.JSRenderTime = performance.now() - times.JSRenderTime - (times.JSBitmapGenerationTime || 0)
+      times.JSRenderTime = Date.now() - times.JSRenderTime - times.IPCTime
       let total = 0
       const count = times.bitmaps || images.length
       delete times.bitmaps
       for (const key in times) total += times[key]
-      total -= times.IPCTime
       console.log('Bitmaps: ' + count + ' Total: ' + (total | 0) + 'ms', times)
     }
   }

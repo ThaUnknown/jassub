@@ -216,7 +216,7 @@ const render = (time, force) => {
     const renderEndTime = jassubObj.time
     times.WASMRenderTime = renderEndTime - renderStartTime
     times.WASMBitmapDecodeTime = decodeEndTime - renderEndTime
-    times.JSRenderTime = decodeEndTime
+    times.JSRenderTime = Date.now()
   }
   if (jassubObj.changed !== 0 || force) {
     const images = []

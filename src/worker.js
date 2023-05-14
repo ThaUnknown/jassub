@@ -137,8 +137,11 @@ self.setTrack = ({ content }) => {
   // Tell libass to render the new track
   jassubObj.createTrackMem(content)
 
-  trackColorSpace = libassYCbCrMap[jassubObj.trackColorSpace]
+  subtitleColorSpace = libassYCbCrMap[jassubObj.trackColorSpace]
+  postMessage({ target: 'verifyColorSpace', subtitleColorSpace })
 }
+
+self.getColorSpace = () => postMessage({ target: 'verifyColorSpace', subtitleColorSpace })
 
 /**
  * Remove subtitle track.
@@ -205,46 +208,50 @@ const b = 'BT709'
 const c = 'SMPTE240M'
 const d = 'FCC'
 
-const libassYCbCrMap = [a, a, a, a, a, b, b, c, c, d, d]
+const libassYCbCrMap = [null, a, null, a, a, b, b, c, c, d, d]
 
 const render = (time, force) => {
   const times = {}
   const renderStartTime = performance.now()
-  const result = blendMode === 'wasm' ? jassubObj.renderBlend(time, force || 0) : jassubObj.renderImage(time, force || 0)
+  const renderResult = blendMode === 'wasm' ? jassubObj.renderBlend(time, force || 0) : jassubObj.renderImage(time, force || 0)
   if (debug) {
     const decodeEndTime = performance.now()
     const renderEndTime = jassubObj.time
     times.WASMRenderTime = renderEndTime - renderStartTime
     times.WASMBitmapDecodeTime = decodeEndTime - renderEndTime
+    // performance.now is relative to the creation of the scope, since this time MIGHT be used to calculate a time difference
+    // on the main thread, we need absolute time, not relative
     times.JSRenderTime = Date.now()
   }
   if (jassubObj.changed !== 0 || force) {
     const images = []
-    let buffers = []
-    if (!result) return paintImages({ images, buffers, times })
+    const buffers = []
+    if (!renderResult) return paintImages({ images, buffers, times })
     if (asyncRender) {
       const promises = []
-      for (let image = result, i = 0; i < jassubObj.count; image = image.next, ++i) {
-        images.push({ w: image.w, h: image.h, x: image.x, y: image.y })
-        promises.push(createImageBitmap(new ImageData(HEAPU8C.slice(image.image, image.image + image.w * image.h * 4), image.w, image.h)))
+      for (let result = renderResult, i = 0; i < jassubObj.count; result = result.next, ++i) {
+        const reassigned = { w: result.w, h: result.h, x: result.x, y: result.y }
+        const pointer = result.image
+        promises.push(createImageBitmap(new ImageData(HEAPU8C.subarray(pointer, pointer + reassigned.w * reassigned.h * 4), reassigned.w, reassigned.h)))
+        images.push(reassigned)
       }
       // use callback to not rely on async/await
       Promise.all(promises).then(bitmaps => {
         for (let i = 0; i < images.length; i++) {
           images[i].image = bitmaps[i]
         }
-        buffers = bitmaps
-        paintImages({ images, buffers, times })
+        if (debug) times.JSBitmapGenerationTime = Date.now() - times.JSRenderTime
+        paintImages({ images, buffers: bitmaps, times })
       })
     } else {
-      for (let image = result, i = 0; i < jassubObj.count; image = image.next, ++i) {
-        const img = { w: image.w, h: image.h, x: image.x, y: image.y, image: image.image }
+      for (let image = renderResult, i = 0; i < jassubObj.count; image = image.next, ++i) {
+        const reassigned = { w: image.w, h: image.h, x: image.x, y: image.y, image: image.image }
         if (!offCanvasCtx) {
           const buf = wasmMemory.buffer.slice(image.image, image.image + image.w * image.h * 4)
           buffers.push(buf)
-          img.image = buf
+          reassigned.image = buf
         }
-        images.push(img)
+        images.push(reassigned)
       }
       paintImages({ images, buffers, times })
     }
@@ -276,10 +283,10 @@ const paintImages = ({ times, images, buffers }) => {
     times,
     width: self.width,
     height: self.height,
-    colorSpace: trackColorSpace
+    colorSpace: subtitleColorSpace
   }
 
-  if (offCanvasCtx) {
+  if (offscreenRender) {
     if (offCanvas.height !== self.height || offCanvas.width !== self.width) {
       offCanvas.width = self.width
       offCanvas.height = self.height
@@ -298,13 +305,24 @@ const paintImages = ({ times, images, buffers }) => {
         }
       }
     }
-    if (debug) times.bitmaps = images.length
-    try {
-      const image = offCanvas.transferToImageBitmap()
-      resultObject.images = [{ image, x: 0, y: 0 }]
-      resultObject.async = true
-      postMessage(resultObject, [image])
-    } catch (e) {
+    if (offscreenRender === 'hybrid') {
+      if (!images.length) return postMessage(resultObject)
+      if (debug) times.bitmaps = images.length
+      try {
+        const image = offCanvas.transferToImageBitmap()
+        resultObject.images = [{ image, x: 0, y: 0 }]
+        resultObject.asyncRender = true
+        postMessage(resultObject, [image])
+      } catch (e) {
+        postMessage({ target: 'unbusy' })
+      }
+    } else {
+      if (debug) {
+        times.JSRenderTime = Date.now() - times.JSRenderTime - (times.JSBitmapGenerationTime || 0)
+        let total = 0
+        for (const key in times) total += times[key]
+        console.log('Bitmaps: ' + images.length + ' Total: ' + (total | 0) + 'ms', times)
+      }
       postMessage({ target: 'unbusy' })
     }
   } else {
@@ -392,8 +410,6 @@ const requestAnimationFrame = (() => {
   }
 })()
 
-// Frame throttling
-
 const _applyKeys = (input, output) => {
   for (const v of Object.keys(input)) {
     output[v] = input[v]
@@ -401,10 +417,11 @@ const _applyKeys = (input, output) => {
 }
 let offCanvas
 let offCanvasCtx
+let offscreenRender
 let bufferCanvas
 let bufferCtx
 let jassubObj
-let trackColorSpace
+let subtitleColorSpace
 
 self.init = data => {
   self.width = data.width
@@ -438,21 +455,30 @@ self.init = data => {
 
   jassubObj.createTrackMem(subContent)
 
-  trackColorSpace = libassYCbCrMap[jassubObj.trackColorSpace]
+  subtitleColorSpace = libassYCbCrMap[jassubObj.trackColorSpace]
+  postMessage({ target: 'verifyColorSpace', subtitleColorSpace })
 
   jassubObj.setDropAnimations(data.dropAllAnimations || 0)
 
   if (data.libassMemoryLimit > 0 || data.libassGlyphLimit > 0) {
     jassubObj.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)
   }
-  if (data.offscreenRender) {
-    offCanvas = new OffscreenCanvas(self.height, self.width)
-    offCanvasCtx = offCanvas.getContext('2d', { desynchronized: true })
-    if (!asyncRender) {
-      bufferCanvas = new OffscreenCanvas(self.height, self.width)
-      bufferCtx = bufferCanvas.getContext('2d', { desynchronized: true })
-    }
+}
+
+self.offscreenCanvas = ({ transferable }) => {
+  offCanvas = transferable[0]
+  offCanvasCtx = offCanvas.getContext('2d')
+  if (!asyncRender) {
+    bufferCanvas = new OffscreenCanvas(self.height, self.width)
+    bufferCtx = bufferCanvas.getContext('2d', { desynchronized: true })
   }
+  offscreenRender = true
+}
+
+self.detachOffscreen = () => {
+  offCanvas = new OffscreenCanvas(self.height, self.width)
+  offCanvasCtx = offCanvas.getContext('2d', { desynchronized: true })
+  offscreenRender = 'hybrid'
 }
 
 self.canvas = ({ width, height, force }) => {
@@ -460,7 +486,7 @@ self.canvas = ({ width, height, force }) => {
   self.width = width
   self.height = height
   jassubObj.resizeCanvas(width, height)
-  if (force) render(lastCurrentTime)
+  if (force) render(lastCurrentTime, true)
 }
 
 self.video = ({ currentTime, isPaused, rate }) => {

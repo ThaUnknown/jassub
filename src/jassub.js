@@ -63,6 +63,9 @@ export default class JASSUB extends EventTarget {
     JASSUB._test()
     this._onDemandRender = 'requestVideoFrameCallback' in HTMLVideoElement.prototype && (options.onDemandRender ?? true)
 
+    // don't support offscreen rendering on custom canvases, as we can't replace it if colorSpace doesn't match
+    this._offscreenRender = 'transferControlToOffscreen' in HTMLCanvasElement.prototype && !options.canvas && (options.offscreenRender ?? true)
+
     this.timeOffset = options.timeOffset || 0
     this._video = options.video
     this._videoHeight = 0
@@ -74,11 +77,7 @@ export default class JASSUB extends EventTarget {
       this._canvasParent.className = 'JASSUB'
       this._canvasParent.style.position = 'relative'
 
-      this._canvas = document.createElement('canvas')
-      this._canvas.style.display = 'block'
-      this._canvas.style.position = 'absolute'
-      this._canvas.style.pointerEvents = 'none'
-      this._canvasParent.appendChild(this._canvas)
+      this._createCanvas()
 
       if (this._video.nextSibling) {
         this._video.parentNode.insertBefore(this._canvasParent, this._video.nextSibling)
@@ -92,8 +91,8 @@ export default class JASSUB extends EventTarget {
     this._bufferCanvas = document.createElement('canvas')
     this._bufferCtx = this._bufferCanvas.getContext('2d')
 
-    this._canvasctrl = this._canvas
-    this._ctx = this._canvasctrl.getContext('2d')
+    this._canvasctrl = this._offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas
+    this._ctx = !this._offscreenRender && this._canvasctrl.getContext('2d')
 
     this._lastRenderTime = 0
     this.debug = !!options.debug
@@ -115,7 +114,6 @@ export default class JASSUB extends EventTarget {
           onDemandRender: this._onDemandRender,
           width: this._canvasctrl.width || 0,
           height: this._canvasctrl.height || 0,
-          preMain: true,
           blendMode: options.blendMode || 'js',
           subUrl: options.subUrl,
           subContent: options.subContent || null,
@@ -127,10 +125,9 @@ export default class JASSUB extends EventTarget {
           dropAllAnimations: options.dropAllAnimations,
           libassMemoryLimit: options.libassMemoryLimit || 0,
           libassGlyphLimit: options.libassGlyphLimit || 0,
-          hasAlphaBug: JASSUB._hasAlphaBug,
-          offscreenRender: typeof OffscreenCanvas !== 'undefined' && (options.offscreenRender ?? true),
           useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)
         })
+        if (this._offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
 
         this._boundResize = this.resize.bind(this)
         this._boundTimeUpdate = this._timeupdate.bind(this)
@@ -145,6 +142,14 @@ export default class JASSUB extends EventTarget {
         resolve()
       }
     })
+  }
+
+  _createCanvas () {
+    this._canvas = document.createElement('canvas')
+    this._canvas.style.display = 'block'
+    this._canvas.style.position = 'absolute'
+    this._canvas.style.pointerEvents = 'none'
+    this._canvasParent.appendChild(this._canvas)
   }
 
   // test support for WASM, ImageData, alphaBug, but only once, on init so it doesn't run when first running the page
@@ -226,7 +231,12 @@ export default class JASSUB extends EventTarget {
 
     this._canvas.style.top = top + 'px'
     this._canvas.style.left = left + 'px'
-    this.sendMessage('canvas', { width, height, force: force && this.busy === false })
+    if (force && this.busy === false) {
+      this.busy = true
+    } else {
+      force = false
+    }
+    this.sendMessage('canvas', { width, height, force })
   }
 
   _getVideoPosition (width = this._video.videoWidth, height = this._video.videoHeight) {
@@ -285,20 +295,6 @@ export default class JASSUB extends EventTarget {
     this.setCurrentTime(this._video.paused || this._playstate, this._video.currentTime + this.timeOffset)
   }
 
-  _updateColorSpace () {
-    this._video.requestVideoFrameCallback(() => {
-      try {
-        // eslint-disable-next-line no-undef
-        const frame = new VideoFrame(this._video)
-        this._videoColorSpace = webYCbCrMap[frame.colorSpace.matrix]
-        frame.close()
-      } catch (e) {
-        // sources can be tainted
-        console.warn(e)
-      }
-    })
-  }
-
   /**
    * Change the video to use as target for event listeners.
    * @param  {HTMLVideoElement} video
@@ -346,6 +342,8 @@ export default class JASSUB extends EventTarget {
    */
   setTrackByUrl (url) {
     this.sendMessage('setTrackByUrl', { url })
+    this._reAttachOffscreen()
+    if (this._ctx) this._ctx.filter = 'none'
   }
 
   /**
@@ -354,6 +352,8 @@ export default class JASSUB extends EventTarget {
    */
   setTrack (content) {
     this.sendMessage('setTrack', { content })
+    this._reAttachOffscreen()
+    if (this._ctx) this._ctx.filter = 'none'
   }
 
   /**
@@ -386,7 +386,7 @@ export default class JASSUB extends EventTarget {
    * @param  {Number} [rate] Playback rate.
    */
   setCurrentTime (isPaused, currentTime, rate) {
-    this.sendMessage('video', { isPaused, currentTime, rate })
+    this.sendMessage('video', { isPaused, currentTime, rate, colorSpace: this._videoColorSpace })
   }
 
   /**
@@ -582,14 +582,54 @@ export default class JASSUB extends EventTarget {
     this.sendMessage('demand', { time: mediaTime + this.timeOffset })
   }
 
+  // if we're using offscreen render, we can't use ctx filters, so we can't use a transfered canvas
+  _detachOffscreen () {
+    if (!this._offscreenRender || this._ctx) return null
+    this._canvas.remove()
+    this._createCanvas()
+    this._canvasctrl = this._canvas
+    this._ctx = this._canvasctrl.getContext('2d')
+    this.sendMessage('detachOffscreen')
+    // force a render after resize
+    this.busy = false
+    this.resize(0, 0, 0, 0, true)
+  }
+
+  // if the video or track changed, we need to re-attach the offscreen canvas
+  _reAttachOffscreen () {
+    if (!this._offscreenRender || !this._ctx) return null
+    this._canvas.remove()
+    this._createCanvas()
+    this._canvasctrl = this._canvas.transferControlToOffscreen()
+    this._ctx = false
+    this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
+    this.resize(0, 0, 0, 0, true)
+  }
+
+  _updateColorSpace () {
+    this._video.requestVideoFrameCallback(() => {
+      try {
+        // eslint-disable-next-line no-undef
+        const frame = new VideoFrame(this._video)
+        this._videoColorSpace = webYCbCrMap[frame.colorSpace.matrix]
+        frame.close()
+        this.sendMessage('getColorSpace')
+      } catch (e) {
+        // sources can be tainted
+        console.warn(e)
+      }
+    })
+  }
+
   /**
    * Veryify the color spaces for subtitles and videos, then apply filters to correct the color of subtitles.
-   * @param  {String} subtitleColorSpace Subtitle color space. One of: BT.601 BT.709 SMPTE240M FCC
-   * @param  {String} videoColorSpace Video color space. One of: BT.601 BT.709
+   * @param  {String} subtitleColorSpace Subtitle color space. One of: BT601 BT709 SMPTE240M FCC
+   * @param  {String} videoColorSpace Video color space. One of: BT601 BT709
    */
-  verifyColorSpace (subtitleColorSpace, videoColorSpace = this._videoColorSpace) {
+  _verifyColorSpace ({ subtitleColorSpace, videoColorSpace = this._videoColorSpace }) {
     if (!subtitleColorSpace || !videoColorSpace) return
     if (subtitleColorSpace === videoColorSpace) return
+    this._detachOffscreen()
     this._ctx.filter = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='f'><feColorMatrix type='matrix' values='${colorMatrixConversionMap[subtitleColorSpace][videoColorSpace]} 0 0 0 0 0 1 0'/></filter></svg>#f")`
   }
 
@@ -599,7 +639,7 @@ export default class JASSUB extends EventTarget {
     if (this._canvasctrl.width !== width || this._canvasctrl.height !== height) {
       this._canvasctrl.width = width
       this._canvasctrl.height = height
-      this.verifyColorSpace(colorSpace)
+      this._verifyColorSpace({ subtitleColorSpace: colorSpace })
     }
     this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
     for (const image of images) {
@@ -721,7 +761,7 @@ export default class JASSUB extends EventTarget {
   _removeListeners () {
     if (this._video) {
       if (this._ro) this._ro.unobserve(this._video)
-      this._ctx.filter = 'none'
+      if (this._ctx) this._ctx.filter = 'none'
       this._video.removeEventListener('timeupdate', this._boundTimeUpdate)
       this._video.removeEventListener('progress', this._boundTimeUpdate)
       this._video.removeEventListener('waiting', this._boundTimeUpdate)

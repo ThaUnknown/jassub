@@ -87,6 +87,7 @@ class l extends EventTarget {
           debug: this.debug,
           targetFps: e.targetFps || 24,
           dropAllAnimations: e.dropAllAnimations,
+          dropAllBlur: e.dropAllBlur,
           libassMemoryLimit: e.libassMemoryLimit || 0,
           libassGlyphLimit: e.libassGlyphLimit || 0,
           useLocalFonts: "queryLocalFonts" in self && (e.useLocalFonts ?? !0)

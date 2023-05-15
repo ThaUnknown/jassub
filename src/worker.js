@@ -134,6 +134,7 @@ self.setTrack = ({ content }) => {
   // Make sure that the fonts are loaded
   processAvailableFonts(content)
 
+  if (dropAllBlur) content = dropBlur(content)
   // Tell libass to render the new track
   jassubObj.createTrackMem(content)
 
@@ -391,6 +392,12 @@ const parseAss = content => {
   return sections
 }
 
+const blurRegex = /\\blur(?:[0-9]+\.)?[0-9]+/gm
+
+const dropBlur = subContent => {
+  return subContent.replace(blurRegex, '')
+}
+
 const requestAnimationFrame = (() => {
   // similar to Browser.requestAnimationFrame
   let nextRAF = 0
@@ -422,6 +429,7 @@ let bufferCanvas
 let bufferCtx
 let jassubObj
 let subtitleColorSpace
+let dropAllBlur
 
 self.init = data => {
   self.width = data.width
@@ -440,6 +448,7 @@ self.init = data => {
   debug = data.debug
   targetFps = data.targetFps || targetFps
   useLocalFonts = data.useLocalFonts
+  dropAllBlur = data.dropAllBlur
 
   const fallbackFont = data.fallbackFont.toLowerCase()
   jassubObj = new Module.JASSUB(self.width, self.height, fallbackFont || null, debug)
@@ -450,6 +459,7 @@ self.init = data => {
   if (!subContent) subContent = read_(data.subUrl)
 
   processAvailableFonts(subContent)
+  if (dropAllBlur) subContent = dropBlur(subContent)
 
   for (const font of data.fonts || []) asyncWrite(font)
 

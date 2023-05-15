@@ -123,6 +123,7 @@ export default class JASSUB extends EventTarget {
           debug: this.debug,
           targetFps: options.targetFps || 24,
           dropAllAnimations: options.dropAllAnimations,
+          dropAllBlur: options.dropAllBlur,
           libassMemoryLimit: options.libassMemoryLimit || 0,
           libassGlyphLimit: options.libassGlyphLimit || 0,
           useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)

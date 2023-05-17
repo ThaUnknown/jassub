@@ -60,9 +60,12 @@ interface JassubOptions {
 	prescaleHeightLimit?: number;
 	maxRenderHeight?: number;
 	dropAllAnimations?: boolean;
+	dropAllBlur?: boolean
 
 	workerUrl?: string;
-	legacyWorkerUrl?: string;
+	wasmUrl?: string;
+	legacyWasmUrl?: string;
+	modernWasmUrl?: string;
 
 	subUrl?: string;
 	subContent?: string;

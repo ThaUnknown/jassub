@@ -24,4 +24,5 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /code
-CMD ["bash", "-c", "make; sudo npm i; sudo node vite.build.js"]
+CMD ["bash", "-c", "sudo rm -rf dist/libraries; sudo rm -rf build/lib; make; sudo rm -rf dist/libraries; sudo rm -rf build/lib; env MODERN=1 make; sudo npm i; sudo node vite.build.js"]
+

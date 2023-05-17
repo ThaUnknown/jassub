@@ -1,6 +1,5 @@
-/* eslint-disable no-global-assign */
-// eslint-disable-next-line no-unused-vars
-/* global Module, HEAPU8, _malloc, out, err, ready, wasmMemory, updateMemoryViews */
+import WASM from 'wasm'
+
 const read_ = (url, ab) => {
   const xhr = new XMLHttpRequest()
   xhr.open('GET', url, false)
@@ -16,13 +15,42 @@ const readAsync = (url, load, err) => {
     if ((xhr.status === 200 || xhr.status === 0) && xhr.response) {
       return load(xhr.response)
     }
-    err()
   }
   xhr.onerror = err
   xhr.send(null)
 }
-Module = {
-  wasm: WebAssembly && !WebAssembly.instantiateStreaming && read_('jassub-worker.wasm', true)
+
+if (!Date.now) Date.now = () => new Date().getTime()
+if (!('performance' in self)) self.performance = { now: () => Date.now() }
+
+// implement console methods if they're missing
+if (typeof console === 'undefined') {
+  const msg = (command, a) => {
+    postMessage({
+      target: 'console',
+      command,
+      content: JSON.stringify(Array.prototype.slice.call(a))
+    })
+  }
+  // eslint-disable-next-line no-global-assign
+  console = {
+    log: function () {
+      msg('log', arguments)
+    },
+    debug: function () {
+      msg('debug', arguments)
+    },
+    info: function () {
+      msg('info', arguments)
+    },
+    warn: function () {
+      msg('warn', arguments)
+    },
+    error: function () {
+      msg('error', arguments)
+    }
+  }
+  console.log('Detected lack of console, overridden console')
 }
 
 try {
@@ -33,24 +61,6 @@ try {
   // load WASM2JS code if WASM is unsupported
   // eslint-disable-next-line no-eval
   eval(read_('jassub-worker.wasm.js'))
-}
-
-// ran when WASM is compiled
-ready = () => postMessage({ target: 'ready' })
-
-out = text => {
-  if (text === 'JASSUB: No usable fontconfig configuration file found, using fallback.') {
-    console.debug(text)
-  } else {
-    console.log(text)
-  }
-}
-err = text => {
-  if (text === 'Fontconfig error: Cannot load default config file: No such file: (null)') {
-    console.debug(text)
-  } else {
-    console.error(text)
-  }
 }
 
 let lastCurrentTime = 0
@@ -90,19 +100,19 @@ const findAvailableFonts = font => {
 }
 
 const asyncWrite = font => {
-  if (ArrayBuffer.isView(font)) {
-    allocFont(font)
-  } else {
+  if (typeof font === 'string') {
     readAsync(font, fontData => {
       allocFont(new Uint8Array(fontData))
     }, console.error)
+  } else {
+    allocFont(font)
   }
 }
 
 // TODO: this should re-draw last frame!
 const allocFont = uint8 => {
   const ptr = _malloc(uint8.byteLength)
-  HEAPU8.set(uint8, ptr)
+  self.HEAPU8.set(uint8, ptr)
   jassubObj.addFont('font-' + (fontId++), ptr, uint8.byteLength)
   jassubObj.reloadFonts()
 }
@@ -233,7 +243,7 @@ const render = (time, force) => {
       for (let result = renderResult, i = 0; i < jassubObj.count; result = result.next, ++i) {
         const reassigned = { w: result.w, h: result.h, x: result.x, y: result.y }
         const pointer = result.image
-        promises.push(createImageBitmap(new ImageData(HEAPU8C.subarray(pointer, pointer + reassigned.w * reassigned.h * 4), reassigned.w, reassigned.h)))
+        promises.push(createImageBitmap(new ImageData(self.HEAPU8C.subarray(pointer, pointer + reassigned.w * reassigned.h * 4), reassigned.w, reassigned.h)))
         images.push(reassigned)
       }
       // use callback to not rely on async/await
@@ -248,7 +258,7 @@ const render = (time, force) => {
       for (let image = renderResult, i = 0; i < jassubObj.count; image = image.next, ++i) {
         const reassigned = { w: image.w, h: image.h, x: image.x, y: image.y, image: image.image }
         if (!offCanvasCtx) {
-          const buf = wasmMemory.buffer.slice(image.image, image.image + image.w * image.h * 4)
+          const buf = self.wasmMemory.buffer.slice(image.image, image.image + image.w * image.h * 4)
           buffers.push(buf)
           reassigned.image = buf
         }
@@ -301,7 +311,7 @@ const paintImages = ({ times, images, buffers }) => {
         } else {
           bufferCanvas.width = image.w
           bufferCanvas.height = image.h
-          bufferCtx.putImageData(new ImageData(HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h), 0, 0)
+          bufferCtx.putImageData(new ImageData(self.HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h), 0, 0)
           offCanvasCtx.drawImage(bufferCanvas, image.x, image.y)
         }
       }
@@ -430,49 +440,59 @@ let bufferCtx
 let jassubObj
 let subtitleColorSpace
 let dropAllBlur
+let _malloc
 
 self.init = data => {
-  self.width = data.width
-  self.height = data.height
-  blendMode = data.blendMode
-  asyncRender = data.asyncRender
-  // Force fallback if engine does not support 'lossy' mode.
-  // We only use createImageBitmap in the worker and historic WebKit versions supported
-  // the API in the normal but not the worker scope, so we can't check this earlier.
-  if (asyncRender && typeof createImageBitmap === 'undefined') {
-    asyncRender = false
-    console.error("'createImageBitmap' needed for 'asyncRender' unsupported!")
-  }
+  // hack, we want custom WASM URLs
+  const _fetch = fetch
+  const wasm = !WebAssembly.instantiateStreaming && read_(data.legacyWasmUrl, true)
+  if (WebAssembly.instantiateStreaming) self.fetch = _ => _fetch(data.wasmUrl)
+  WASM({ wasm }).then(Module => {
+    _malloc = Module._malloc
+    self.width = data.width
+    self.height = data.height
+    blendMode = data.blendMode
+    asyncRender = data.asyncRender
+    // Force fallback if engine does not support 'lossy' mode.
+    // We only use createImageBitmap in the worker and historic WebKit versions supported
+    // the API in the normal but not the worker scope, so we can't check this earlier.
+    if (asyncRender && typeof createImageBitmap === 'undefined') {
+      asyncRender = false
+      console.error("'createImageBitmap' needed for 'asyncRender' unsupported!")
+    }
 
-  availableFonts = data.availableFonts
-  debug = data.debug
-  targetFps = data.targetFps || targetFps
-  useLocalFonts = data.useLocalFonts
-  dropAllBlur = data.dropAllBlur
+    availableFonts = data.availableFonts
+    debug = data.debug
+    targetFps = data.targetFps || targetFps
+    useLocalFonts = data.useLocalFonts
+    dropAllBlur = data.dropAllBlur
 
-  const fallbackFont = data.fallbackFont.toLowerCase()
-  jassubObj = new Module.JASSUB(self.width, self.height, fallbackFont || null, debug)
+    const fallbackFont = data.fallbackFont.toLowerCase()
+    jassubObj = new Module.JASSUB(self.width, self.height, fallbackFont || null, debug)
 
-  if (fallbackFont) findAvailableFonts(fallbackFont)
+    if (fallbackFont) findAvailableFonts(fallbackFont)
 
-  let subContent = data.subContent
-  if (!subContent) subContent = read_(data.subUrl)
+    let subContent = data.subContent
+    if (!subContent) subContent = read_(data.subUrl)
 
-  processAvailableFonts(subContent)
-  if (dropAllBlur) subContent = dropBlur(subContent)
+    processAvailableFonts(subContent)
+    if (dropAllBlur) subContent = dropBlur(subContent)
 
-  for (const font of data.fonts || []) asyncWrite(font)
+    for (const font of data.fonts || []) asyncWrite(font)
 
-  jassubObj.createTrackMem(subContent)
+    jassubObj.createTrackMem(subContent)
 
-  subtitleColorSpace = libassYCbCrMap[jassubObj.trackColorSpace]
-  postMessage({ target: 'verifyColorSpace', subtitleColorSpace })
+    subtitleColorSpace = libassYCbCrMap[jassubObj.trackColorSpace]
 
-  jassubObj.setDropAnimations(data.dropAllAnimations || 0)
+    jassubObj.setDropAnimations(data.dropAllAnimations || 0)
 
-  if (data.libassMemoryLimit > 0 || data.libassGlyphLimit > 0) {
-    jassubObj.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)
-  }
+    if (data.libassMemoryLimit > 0 || data.libassGlyphLimit > 0) {
+      jassubObj.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)
+    }
+
+    postMessage({ target: 'ready' })
+    postMessage({ target: 'verifyColorSpace', subtitleColorSpace })
+  })
 }
 
 self.offscreenCanvas = ({ transferable }) => {
@@ -495,7 +515,7 @@ self.canvas = ({ width, height, force }) => {
   if (width == null) throw new Error('Invalid canvas size specified')
   self.width = width
   self.height = height
-  jassubObj.resizeCanvas(width, height)
+  if (jassubObj) jassubObj.resizeCanvas(width, height)
   if (force) render(lastCurrentTime, true)
 }
 
@@ -567,13 +587,3 @@ onmessage = ({ data }) => {
     throw new Error('Unknown event target ' + data.target)
   }
 }
-
-let HEAPU8C = null
-
-// patch EMS function to include Uint8Clamped, but call old function too
-updateMemoryViews = (_super => {
-  return () => {
-    _super()
-    HEAPU8C = new Uint8ClampedArray(wasmMemory.buffer)
-  }
-})(updateMemoryViews)

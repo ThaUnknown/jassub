@@ -1,9 +1,9 @@
 # For inclusion in toplevel Makefile
-#   Defines some useful macros and variables for building etc
-#   If arguments are expected (macro) it needs to be invoked with $(call ...),
-#   if no arguments are supported the definition is aregular avariable and can be used as such.
-#   Special macros of the name TR_... create targets (and always take arguments)
-#   and thus also need to be $(eval ...)'ed
+#	 Defines some useful macros and variables for building etc
+#	 If arguments are expected (macro) it needs to be invoked with $(call ...),
+#	 if no arguments are supported the definition is aregular avariable and can be used as such.
+#	 Special macros of the name TR_... create targets (and always take arguments)
+#	 and thus also need to be $(eval ...)'ed
 
 ## Build stuff
 
@@ -27,15 +27,22 @@ endef
 # All projects we build have autogen.sh, otherwise we could also fallback to `autoreconf -ivf .`
 RECONF_AUTO := NOCONFIGURE=1 ./autogen.sh
 
+CONF_ARGS = --enable-optimize
+
+ifeq (${MODERN},1)
+  override CONF_ARGS += --enable-simd 
+endif
+
 # @arg1: path to source directory; defaults to current working directory
 define CONFIGURE_AUTO
 	emconfigure $(or $(1),.)/configure \
-	  --prefix="$(DIST_DIR)" \
-	  --host=x86-none-linux \
-	  --build=x86_64 \
-	  --enable-static \
-	  --disable-shared \
-	  --disable-debug
+		--prefix="$(DIST_DIR)" \
+		--host=x86-none-linux \
+		--build=x86_64 \
+		--enable-static \
+		--disable-shared \
+		--disable-debug \
+    $(CONF_ARGS)
 endef
 
 # @arg1: path to source directory; defaults to current working directory

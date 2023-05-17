@@ -28,21 +28,27 @@ await build({
         {
           src: 'dist/js/jassub-worker.wasm',
           dest: './'
+        },
+        {
+          src: 'dist/js/jassub-worker-modern.wasm',
+          dest: './'
         }
       ]
     })
   ],
+  resolve: {
+    alias: {
+      wasm: 'dist/js/jassub-worker-modern.js'
+    }
+  },
   build: {
     target: 'esnext',
     outDir: './dist',
     minify: 'esbuild',
-    rollupOptions: {
-      output: {
-        entryFileNames: '[name].js'
-      },
-      input: {
-        'jassub-worker': resolve(__dirname, 'dist/js/jassub-worker.js')
-      }
+    lib: {
+      fileName: () => 'jassub-worker.js',
+      entry: 'src/worker.js',
+      formats: ['cjs']
     },
     emptyOutDir: false
   }

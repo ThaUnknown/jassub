@@ -46,12 +46,13 @@ npm i jassub
 ```js
 import JASSUB from 'jassub'
 import workerUrl from 'jassub/dist/jassub-worker.js?url'
-import 'jassub/dist/jassub-worker.wasm?url'
+import wasmUrl from 'jassub/dist/jassub-worker.wasm?url'
 
 const renderer = new JASSUB({
   video: document.querySelector('video'),
   subContent: subtitleString,
-  workerUrl // you can also use: `new URL('jassub/dist/jassub-worker.js', import.meta.url)` instead of importing it as an url
+  workerUrl, // you can also use: `new URL('jassub/dist/jassub-worker.js', import.meta.url)` instead of importing it as an url
+  wasmUrl
 })
 ```
 ## Using only with canvas
@@ -99,8 +100,11 @@ The default options are best, and automatically fallback to the next fastest opt
 - `{Number} options.prescaleHeightLimit` { Optional = 1080 } The height in pixels beyond which the subtitles canvas won't be prescaled.
 - `{Number} options.maxRenderHeight` { Optional = 0 } The maximum rendering height in pixels of the subtitles canvas. Beyond this subtitles will be upscaled by the browser.
 - `{Boolean} options.dropAllAnimations` { Optional = false } Attempt to discard all animated tags. Enabling this may severly mangle complex subtitles and should only be considered as an last ditch effort of uncertain success for hardware otherwise incapable of displaing anything. Will not reliably work with manually edited or allocated events.
+- `{Boolean} options.dropAllBlur` { Optional = false } The holy grail of performance gains. If heavy TS lags a lot, disabling this will make it ~x10 faster. This drops blur from all added subtitle tracks making most text and backgrounds look sharper, this is way less intrusive than dropping all animations, while still offering major performance gains.
 - `{String} options.workerUrl` { Optional = 'jassub-worker.js' } The URL of the worker.
-- `{String} options.legacyWorkerUrl` { Optional = 'jassub-worker-legacy.js' } The URL of the legacy worker. Only loaded if the browser doesn't support WASM.
+- `{String} options.wasmUrl` { Optional = 'jassub-worker.wasm' } The URL of the worker WASM.
+- `{String} options.legacyWasmUrl` { Optional = 'jassub-worker.wasm.js' } The URL of the legacy worker WASM. Only loaded if the browser doesn't support WASM.
+- `{String} options.modernWasmUrl` { Optional } The URL of the modern worker WASM. This includes faster ASM instructions, but is only supported by newer browsers, disabled if the URL isn't defined.
 - `{String} [options.subUrl=options.subContent]` The URL of the subtitle file to play.
 - `{String} [options.subContent=options.subUrl]` The content of the subtitle file to play.
 - `{String[]|Uint8Array[]} options.fonts` { Optional } An array of links or Uint8Arrays to the fonts used in the subtitle. If Uint8Array is used the array is copied, not referenced. This forces all the fonts in this array to be loaded by the renderer, regardless of if they are used.
@@ -121,11 +125,12 @@ This library has a lot of methods and properties, however many aren't made for m
   - `busy` - Boolean which specifies if the renderer is currently busy. 
   - `timeOffset` - -||-
 ### List of methods:
-- `resize(width = 0, height = 0, top = 0, left = 0)` - Resize the canvas to given parameters. Auto-generated if values are ommited.
+- `resize(width = 0, height = 0, top = 0, left = 0, force)` - Resize the canvas to given parameters. Auto-generated if values are ommited.
   - {Number} [width=0]
   - {Number} [height=0]
   - {Number} [top=0]
   - {Number} [left=0]
+  - {Boolean} force
 - `setVideo(video)` - Change the video to use as target for event listeners.
   - {HTMLVideoElement} video
 - `setTrackByUrl(url)` - Overwrites the current subtitle content.

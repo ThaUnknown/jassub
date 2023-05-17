@@ -44,8 +44,11 @@ export default class JASSUB extends EventTarget {
    * @param {Number} [options.prescaleHeightLimit=1080] The height in pixels beyond which the subtitles canvas won't be prescaled.
    * @param {Number} [options.maxRenderHeight=0] The maximum rendering height in pixels of the subtitles canvas. Beyond this subtitles will be upscaled by the browser.
    * @param {Boolean} [options.dropAllAnimations=false] Attempt to discard all animated tags. Enabling this may severly mangle complex subtitles and should only be considered as an last ditch effort of uncertain success for hardware otherwise incapable of displaing anything. Will not reliably work with manually edited or allocated events.
+   * @param {Boolean} [options.dropAllBlur=false] The holy grail of performance gains. If heavy TS lags a lot, disabling this will make it ~x10 faster. This drops blur from all added subtitle tracks making most text and backgrounds look sharper, this is way less intrusive than dropping all animations, while still offering major performance gains.
    * @param {String} [options.workerUrl='jassub-worker.js'] The URL of the worker.
-   * @param {String} [options.legacyWorkerUrl='jassub-worker-legacy.js'] The URL of the legacy worker. Only loaded if the browser doesn't support WASM.
+   * @param {String} [options.wasmUrl='jassub-worker.wasm'] The URL of the worker WASM.
+   * @param {String} [options.legacyWasmUrl='jassub-worker.wasm.js'] The URL of the worker WASM. Only loaded if the browser doesn't support WASM.
+   * @param {String} options.modernWasmUrl The URL of the modern worker WASM. This includes faster ASM instructions, but is only supported by newer browsers, disabled if the URL isn't defined.
    * @param {String} [options.subUrl=options.subContent] The URL of the subtitle file to play.
    * @param {String} [options.subContent=options.subUrl] The content of the subtitle file to play.
    * @param {String[]|Uint8Array[]} [options.fonts] An array of links or Uint8Arrays to the fonts used in the subtitle. If Uint8Array is used the array is copied, not referenced. This forces all the fonts in this array to be loaded by the renderer, regardless of if they are used.
@@ -60,6 +63,11 @@ export default class JASSUB extends EventTarget {
     if (!globalThis.Worker) {
       this.destroy('Worker not supported')
     }
+
+    this._loaded = new Promise(resolve => {
+      this._init = resolve
+    })
+
     JASSUB._test()
     this._onDemandRender = 'requestVideoFrameCallback' in HTMLVideoElement.prototype && (options.onDemandRender ?? true)
 
@@ -101,48 +109,44 @@ export default class JASSUB extends EventTarget {
     this.prescaleHeightLimit = options.prescaleHeightLimit || 1080
     this.maxRenderHeight = options.maxRenderHeight || 0 // 0 - no limit.
 
+    this._boundResize = this.resize.bind(this)
+    this._boundTimeUpdate = this._timeupdate.bind(this)
+    this._boundSetRate = this.setRate.bind(this)
+    this._boundUpdateColorSpace = this._updateColorSpace.bind(this)
+    if (this._video) this.setVideo(options.video)
+
+    if (this._onDemandRender) {
+      this.busy = false
+      this._lastDemandTime = null
+    }
+
     this._worker = new Worker(options.workerUrl || 'jassub-worker.js')
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
 
-    this._loaded = new Promise(resolve => {
-      this._init = () => {
-        if (this._destroyed) return
-        this._worker.postMessage({
-          target: 'init',
-          asyncRender: typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true),
-          onDemandRender: this._onDemandRender,
-          width: this._canvasctrl.width || 0,
-          height: this._canvasctrl.height || 0,
-          blendMode: options.blendMode || 'js',
-          subUrl: options.subUrl,
-          subContent: options.subContent || null,
-          fonts: options.fonts || [],
-          availableFonts: options.availableFonts || { 'liberation sans': './default.woff2' },
-          fallbackFont: options.fallbackFont || 'liberation sans',
-          debug: this.debug,
-          targetFps: options.targetFps || 24,
-          dropAllAnimations: options.dropAllAnimations,
-          dropAllBlur: options.dropAllBlur,
-          libassMemoryLimit: options.libassMemoryLimit || 0,
-          libassGlyphLimit: options.libassGlyphLimit || 0,
-          useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)
-        })
-        if (this._offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
-
-        this._boundResize = this.resize.bind(this)
-        this._boundTimeUpdate = this._timeupdate.bind(this)
-        this._boundSetRate = this.setRate.bind(this)
-        this._boundUpdateColorSpace = this._updateColorSpace.bind(this)
-        if (this._video) this.setVideo(options.video)
-
-        if (this._onDemandRender) {
-          this.busy = false
-          this._lastDemandTime = null
-        }
-        resolve()
-      }
+    this._worker.postMessage({
+      target: 'init',
+      wasmUrl: JASSUB._supportsSIMD && options.modernWasmUrl ? options.modernWasmUrl : options.wasmUrl || 'jassub-worker.wasm',
+      legacyWasmUrl: options.legacyWasmUrl || 'jassub-worker.wasm.js',
+      asyncRender: typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true),
+      onDemandRender: this._onDemandRender,
+      width: this._canvasctrl.width || 0,
+      height: this._canvasctrl.height || 0,
+      blendMode: options.blendMode || 'js',
+      subUrl: options.subUrl,
+      subContent: options.subContent || null,
+      fonts: options.fonts || [],
+      availableFonts: options.availableFonts || { 'liberation sans': './default.woff2' },
+      fallbackFont: options.fallbackFont || 'liberation sans',
+      debug: this.debug,
+      targetFps: options.targetFps || 24,
+      dropAllAnimations: options.dropAllAnimations,
+      dropAllBlur: options.dropAllBlur,
+      libassMemoryLimit: options.libassMemoryLimit || 0,
+      libassGlyphLimit: options.libassGlyphLimit || 0,
+      useLocalFonts: typeof queryLocalFonts !== 'undefined' && (options.useLocalFonts ?? true)
     })
+    if (this._offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
   }
 
   _createCanvas () {
@@ -154,12 +158,18 @@ export default class JASSUB extends EventTarget {
   }
 
   // test support for WASM, ImageData, alphaBug, but only once, on init so it doesn't run when first running the page
-  static _supportsWebAssembly = null
+  static _supportsSIMD = null
   static _hasAlphaBug = null
 
   static _test () {
     // check if ran previously
-    if (JASSUB._supportsWebAssembly !== null) return null
+    if (JASSUB._supportsSIMD !== null) return null
+
+    try {
+      JASSUB._supportsSIMD = WebAssembly.validate(Uint8Array.of(0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11))
+    } catch (e) {
+      JASSUB._supportsSIMD = false
+    }
 
     const canvas1 = document.createElement('canvas')
     const ctx1 = canvas1.getContext('2d', { willReadFrequently: true })

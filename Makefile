@@ -9,6 +9,36 @@ export CXXFLAGS = $(CFLAGS)
 export PKG_CONFIG_PATH = $(DIST_DIR)/lib/pkgconfig
 export EM_PKG_CONFIG_PATH = $(PKG_CONFIG_PATH)
 
+SIMD_ARGS = \
+	-msimd128 \
+	-msse \
+	-msse2 \
+	-msse3 \
+	-mssse3 \
+	-msse4 \
+	-msse4.1 \
+	-msse4.2 \
+	-mavx \
+	-mavx2 \
+	-matomics \
+	-mnontrapping-fptoint 
+
+ifeq (${MODERN},1)
+	WORKER_NAME = jassub-worker-modern
+	WORKER_ARGS = \
+		-s WASM=1 \
+		$(SIMD_ARGS)
+
+	override CFLAGS += $(SIMD_ARGS)
+	override CXXFLAGS += $(SIMD_ARGS)
+
+else
+	WORKER_NAME = jassub-worker
+	WORKER_ARGS = \
+		-s WASM=2 
+
+endif
+
 all: jassub
 jassub: dist
 
@@ -127,13 +157,12 @@ build/lib/libass/configured: lib/libass
 $(DIST_DIR)/lib/libass.a: $(DIST_DIR)/lib/libfontconfig.a $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/libexpat.a $(DIST_DIR)/lib/libfribidi.a $(DIST_DIR)/lib/libfreetype.a $(DIST_DIR)/lib/libbrotlidec.a build/lib/libass/configured
 	cd build/lib/libass && \
 	$(call CONFIGURE_AUTO,../../../lib/libass) \
-		--disable-asm \
+		--enable-large-tiles \
 		--enable-fontconfig \
 	&& \
 	$(JSO_MAKE) install
 
-# JASSUB.js
-OCTP_DEPS = \
+LIBASS_DEPS = \
 	$(DIST_DIR)/lib/libfribidi.a \
 	$(DIST_DIR)/lib/libbrotlicommon.a \
 	$(DIST_DIR)/lib/libbrotlidec.a \
@@ -143,47 +172,59 @@ OCTP_DEPS = \
 	$(DIST_DIR)/lib/libfontconfig.a \
 	$(DIST_DIR)/lib/libass.a
 
+
+dist: $(LIBASS_DEPS) dist/js/$(WORKER_NAME).js dist/js/jassub.js
+
 # Dist Files https://github.com/emscripten-core/emscripten/blob/3.1.38/src/settings.js
+
+# args for increasing performance
 # https://github.com/emscripten-core/emscripten/issues/13899
-EMCC_COMMON_ARGS = \
-	-s ENVIRONMENT=worker \
-	-s NO_EXIT_RUNTIME=1 \
-	-lembind \
-	-s ALLOW_MEMORY_GROWTH=1 \
-	-s FILESYSTEM=0 \
-	-s AUTO_JS_LIBRARIES=0 \
-	-s AUTO_NATIVE_LIBRARIES=0 \
-	-s HTML5_SUPPORT_DEFERRING_USER_SENSITIVE_REQUESTS=0 \
-	-s USE_SDL=0 \
-	-s INVOKE_RUN=0 \
-	-s STRICT_JS=1 \
-	-s DISABLE_EXCEPTION_CATCHING=1 \
-	-s EXPORTED_FUNCTIONS="['_malloc']" \
-	-s MINIMAL_RUNTIME=1 \
-	-s MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION=1 \
-	-s POLYFILL=0 \
-	-s BINARYEN_EXTRA_PASSES=--one-caller-inline-max-function-size=19306 \
-	-s INCOMING_MODULE_JS_API="[]" \
-	--no-heap-copy \
-	-flto \
-	-fno-exceptions \
-	-o $@
-
-dist: $(OCTP_DEPS) dist/js/jassub-worker.js dist/js/jassub.js
-
-dist/js/jassub-worker.js: src/JASSUB.cpp src/worker.js src/polyfill.js
-	mkdir -p dist/js
-	emcc src/JASSUB.cpp $(OCTP_DEPS) \
-		--pre-js src/polyfill.js \
-		--pre-js src/worker.js \
-		-O3 \
+PERFORMANCE_ARGS = \
+		-s BINARYEN_EXTRA_PASSES=--one-caller-inline-max-function-size=19306 \
+		-s INVOKE_RUN=0 \
+		-s DISABLE_EXCEPTION_CATCHING=1 \
 		-s TEXTDECODER=1 \
-		-s WASM=2 \
-		--memory-init-file 0 \
-		--closure=0 \
-		-s MIN_CHROME_VERSION=27 \
-		-s MIN_SAFARI_VERSION=60005 \
-		$(EMCC_COMMON_ARGS)
+		-s MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION=1 \
+		--no-heap-copy \
+		-flto \
+		-fno-exceptions \
+		-O3
+
+# args for reducing size
+SIZE_ARGS = \
+		-s POLYFILL=0 \
+		-s FILESYSTEM=0 \
+		-s AUTO_JS_LIBRARIES=0 \
+		-s AUTO_NATIVE_LIBRARIES=0 \
+		-s HTML5_SUPPORT_DEFERRING_USER_SENSITIVE_REQUESTS=0 \
+		-s INCOMING_MODULE_JS_API="[]" \
+		-s USE_SDL=0 \
+		-s MINIMAL_RUNTIME=1 
+
+# args that are required for this to even work at all
+COMPAT_ARGS = \
+		-s EXPORTED_FUNCTIONS="['_malloc']" \
+		-s EXPORT_KEEPALIVE=1 \
+		-s EXPORTED_RUNTIME_METHODS="['getTempRet0', 'setTempRet0']" \
+		-s IMPORTED_MEMORY=1 \
+		-mbulk-memory \
+		--memory-init-file 0 
+
+dist/js/$(WORKER_NAME).js: src/JASSUB.cpp src/worker.js src/pre-worker.js
+	mkdir -p dist/js
+	emcc src/JASSUB.cpp $(LIBASS_DEPS) \
+		$(WORKER_ARGS) \
+		$(PERFORMANCE_ARGS) \
+		$(SIZE_ARGS) \
+		$(COMPAT_ARGS) \
+		--pre-js src/pre-worker.js \
+		-s ENVIRONMENT=worker \
+		-s EXIT_RUNTIME=0 \
+		-s ALLOW_MEMORY_GROWTH=1 \
+		-s MODULARIZE=1 \
+		-s EXPORT_ES6=1 \
+		-lembind \
+		-o $@
 
 dist/js/jassub.js: src/jassub.js
 	mkdir -p dist/js

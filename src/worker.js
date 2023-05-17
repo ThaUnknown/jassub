@@ -53,16 +53,6 @@ if (typeof console === 'undefined') {
   console.log('Detected lack of console, overridden console')
 }
 
-try {
-  const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
-  if (!(module instanceof WebAssembly.Module) || !(new WebAssembly.Instance(module) instanceof WebAssembly.Instance)) throw new Error('WASM not supported')
-} catch (e) {
-  console.warn(e)
-  // load WASM2JS code if WASM is unsupported
-  // eslint-disable-next-line no-eval
-  eval(read_('jassub-worker.wasm.js'))
-}
-
 let lastCurrentTime = 0
 const rate = 1
 let rafId = null
@@ -443,9 +433,18 @@ let dropAllBlur
 let _malloc
 
 self.init = data => {
+  try {
+    const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
+    if (!(module instanceof WebAssembly.Module) || !(new WebAssembly.Instance(module) instanceof WebAssembly.Instance)) throw new Error('WASM not supported')
+  } catch (e) {
+    console.warn(e)
+    // load WASM2JS code if WASM is unsupported
+    // eslint-disable-next-line no-eval
+    eval(read_(data.legacyWasmUrl))
+  }
   // hack, we want custom WASM URLs
   const _fetch = fetch
-  const wasm = !WebAssembly.instantiateStreaming && read_(data.legacyWasmUrl, true)
+  const wasm = !WebAssembly.instantiateStreaming && read_(data.wasmUrl, true)
   if (WebAssembly.instantiateStreaming) self.fetch = _ => _fetch(data.wasmUrl)
   WASM({ wasm }).then(Module => {
     _malloc = Module._malloc

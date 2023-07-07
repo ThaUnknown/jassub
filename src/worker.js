@@ -156,20 +156,46 @@ self.freeTrack = () => {
  * @param {!string} url the URL of the subtitle file.
  */
 self.setTrackByUrl = ({ url }) => {
-  // currently don't support processAvailableFonts while streaming
-  if (!availableFonts) {
-    self.setTrack({ content: read_(url) });
-    return;
-  }
-
   // simulate throttling due to network or resource pressure
   // let delay = 0;
+  let fontnameIndex;
+
   const process = line => {
+    preprocess: if (availableFonts) {
+      // Ignore empty lines and comments
+      if (!line || line.startsWith(';')) {
+        break preprocess;
+      }
+
+      // Reset format with new sections
+      if (line.startsWith('[')) {
+        fontnameIndex = undefined;
+        break preprocess;
+      }
+
+      const verb = line.split(':')[0];
+
+      if (verb === 'Format') {
+        fontnameIndex = line.split(',').map(s => s.trim()).findIndex(s => s === 'Fontname');
+      } else if (verb === 'Style') {
+        let font = line.split(',').map(s => s.trim())[fontnameIndex];
+
+        if (font) {
+          findAvailableFonts(font);
+        }
+      }
+
+      const regex = /\\fn([^\\}]*?)[\\}]/g;
+      let matches;
+      while ((matches = regex.exec(line)) !== null) {
+        findAvailableFonts(matches[1])
+      }
+    }
+
     // delay += 200 + Math.random() * 500;
     // setTimeout(() => {
     if (dropAllBlur) line = dropBlur(line)
     jassubObj.processLine(line);
-    console.log(line);
     // }, delay);
   };
 

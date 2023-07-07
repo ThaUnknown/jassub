@@ -176,9 +176,9 @@ self.setTrackByUrl = ({ url }) => {
       const verb = line.split(':')[0];
 
       if (verb === 'Format') {
-        fontnameIndex = line.split(',').map(s => s.trim()).findIndex(s => s === 'Fontname');
+        fontnameIndex = line.split(',').findIndex(s => s.trim() === 'Fontname');
       } else if (verb === 'Style') {
-        let font = line.split(',').map(s => s.trim())[fontnameIndex];
+        let font = line.split(',')[fontnameIndex].trim();
 
         if (font) {
           findAvailableFonts(font);
@@ -200,7 +200,7 @@ self.setTrackByUrl = ({ url }) => {
   };
 
   _fetch(url).then(response => {
-    let partialLine = "";
+    let partialLine = '';
 
     return response.body
       .pipeThrough(new TextDecoderStream())
@@ -215,7 +215,7 @@ self.setTrackByUrl = ({ url }) => {
           const lines = (partialLine + chunk).split(/\r\n|[\r\n]/g);
 
           // Save last line, as it might be incomplete
-          partialLine = lines.pop() || "";
+          partialLine = lines.pop() || '';
 
           // Process each complete line
           lines.forEach(process);

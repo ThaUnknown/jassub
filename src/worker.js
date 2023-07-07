@@ -156,21 +156,30 @@ self.freeTrack = () => {
  * @param {!string} url the URL of the subtitle file.
  */
 self.setTrackByUrl = ({ url }) => {
-  // simulate throttling due to network or resource pressure
-  // let delay = 0;
-  let fontnameIndex;
+  // fallback to reading the entire file if required apis don't exist
+  if (typeof TextDecoderStream !== 'function'
+    || typeof WritableStream !== 'function') {
+    return self.setTrack({ content: read_(url) });
+  }
 
-  const process = line => {
-    preprocess: if (availableFonts) {
-      // Ignore empty lines and comments
+  let process = line => {
+    if (dropAllBlur) line = dropBlur(line)
+    jassubObj.processLine(line);
+  };
+
+  if (availableFonts) {
+    const original = process;
+    let fontnameIndex;
+
+    process = line => {
+       // Ignore empty lines and comments
       if (!line || line.startsWith(';')) {
-        break preprocess;
+        return original(line);
       }
 
-      // Reset format with new sections
       if (line.startsWith('[')) {
         fontnameIndex = undefined;
-        break preprocess;
+        return original(line);
       }
 
       const verb = line.split(':')[0];
@@ -190,14 +199,10 @@ self.setTrackByUrl = ({ url }) => {
       while ((matches = regex.exec(line)) !== null) {
         findAvailableFonts(matches[1])
       }
-    }
 
-    // delay += 200 + Math.random() * 500;
-    // setTimeout(() => {
-    if (dropAllBlur) line = dropBlur(line)
-    jassubObj.processLine(line);
-    // }, delay);
-  };
+      return original(line);
+    };
+  }
 
   _fetch(url).then(response => {
     let partialLine = '';
@@ -218,7 +223,9 @@ self.setTrackByUrl = ({ url }) => {
           partialLine = lines.pop() || '';
 
           // Process each complete line
-          lines.forEach(process);
+          for (const line of lines) {
+            process(line);
+          }
         },
         close: () => {
           // Process the last partial line, if any

@@ -354,6 +354,21 @@ public:
     trackColorSpace = track->YCbCrMatrix;
   }
 
+  void newEmptyTrack() {
+    removeTrack();
+    track = ass_new_track(ass_library);
+    if (!track) {
+      fprintf(stderr, "JASSUB: Failed to start a track\n");
+      exit(4);
+    }
+
+    trackColorSpace = track->YCbCrMatrix;
+  }
+
+  void processLine(std::string line) {
+    ass_process_data(track, line.data(), line.length());
+  }
+
   void removeTrack() {
     if (track != NULL) {
       ass_free_track(track);
@@ -814,6 +829,8 @@ EMSCRIPTEN_BINDINGS(JASSUB) {
     .function("setLogLevel", &JASSUB::setLogLevel)
     .function("setDropAnimations", &JASSUB::setDropAnimations)
     .function("createTrackMem", &JASSUB::createTrackMem)
+    .function("newEmptyTrack", &JASSUB::newEmptyTrack)
+    .function("processLine", &JASSUB::processLine)
     .function("removeTrack", &JASSUB::removeTrack)
     .function("resizeCanvas", &JASSUB::resizeCanvas)
     .function("quitLibrary", &JASSUB::quitLibrary)

@@ -156,7 +156,52 @@ self.freeTrack = () => {
  * @param {!string} url the URL of the subtitle file.
  */
 self.setTrackByUrl = ({ url }) => {
-  self.setTrack({ content: read_(url) })
+  // currently don't support processAvailableFonts while streaming
+  if (!availableFonts) {
+    self.setTrack({ content: read_(url) });
+    return;
+  }
+
+  // simulate throttling due to network or resource pressure
+  // let delay = 0;
+  const process = line => {
+    // delay += 200 + Math.random() * 500;
+    // setTimeout(() => {
+    if (dropAllBlur) line = dropBlur(line)
+    jassubObj.processLine(line);
+    console.log(line);
+    // }, delay);
+  };
+
+  _fetch(url).then(response => {
+    let partialLine = "";
+
+    return response.body
+      .pipeThrough(new TextDecoderStream())
+      .pipeTo(new WritableStream({
+        start: () => {
+          jassubObj.newEmptyTrack();
+          subtitleColorSpace = libassYCbCrMap[jassubObj.trackColorSpace];
+          postMessage({ target: 'verifyColorSpace', subtitleColorSpace });
+        },
+        write: (chunk) => {
+          // Extract lines from chunk
+          const lines = (partialLine + chunk).split(/\r\n|[\r\n]/g);
+
+          // Save last line, as it might be incomplete
+          partialLine = lines.pop() || "";
+
+          // Process each complete line
+          lines.forEach(process);
+        },
+        close: () => {
+          // Process the last partial line, if any
+          if (partialLine) {
+            process(partialLine);
+          }
+        }
+      }));
+  });
 }
 
 const getCurrentTime = () => {
@@ -422,6 +467,7 @@ const _applyKeys = (input, output) => {
     output[v] = input[v]
   }
 }
+const _fetch = fetch
 let offCanvas
 let offCanvasCtx
 let offscreenRender
@@ -443,7 +489,6 @@ self.init = data => {
     eval(read_(data.legacyWasmUrl))
   }
   // hack, we want custom WASM URLs
-  const _fetch = fetch
   const wasm = !WebAssembly.instantiateStreaming && read_(data.wasmUrl, true)
   if (WebAssembly.instantiateStreaming) self.fetch = _ => _fetch(data.wasmUrl)
   WASM({ wasm }).then(Module => {
@@ -471,15 +516,13 @@ self.init = data => {
 
     if (fallbackFont) findAvailableFonts(fallbackFont)
 
-    let subContent = data.subContent
-    if (!subContent) subContent = read_(data.subUrl)
-
-    processAvailableFonts(subContent)
-    if (dropAllBlur) subContent = dropBlur(subContent)
-
     for (const font of data.fonts || []) asyncWrite(font)
 
-    jassubObj.createTrackMem(subContent)
+    if (data.subContent) {
+      self.setTrack({ content: data.subContent });
+    } else {
+      self.setTrackByUrl({ url: data.subUrl });
+    }
 
     subtitleColorSpace = libassYCbCrMap[jassubObj.trackColorSpace]
 

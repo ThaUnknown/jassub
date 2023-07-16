@@ -1,27 +1,26 @@
 import 'rvfc-polyfill'
 
 const webYCbCrMap = {
-  bt709: 'BT.709',
+  bt709: 'BT709',
   // these might not be exactly correct? oops?
-  bt470bg: 'BT.601', // alias BT.601 PAL... whats the difference?
-  smpte170m: 'BT.601'// alias BT.601 NTSC... whats the difference?
+  bt470bg: 'BT601', // alias BT.601 PAL... whats the difference?
+  smpte170m: 'BT601'// alias BT.601 NTSC... whats the difference?
 }
 
 const colorMatrixConversionMap = {
-  'BT.601': {
-    'BT.709': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'1.0863 -0.0723 -0.014 0 0 0.0965 0.8451 0.0584 0 0 -0.0141 -0.0277 1.0418 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+  BT601: {
+    BT709: '1.0863 -0.0723 -0.014 0 0 0.0965 0.8451 0.0584 0 0 -0.0141 -0.0277 1.0418'
   },
-  'BT.709': {
-    'BT.601': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'0.9137 0.0784 0.0079 0 0 -0.1049 1.1722 -0.0671 0 0 0.0096 0.0322 0.9582 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+  BT709: {
+    BT601: '0.9137 0.0784 0.0079 0 0 -0.1049 1.1722 -0.0671 0 0 0.0096 0.0322 0.9582'
   },
   FCC: {
-    'BT.709': `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='f'><feColorMatrix type='matrix' values='1.0873 -0.0736 -0.0137 0 0 0.0974 0.8494 0.0531 0 0 -0.0127 -0.0251 
-1.0378 0 0 0 0 0 1 0'/></filter></svg>#f")`,
-    'BT.601': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'1.001 -0.0008 -0.0002 0 0 0.0009 1.005 -0.006 0 0 0.0013 0.0027 0.996 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+    BT709: '1.0873 -0.0736 -0.0137 0 0 0.0974 0.8494 0.0531 0 0 -0.0127 -0.0251 1.0378',
+    BT601: '1.001 -0.0008 -0.0002 0 0 0.0009 1.005 -0.006 0 0 0.0013 0.0027 0.996'
   },
   SMPTE240M: {
-    'BT.709': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'0.9993 0.0006 0.0001 0 0 -0.0004 0.9812 0.0192 0 0 -0.0034 -0.0114 1.0148 0 0 0 0 0 1 0\'/></filter></svg>#f")',
-    'BT.601': 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'f\'><feColorMatrix type=\'matrix\' values=\'0.913 0.0774 0.0096 0 0 -0.1051 1.1508 -0.0456 0 0 0.0063 0.0207 0.973 0 0 0 0 0 1 0\'/></filter></svg>#f")'
+    BT709: '0.9993 0.0006 0.0001 0 0 -0.0004 0.9812 0.0192 0 0 -0.0034 -0.0114 1.0148',
+    BT601: '0.913 0.0774 0.0096 0 0 -0.1051 1.1508 -0.0456 0 0 0.0063 0.0207 0.973'
   }
 }
 
@@ -45,8 +44,11 @@ export default class JASSUB extends EventTarget {
    * @param {Number} [options.prescaleHeightLimit=1080] The height in pixels beyond which the subtitles canvas won't be prescaled.
    * @param {Number} [options.maxRenderHeight=0] The maximum rendering height in pixels of the subtitles canvas. Beyond this subtitles will be upscaled by the browser.
    * @param {Boolean} [options.dropAllAnimations=false] Attempt to discard all animated tags. Enabling this may severly mangle complex subtitles and should only be considered as an last ditch effort of uncertain success for hardware otherwise incapable of displaing anything. Will not reliably work with manually edited or allocated events.
+   * @param {Boolean} [options.dropAllBlur=false] The holy grail of performance gains. If heavy TS lags a lot, disabling this will make it ~x10 faster. This drops blur from all added subtitle tracks making most text and backgrounds look sharper, this is way less intrusive than dropping all animations, while still offering major performance gains.
    * @param {String} [options.workerUrl='jassub-worker.js'] The URL of the worker.
-   * @param {String} [options.legacyWorkerUrl='jassub-worker-legacy.js'] The URL of the legacy worker. Only loaded if the browser doesn't support WASM.
+   * @param {String} [options.wasmUrl='jassub-worker.wasm'] The URL of the worker WASM.
+   * @param {String} [options.legacyWasmUrl='jassub-worker.wasm.js'] The URL of the worker WASM. Only loaded if the browser doesn't support WASM.
+   * @param {String} options.modernWasmUrl The URL of the modern worker WASM. This includes faster ASM instructions, but is only supported by newer browsers, disabled if the URL isn't defined.
    * @param {String} [options.subUrl=options.subContent] The URL of the subtitle file to play.
    * @param {String} [options.subContent=options.subUrl] The content of the subtitle file to play.
    * @param {String[]|Uint8Array[]} [options.fonts] An array of links or Uint8Arrays to the fonts used in the subtitle. If Uint8Array is used the array is copied, not referenced. This forces all the fonts in this array to be loaded by the renderer, regardless of if they are used.
@@ -61,8 +63,16 @@ export default class JASSUB extends EventTarget {
     if (!globalThis.Worker) {
       this.destroy('Worker not supported')
     }
+
+    this._loaded = new Promise(resolve => {
+      this._init = resolve
+    })
+
     JASSUB._test()
     this._onDemandRender = 'requestVideoFrameCallback' in HTMLVideoElement.prototype && (options.onDemandRender ?? true)
+
+    // don't support offscreen rendering on custom canvases, as we can't replace it if colorSpace doesn't match
+    this._offscreenRender = 'transferControlToOffscreen' in HTMLCanvasElement.prototype && !options.canvas && (options.offscreenRender ?? true)
 
     this.timeOffset = options.timeOffset || 0
     this._video = options.video
@@ -75,11 +85,7 @@ export default class JASSUB extends EventTarget {
       this._canvasParent.className = 'JASSUB'
       this._canvasParent.style.position = 'relative'
 
-      this._canvas = document.createElement('canvas')
-      this._canvas.style.display = 'block'
-      this._canvas.style.position = 'absolute'
-      this._canvas.style.pointerEvents = 'none'
-      this._canvasParent.appendChild(this._canvas)
+      this._createCanvas()
 
       if (this._video.nextSibling) {
         this._video.parentNode.insertBefore(this._canvasParent, this._video.nextSibling)
@@ -91,10 +97,10 @@ export default class JASSUB extends EventTarget {
     }
 
     this._bufferCanvas = document.createElement('canvas')
-    this._bufferCtx = this._bufferCanvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
+    this._bufferCtx = this._bufferCanvas.getContext('2d')
 
-    this._canvasctrl = this._canvas
-    this._ctx = this._canvasctrl.getContext('2d', { desynchronized: true })
+    this._canvasctrl = this._offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas
+    this._ctx = !this._offscreenRender && this._canvasctrl.getContext('2d')
 
     this._lastRenderTime = 0
     this.debug = !!options.debug
@@ -103,58 +109,67 @@ export default class JASSUB extends EventTarget {
     this.prescaleHeightLimit = options.prescaleHeightLimit || 1080
     this.maxRenderHeight = options.maxRenderHeight || 0 // 0 - no limit.
 
-    this._worker = new Worker(JASSUB._supportsWebAssembly ? options.workerUrl || 'jassub-worker.js' : options.legacyWorkerUrl || 'jassub-worker-legacy.js')
+    this._boundResize = this.resize.bind(this)
+    this._boundTimeUpdate = this._timeupdate.bind(this)
+    this._boundSetRate = this.setRate.bind(this)
+    this._boundUpdateColorSpace = this._updateColorSpace.bind(this)
+    if (this._video) this.setVideo(options.video)
+
+    if (this._onDemandRender) {
+      this.busy = false
+      this._lastDemandTime = null
+    }
+
+    this._worker = new Worker(options.workerUrl || 'jassub-worker.js')
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
 
-    this._loaded = new Promise(resolve => {
-      this._init = () => {
-        if (this._destroyed) return
-        this._worker.postMessage({
-          target: 'init',
-          asyncRender: typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true),
-          onDemandRender: this._onDemandRender,
-          width: this._canvasctrl.width || 0,
-          height: this._canvasctrl.height || 0,
-          preMain: true,
-          blendMode: options.blendMode || 'js',
-          subUrl: options.subUrl,
-          subContent: options.subContent || null,
-          fonts: options.fonts || [],
-          availableFonts: options.availableFonts || { 'liberation sans': './default.woff2' },
-          fallbackFont: options.fallbackFont || 'liberation sans',
-          debug: this.debug,
-          targetFps: options.targetFps || 24,
-          dropAllAnimations: options.dropAllAnimations,
-          libassMemoryLimit: options.libassMemoryLimit || 0,
-          libassGlyphLimit: options.libassGlyphLimit || 0,
-          hasAlphaBug: JASSUB._hasAlphaBug,
-          offscreenRender: typeof OffscreenCanvas !== 'undefined' && (options.offscreenRender ?? true),
-          useLocalFonts: ('queryLocalFonts' in self) && (options.useLocalFonts ?? true)
-        })
-
-        this._boundResize = this.resize.bind(this)
-        this._boundTimeUpdate = this._timeupdate.bind(this)
-        this._boundSetRate = this.setRate.bind(this)
-        this._boundUpdateColorSpace = this._updateColorSpace.bind(this)
-        if (this._video) this.setVideo(options.video)
-
-        if (this._onDemandRender) {
-          this.busy = false
-          this._lastDemandTime = null
-        }
-        resolve()
-      }
+    this._worker.postMessage({
+      target: 'init',
+      wasmUrl: JASSUB._supportsSIMD && options.modernWasmUrl ? options.modernWasmUrl : options.wasmUrl || 'jassub-worker.wasm',
+      legacyWasmUrl: options.legacyWasmUrl || 'jassub-worker.wasm.js',
+      asyncRender: typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true),
+      onDemandRender: this._onDemandRender,
+      width: this._canvasctrl.width || 0,
+      height: this._canvasctrl.height || 0,
+      blendMode: options.blendMode || 'js',
+      subUrl: options.subUrl,
+      subContent: options.subContent || null,
+      fonts: options.fonts || [],
+      availableFonts: options.availableFonts || { 'liberation sans': './default.woff2' },
+      fallbackFont: options.fallbackFont || 'liberation sans',
+      debug: this.debug,
+      targetFps: options.targetFps || 24,
+      dropAllAnimations: options.dropAllAnimations,
+      dropAllBlur: options.dropAllBlur,
+      libassMemoryLimit: options.libassMemoryLimit || 0,
+      libassGlyphLimit: options.libassGlyphLimit || 0,
+      useLocalFonts: typeof queryLocalFonts !== 'undefined' && (options.useLocalFonts ?? true)
     })
+    if (this._offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
+  }
+
+  _createCanvas () {
+    this._canvas = document.createElement('canvas')
+    this._canvas.style.display = 'block'
+    this._canvas.style.position = 'absolute'
+    this._canvas.style.pointerEvents = 'none'
+    this._canvasParent.appendChild(this._canvas)
   }
 
   // test support for WASM, ImageData, alphaBug, but only once, on init so it doesn't run when first running the page
-  static _supportsWebAssembly = null
+  static _supportsSIMD = null
   static _hasAlphaBug = null
 
   static _test () {
     // check if ran previously
-    if (JASSUB._supportsWebAssembly !== null) return null
+    if (JASSUB._supportsSIMD !== null) return null
+
+    try {
+      JASSUB._supportsSIMD = WebAssembly.validate(Uint8Array.of(0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11))
+    } catch (e) {
+      JASSUB._supportsSIMD = false
+    }
 
     const canvas1 = document.createElement('canvas')
     const ctx1 = canvas1.getContext('2d', { willReadFrequently: true })
@@ -174,15 +189,6 @@ export default class JASSUB extends EventTarget {
           return imageData
         }
       }
-    }
-
-    try {
-      if (typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function') {
-        const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
-        if (module instanceof WebAssembly.Module) JASSUB._supportsWebAssembly = (new WebAssembly.Instance(module) instanceof WebAssembly.Instance)
-      }
-    } catch (e) {
-      JASSUB._supportsWebAssembly = false
     }
 
     // Test for alpha bug, where e.g. WebKit can render a transparent pixel
@@ -236,7 +242,12 @@ export default class JASSUB extends EventTarget {
 
     this._canvas.style.top = top + 'px'
     this._canvas.style.left = left + 'px'
-    this.sendMessage('canvas', { width, height, force: force && this.busy === false })
+    if (force && this.busy === false) {
+      this.busy = true
+    } else {
+      force = false
+    }
+    this.sendMessage('canvas', { width, height, force })
   }
 
   _getVideoPosition (width = this._video.videoWidth, height = this._video.videoHeight) {
@@ -295,15 +306,6 @@ export default class JASSUB extends EventTarget {
     this.setCurrentTime(this._video.paused || this._playstate, this._video.currentTime + this.timeOffset)
   }
 
-  _updateColorSpace () {
-    this._video.requestVideoFrameCallback(() => {
-    // eslint-disable-next-line no-undef
-      const frame = new VideoFrame(this._video)
-      this._videoColorSpace = webYCbCrMap[frame.colorSpace.matrix]
-      frame.close()
-    })
-  }
-
   /**
    * Change the video to use as target for event listeners.
    * @param  {HTMLVideoElement} video
@@ -351,6 +353,8 @@ export default class JASSUB extends EventTarget {
    */
   setTrackByUrl (url) {
     this.sendMessage('setTrackByUrl', { url })
+    this._reAttachOffscreen()
+    if (this._ctx) this._ctx.filter = 'none'
   }
 
   /**
@@ -359,6 +363,8 @@ export default class JASSUB extends EventTarget {
    */
   setTrack (content) {
     this.sendMessage('setTrack', { content })
+    this._reAttachOffscreen()
+    if (this._ctx) this._ctx.filter = 'none'
   }
 
   /**
@@ -391,7 +397,7 @@ export default class JASSUB extends EventTarget {
    * @param  {Number} [rate] Playback rate.
    */
   setCurrentTime (isPaused, currentTime, rate) {
-    this.sendMessage('video', { isPaused, currentTime, rate })
+    this.sendMessage('video', { isPaused, currentTime, rate, colorSpace: this._videoColorSpace })
   }
 
   /**
@@ -587,29 +593,69 @@ export default class JASSUB extends EventTarget {
     this.sendMessage('demand', { time: mediaTime + this.timeOffset })
   }
 
-  /**
-   * Veryify the color spaces for subtitles and videos, then apply filters to correct the color of subtitles.
-   * @param  {String} subtitleColorSpace Subtitle color space. One of: BT.601 BT.709 SMPTE240M FCC
-   * @param  {String} videoColorSpace Video color space. One of: BT.601 BT.709
-   */
-  verifyColorSpace (subtitleColorSpace, videoColorSpace = this._videoColorSpace) {
-    if (!subtitleColorSpace || !videoColorSpace) return
-    if (subtitleColorSpace === videoColorSpace) return
-    this._ctx.filter = colorMatrixConversionMap[subtitleColorSpace][videoColorSpace]
+  // if we're using offscreen render, we can't use ctx filters, so we can't use a transfered canvas
+  _detachOffscreen () {
+    if (!this._offscreenRender || this._ctx) return null
+    this._canvas.remove()
+    this._createCanvas()
+    this._canvasctrl = this._canvas
+    this._ctx = this._canvasctrl.getContext('2d')
+    this.sendMessage('detachOffscreen')
+    // force a render after resize
+    this.busy = false
+    this.resize(0, 0, 0, 0, true)
   }
 
-  _render ({ images, async, times, width, height, colorSpace }) {
+  // if the video or track changed, we need to re-attach the offscreen canvas
+  _reAttachOffscreen () {
+    if (!this._offscreenRender || !this._ctx) return null
+    this._canvas.remove()
+    this._createCanvas()
+    this._canvasctrl = this._canvas.transferControlToOffscreen()
+    this._ctx = false
+    this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
+    this.resize(0, 0, 0, 0, true)
+  }
+
+  _updateColorSpace () {
+    this._video.requestVideoFrameCallback(() => {
+      try {
+        // eslint-disable-next-line no-undef
+        const frame = new VideoFrame(this._video)
+        this._videoColorSpace = webYCbCrMap[frame.colorSpace.matrix]
+        frame.close()
+        this.sendMessage('getColorSpace')
+      } catch (e) {
+        // sources can be tainted
+        console.warn(e)
+      }
+    })
+  }
+
+  /**
+   * Veryify the color spaces for subtitles and videos, then apply filters to correct the color of subtitles.
+   * @param  {String} subtitleColorSpace Subtitle color space. One of: BT601 BT709 SMPTE240M FCC
+   * @param  {String} videoColorSpace Video color space. One of: BT601 BT709
+   */
+  _verifyColorSpace ({ subtitleColorSpace, videoColorSpace = this._videoColorSpace }) {
+    if (!subtitleColorSpace || !videoColorSpace) return
+    if (subtitleColorSpace === videoColorSpace) return
+    this._detachOffscreen()
+    this._ctx.filter = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='f'><feColorMatrix type='matrix' values='${colorMatrixConversionMap[subtitleColorSpace][videoColorSpace]} 0 0 0 0 0 1 0'/></filter></svg>#f")`
+  }
+
+  _render ({ images, asyncRender, times, width, height, colorSpace }) {
     this._unbusy()
-    const drawStartTime = Date.now()
+    if (this.debug) times.IPCTime = Date.now() - times.JSRenderTime
     if (this._canvasctrl.width !== width || this._canvasctrl.height !== height) {
       this._canvasctrl.width = width
       this._canvasctrl.height = height
-      this.verifyColorSpace(colorSpace)
+      this._verifyColorSpace({ subtitleColorSpace: colorSpace })
     }
     this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height)
     for (const image of images) {
       if (image.image) {
-        if (async) {
+        if (asyncRender) {
           this._ctx.drawImage(image.image, image.x, image.y)
           image.image.close()
         } else {
@@ -621,10 +667,12 @@ export default class JASSUB extends EventTarget {
       }
     }
     if (this.debug) {
-      times.drawTime = Date.now() - drawStartTime
+      times.JSRenderTime = Date.now() - times.JSRenderTime - times.IPCTime
       let total = 0
+      const count = times.bitmaps || images.length
+      delete times.bitmaps
       for (const key in times) total += times[key]
-      console.log('Bitmaps: ' + images.length + ' Total: ' + Math.round(total) + 'ms', times)
+      console.log('Bitmaps: ' + count + ' Total: ' + (total | 0) + 'ms', times)
     }
   }
 
@@ -724,7 +772,7 @@ export default class JASSUB extends EventTarget {
   _removeListeners () {
     if (this._video) {
       if (this._ro) this._ro.unobserve(this._video)
-      this._ctx.filter = 'none'
+      if (this._ctx) this._ctx.filter = 'none'
       this._video.removeEventListener('timeupdate', this._boundTimeUpdate)
       this._video.removeEventListener('progress', this._boundTimeUpdate)
       this._video.removeEventListener('waiting', this._boundTimeUpdate)

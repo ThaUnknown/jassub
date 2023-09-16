@@ -58,17 +58,16 @@ export default class JASSUB extends EventTarget {
    * @param {Number} [options.libassMemoryLimit] libass bitmap cache memory limit in MiB (approximate).
    * @param {Number} [options.libassGlyphLimit] libass glyph cache memory limit in MiB (approximate).
    */
-  constructor (options = {}) {
+  constructor (options) {
     super()
-    if (!globalThis.Worker) {
-      this.destroy('Worker not supported')
-    }
+    if (!globalThis.Worker) throw this.destroy('Worker not supported')
+    if (!options) throw this.destroy('No options provided')
 
-    this._loaded = new Promise(resolve => {
+    this._loaded = /** @type {Promise<void>} */(new Promise(resolve => {
       this._init = resolve
-    })
+    }))
 
-    JASSUB._test()
+    const test = JASSUB._test()
     this._onDemandRender = 'requestVideoFrameCallback' in HTMLVideoElement.prototype && (options.onDemandRender ?? true)
 
     // don't support offscreen rendering on custom canvases, as we can't replace it if colorSpace doesn't match
@@ -85,7 +84,7 @@ export default class JASSUB extends EventTarget {
       this._canvasParent.className = 'JASSUB'
       this._canvasParent.style.position = 'relative'
 
-      this._createCanvas()
+      this._canvas = this._createCanvas()
 
       if (this._video.nextSibling) {
         this._video.parentNode.insertBefore(this._canvasParent, this._video.nextSibling)
@@ -93,11 +92,12 @@ export default class JASSUB extends EventTarget {
         this._video.parentNode.appendChild(this._canvasParent)
       }
     } else if (!this._canvas) {
-      this.destroy('Don\'t know where to render: you should give video or canvas in options.')
+      throw this.destroy('Don\'t know where to render: you should give video or canvas in options.')
     }
 
     this._bufferCanvas = document.createElement('canvas')
     this._bufferCtx = this._bufferCanvas.getContext('2d')
+    if (!this._bufferCtx) throw this.destroy('Canvas rendering not supported')
 
     this._canvasctrl = this._offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas
     this._ctx = !this._offscreenRender && this._canvasctrl.getContext('2d')
@@ -124,29 +124,33 @@ export default class JASSUB extends EventTarget {
     this._worker.onmessage = e => this._onmessage(e)
     this._worker.onerror = e => this._error(e)
 
-    this._worker.postMessage({
-      target: 'init',
-      wasmUrl: JASSUB._supportsSIMD && options.modernWasmUrl ? options.modernWasmUrl : options.wasmUrl || 'jassub-worker.wasm',
-      legacyWasmUrl: options.legacyWasmUrl || 'jassub-worker.wasm.js',
-      asyncRender: typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true),
-      onDemandRender: this._onDemandRender,
-      width: this._canvasctrl.width || 0,
-      height: this._canvasctrl.height || 0,
-      blendMode: options.blendMode || 'js',
-      subUrl: options.subUrl,
-      subContent: options.subContent || null,
-      fonts: options.fonts || [],
-      availableFonts: options.availableFonts || { 'liberation sans': './default.woff2' },
-      fallbackFont: options.fallbackFont || 'liberation sans',
-      debug: this.debug,
-      targetFps: options.targetFps || 24,
-      dropAllAnimations: options.dropAllAnimations,
-      dropAllBlur: options.dropAllBlur,
-      libassMemoryLimit: options.libassMemoryLimit || 0,
-      libassGlyphLimit: options.libassGlyphLimit || 0,
-      useLocalFonts: typeof queryLocalFonts !== 'undefined' && (options.useLocalFonts ?? true)
+    test.then(() => {
+      this._worker.postMessage({
+        target: 'init',
+        wasmUrl: JASSUB._supportsSIMD && options.modernWasmUrl ? options.modernWasmUrl : options.wasmUrl || 'jassub-worker.wasm',
+        legacyWasmUrl: options.legacyWasmUrl || 'jassub-worker.wasm.js',
+        asyncRender: typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true),
+        onDemandRender: this._onDemandRender,
+        width: this._canvasctrl.width || 0,
+        height: this._canvasctrl.height || 0,
+        blendMode: options.blendMode || 'js',
+        subUrl: options.subUrl,
+        subContent: options.subContent || null,
+        fonts: options.fonts || [],
+        availableFonts: options.availableFonts || { 'liberation sans': './default.woff2' },
+        fallbackFont: options.fallbackFont || 'liberation sans',
+        debug: this.debug,
+        targetFps: options.targetFps || 24,
+        dropAllAnimations: options.dropAllAnimations,
+        dropAllBlur: options.dropAllBlur,
+        libassMemoryLimit: options.libassMemoryLimit || 0,
+        libassGlyphLimit: options.libassGlyphLimit || 0,
+        // @ts-ignore
+        useLocalFonts: typeof queryLocalFonts !== 'undefined' && (options.useLocalFonts ?? true),
+        hasBitmapBug: JASSUB._hasBitmapBug
+      })
+      if (this._offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
     })
-    if (this._offscreenRender === true) this.sendMessage('offscreenCanvas', null, [this._canvasctrl])
   }
 
   _createCanvas () {
@@ -155,15 +159,21 @@ export default class JASSUB extends EventTarget {
     this._canvas.style.position = 'absolute'
     this._canvas.style.pointerEvents = 'none'
     this._canvasParent.appendChild(this._canvas)
+    return this._canvas
   }
 
   // test support for WASM, ImageData, alphaBug, but only once, on init so it doesn't run when first running the page
-  static _supportsSIMD = null
-  static _hasAlphaBug = null
 
-  static _test () {
+  /** @type {boolean|null} */
+  static _supportsSIMD = null
+  /** @type {boolean|null} */
+  static _hasAlphaBug = null
+  /** @type {boolean|null} */
+  static _hasBitmapBug = null
+
+  static async _test () {
     // check if ran previously
-    if (JASSUB._supportsSIMD !== null) return null
+    if (JASSUB._hasBitmapBug !== null) return null
 
     try {
       JASSUB._supportsSIMD = WebAssembly.validate(Uint8Array.of(0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11))
@@ -173,6 +183,7 @@ export default class JASSUB extends EventTarget {
 
     const canvas1 = document.createElement('canvas')
     const ctx1 = canvas1.getContext('2d', { willReadFrequently: true })
+    if (!ctx1) throw new Error('Canvas rendering not supported')
     // test ImageData constructor
     if (typeof ImageData.prototype.constructor === 'function') {
       try {
@@ -183,6 +194,7 @@ export default class JASSUB extends EventTarget {
       } catch (e) {
         console.log('Detected that ImageData is not constructable despite browser saying so')
 
+        // @ts-ignore
         self.ImageData = function (data, width, height) {
           const imageData = ctx1.createImageData(width, height)
           if (data) imageData.data.set(data)
@@ -195,6 +207,7 @@ export default class JASSUB extends EventTarget {
     // (with alpha == 0) as non-black which then leads to visual artifacts.
     const canvas2 = document.createElement('canvas')
     const ctx2 = canvas2.getContext('2d', { willReadFrequently: true })
+    if (!ctx2) throw new Error('Canvas rendering not supported')
 
     canvas1.width = canvas2.width = 1
     canvas1.height = canvas2.height = 1
@@ -206,6 +219,24 @@ export default class JASSUB extends EventTarget {
     const postPut = ctx2.getImageData(0, 0, 1, 1).data
     JASSUB._hasAlphaBug = prePut[1] !== postPut[1]
     if (JASSUB._hasAlphaBug) console.log('Detected a browser having issue with transparent pixels, applying workaround')
+
+    if (typeof createImageBitmap !== 'undefined') {
+      const subarray = new Uint8ClampedArray([255, 0, 255, 0, 255]).subarray(1, 5)
+      ctx2.drawImage(await createImageBitmap(new ImageData(subarray, 1)), 0, 0)
+      const { data } = ctx2.getImageData(0, 0, 1, 1)
+      JASSUB._hasBitmapBug = false
+      for (const [i, number] of data.entries()) {
+        // realistically at most this will be a diff of 4, but just to be safe
+        if (Math.abs(subarray[i] - number) > 15) {
+          JASSUB._hasBitmapBug = true
+          console.log('Detected a browser having issue with partial bitmaps, applying workaround')
+          break
+        }
+      }
+    } else {
+      JASSUB._hasBitmapBug = false
+    }
+
     canvas1.remove()
     canvas2.remove()
   }
@@ -443,7 +474,7 @@ export default class JASSUB extends EventTarget {
 
   /**
    * Get all ASS events.
-   * @param  {function(Error|null, ASS_Event)} callback Function to callback when worker returns the events.
+   * @param  {function(Error|null, ASS_Event): void} callback Function to callback when worker returns the events.
    */
   getEvents (callback) {
     this._fetchFromWorker({
@@ -485,7 +516,7 @@ export default class JASSUB extends EventTarget {
 
   /**
    * Create a new ASS style directly.
-   * @param  {ASS_Style} event
+   * @param  {ASS_Style} style
    */
   createStyle (style) {
     this.sendMessage('createStyle', { style })
@@ -510,7 +541,7 @@ export default class JASSUB extends EventTarget {
 
   /**
    * Get all ASS styles.
-   * @param  {function(Error|null, ASS_Style)} callback Function to callback when worker returns the styles.
+   * @param  {function(Error|null, ASS_Style): void} callback Function to callback when worker returns the styles.
    */
   getStyles (callback) {
     this._fetchFromWorker({
@@ -530,6 +561,7 @@ export default class JASSUB extends EventTarget {
 
   _sendLocalFont (name) {
     try {
+      // @ts-ignore
       queryLocalFonts().then(fontData => {
         const font = fontData?.find(obj => obj.fullName.toLowerCase() === name)
         if (font) {
@@ -550,6 +582,7 @@ export default class JASSUB extends EventTarget {
       // electron by default has all permissions enabled, and it doesn't have perm query
       // if this happens, just send it
       if (navigator?.permissions?.query) {
+        // @ts-ignore
         navigator.permissions.query({ name: 'local-fonts' }).then(permission => {
           if (permission.state === 'granted') {
             this._sendLocalFont(font)
@@ -634,8 +667,9 @@ export default class JASSUB extends EventTarget {
 
   /**
    * Veryify the color spaces for subtitles and videos, then apply filters to correct the color of subtitles.
-   * @param  {String} subtitleColorSpace Subtitle color space. One of: BT601 BT709 SMPTE240M FCC
-   * @param  {String} videoColorSpace Video color space. One of: BT601 BT709
+   * @param  {Object} options
+   * @param  {String} options.subtitleColorSpace Subtitle color space. One of: BT601 BT709 SMPTE240M FCC
+   * @param  {String=} options.videoColorSpace Video color space. One of: BT601 BT709
    */
   _verifyColorSpace ({ subtitleColorSpace, videoColorSpace = this._videoColorSpace }) {
     if (!subtitleColorSpace || !videoColorSpace) return
@@ -767,6 +801,8 @@ export default class JASSUB extends EventTarget {
     this.dispatchEvent(event)
 
     console.error(error)
+
+    return error
   }
 
   _removeListeners () {
@@ -786,14 +822,15 @@ export default class JASSUB extends EventTarget {
 
   /**
    * Destroy the object, worker, listeners and all data.
-   * @param  {String} [err] Error to throw when destroying.
+   * @param  {String|Error} [err] Error to throw when destroying.
    */
   destroy (err) {
-    if (err) this._error(err)
-    if (this._video && this._canvasParent) this._video.parentNode.removeChild(this._canvasParent)
+    if (err) err = this._error(err)
+    if (this._video && this._canvasParent) this._video.parentNode?.removeChild(this._canvasParent)
     this._destroyed = true
     this._removeListeners()
     this.sendMessage('destroy')
-    this._worker.terminate()
+    this._worker?.terminate()
+    return err
   }
 }

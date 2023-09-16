@@ -1,6 +1,6 @@
 {
   "name": "jassub",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "libass Subtitle Renderer and Parser library for browsers",
   "main": "src/jassub.js",
   "type": "module",
@@ -10,7 +10,9 @@
     "index.d.ts"
   ],
   "scripts": {
-    "build": "node vite.build.js"
+    "build": "node vite.build.js",
+    "docker:build": "docker build -t thaunknown/jassub-build .",
+    "docker:run": "docker run -it --rm -v ${PWD}:/code --name thaunknown_jassub-build thaunknown/jassub-build:latest"
   },
   "repository": {
     "type": "git",
@@ -32,11 +34,11 @@
   },
   "homepage": "https://github.com/ThaUnknown/jassub",
   "dependencies": {
-    "rvfc-polyfill": "^1.0.4"
+    "rvfc-polyfill": "^1.0.6"
   },
   "devDependencies": {
-    "vite": "^4.1.4",
-    "vite-plugin-static-copy": "^0.13.1",
-    "terser": "^5.17.3"
+    "terser": "^5.19.4",
+    "vite": "^4.4.9",
+    "vite-plugin-static-copy": "^0.17.0"
   }
 }

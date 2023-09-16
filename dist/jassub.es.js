@@ -1,23 +1,23 @@
-!("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPlaybackQuality" in HTMLVideoElement.prototype && (HTMLVideoElement.prototype._rvfcpolyfillmap = {}, HTMLVideoElement.prototype.requestVideoFrameCallback = function(_) {
-  const e = this.getVideoPlaybackQuality(), t = this.mozPresentedFrames || this.mozPaintedFrames || e.totalVideoFrames - e.droppedVideoFrames, s = (r, i) => {
-    const o = this.getVideoPlaybackQuality(), d = this.mozPresentedFrames || this.mozPaintedFrames || o.totalVideoFrames - o.droppedVideoFrames;
-    if (d > t) {
-      const l = this.mozFrameDelay || o.totalFrameDelay - e.totalFrameDelay || 0, c = i - r;
-      _(i, {
-        presentationTime: i + l * 1e3,
-        expectedDisplayTime: i + c,
+!("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPlaybackQuality" in HTMLVideoElement.prototype && (HTMLVideoElement.prototype._rvfcpolyfillmap = {}, HTMLVideoElement.prototype.requestVideoFrameCallback = function(c) {
+  const e = performance.now(), t = this.getVideoPlaybackQuality(), s = this.mozPresentedFrames || this.mozPaintedFrames || t.totalVideoFrames - t.droppedVideoFrames, a = (n, r) => {
+    const i = this.getVideoPlaybackQuality(), o = this.mozPresentedFrames || this.mozPaintedFrames || i.totalVideoFrames - i.droppedVideoFrames;
+    if (o > s) {
+      const d = this.mozFrameDelay || i.totalFrameDelay - t.totalFrameDelay || 0, l = r - n;
+      c(r, {
+        presentationTime: r + d * 1e3,
+        expectedDisplayTime: r + l,
         width: this.videoWidth,
         height: this.videoHeight,
-        mediaTime: Math.max(0, this.currentTime || 0) + c / 1e3,
-        presentedFrames: d,
-        processingDuration: l
-      }), delete this._rvfcpolyfillmap[a];
+        mediaTime: Math.max(0, this.currentTime || 0) + l / 1e3,
+        presentedFrames: o,
+        processingDuration: d
+      }), delete this._rvfcpolyfillmap[e];
     } else
-      this._rvfcpolyfillmap[a] = requestAnimationFrame((l) => s(i, l));
-  }, a = Date.now(), n = performance.now();
-  return this._rvfcpolyfillmap[a] = requestAnimationFrame((r) => s(n, r)), a;
-}, HTMLVideoElement.prototype.cancelVideoFrameCallback = function(_) {
-  cancelAnimationFrame(this._rvfcpolyfillmap[_]), delete this._rvfcpolyfillmap[_];
+      this._rvfcpolyfillmap[e] = requestAnimationFrame((d) => a(r, d));
+  };
+  return this._rvfcpolyfillmap[e] = requestAnimationFrame((n) => a(e, n)), e;
+}, HTMLVideoElement.prototype.cancelVideoFrameCallback = function(c) {
+  cancelAnimationFrame(this._rvfcpolyfillmap[c]), delete this._rvfcpolyfillmap[c];
 });
 const m = {
   bt709: "BT709",
@@ -72,40 +72,61 @@ class h extends EventTarget {
    * @param {Number} [options.libassMemoryLimit] libass bitmap cache memory limit in MiB (approximate).
    * @param {Number} [options.libassGlyphLimit] libass glyph cache memory limit in MiB (approximate).
    */
-  constructor(e = {}) {
-    super(), globalThis.Worker || this.destroy("Worker not supported"), this._loaded = new Promise((t) => {
-      this._init = t;
-    }), h._test(), this._onDemandRender = "requestVideoFrameCallback" in HTMLVideoElement.prototype && (e.onDemandRender ?? !0), this._offscreenRender = "transferControlToOffscreen" in HTMLCanvasElement.prototype && !e.canvas && (e.offscreenRender ?? !0), this.timeOffset = e.timeOffset || 0, this._video = e.video, this._videoHeight = 0, this._videoWidth = 0, this._videoColorSpace = null, this._canvas = e.canvas, this._video && !this._canvas ? (this._canvasParent = document.createElement("div"), this._canvasParent.className = "JASSUB", this._canvasParent.style.position = "relative", this._createCanvas(), this._video.nextSibling ? this._video.parentNode.insertBefore(this._canvasParent, this._video.nextSibling) : this._video.parentNode.appendChild(this._canvasParent)) : this._canvas || this.destroy("Don't know where to render: you should give video or canvas in options."), this._bufferCanvas = document.createElement("canvas"), this._bufferCtx = this._bufferCanvas.getContext("2d"), this._canvasctrl = this._offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas, this._ctx = !this._offscreenRender && this._canvasctrl.getContext("2d"), this._lastRenderTime = 0, this.debug = !!e.debug, this.prescaleFactor = e.prescaleFactor || 1, this.prescaleHeightLimit = e.prescaleHeightLimit || 1080, this.maxRenderHeight = e.maxRenderHeight || 0, this._boundResize = this.resize.bind(this), this._boundTimeUpdate = this._timeupdate.bind(this), this._boundSetRate = this.setRate.bind(this), this._boundUpdateColorSpace = this._updateColorSpace.bind(this), this._video && this.setVideo(e.video), this._onDemandRender && (this.busy = !1, this._lastDemandTime = null), this._worker = new Worker(e.workerUrl || "jassub-worker.js"), this._worker.onmessage = (t) => this._onmessage(t), this._worker.onerror = (t) => this._error(t), this._worker.postMessage({
-      target: "init",
-      wasmUrl: h._supportsSIMD && e.modernWasmUrl ? e.modernWasmUrl : e.wasmUrl || "jassub-worker.wasm",
-      legacyWasmUrl: e.legacyWasmUrl || "jassub-worker.wasm.js",
-      asyncRender: typeof createImageBitmap < "u" && (e.asyncRender ?? !0),
-      onDemandRender: this._onDemandRender,
-      width: this._canvasctrl.width || 0,
-      height: this._canvasctrl.height || 0,
-      blendMode: e.blendMode || "js",
-      subUrl: e.subUrl,
-      subContent: e.subContent || null,
-      fonts: e.fonts || [],
-      availableFonts: e.availableFonts || { "liberation sans": "./default.woff2" },
-      fallbackFont: e.fallbackFont || "liberation sans",
-      debug: this.debug,
-      targetFps: e.targetFps || 24,
-      dropAllAnimations: e.dropAllAnimations,
-      dropAllBlur: e.dropAllBlur,
-      libassMemoryLimit: e.libassMemoryLimit || 0,
-      libassGlyphLimit: e.libassGlyphLimit || 0,
-      useLocalFonts: typeof queryLocalFonts < "u" && (e.useLocalFonts ?? !0)
-    }), this._offscreenRender === !0 && this.sendMessage("offscreenCanvas", null, [this._canvasctrl]);
+  constructor(e) {
+    if (super(), !globalThis.Worker)
+      throw this.destroy("Worker not supported");
+    if (!e)
+      throw this.destroy("No options provided");
+    this._loaded = /** @type {Promise<void>} */
+    new Promise((s) => {
+      this._init = s;
+    });
+    const t = h._test();
+    if (this._onDemandRender = "requestVideoFrameCallback" in HTMLVideoElement.prototype && (e.onDemandRender ?? !0), this._offscreenRender = "transferControlToOffscreen" in HTMLCanvasElement.prototype && !e.canvas && (e.offscreenRender ?? !0), this.timeOffset = e.timeOffset || 0, this._video = e.video, this._videoHeight = 0, this._videoWidth = 0, this._videoColorSpace = null, this._canvas = e.canvas, this._video && !this._canvas)
+      this._canvasParent = document.createElement("div"), this._canvasParent.className = "JASSUB", this._canvasParent.style.position = "relative", this._canvas = this._createCanvas(), this._video.nextSibling ? this._video.parentNode.insertBefore(this._canvasParent, this._video.nextSibling) : this._video.parentNode.appendChild(this._canvasParent);
+    else if (!this._canvas)
+      throw this.destroy("Don't know where to render: you should give video or canvas in options.");
+    if (this._bufferCanvas = document.createElement("canvas"), this._bufferCtx = this._bufferCanvas.getContext("2d"), !this._bufferCtx)
+      throw this.destroy("Canvas rendering not supported");
+    this._canvasctrl = this._offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas, this._ctx = !this._offscreenRender && this._canvasctrl.getContext("2d"), this._lastRenderTime = 0, this.debug = !!e.debug, this.prescaleFactor = e.prescaleFactor || 1, this.prescaleHeightLimit = e.prescaleHeightLimit || 1080, this.maxRenderHeight = e.maxRenderHeight || 0, this._boundResize = this.resize.bind(this), this._boundTimeUpdate = this._timeupdate.bind(this), this._boundSetRate = this.setRate.bind(this), this._boundUpdateColorSpace = this._updateColorSpace.bind(this), this._video && this.setVideo(e.video), this._onDemandRender && (this.busy = !1, this._lastDemandTime = null), this._worker = new Worker(e.workerUrl || "jassub-worker.js"), this._worker.onmessage = (s) => this._onmessage(s), this._worker.onerror = (s) => this._error(s), t.then(() => {
+      this._worker.postMessage({
+        target: "init",
+        wasmUrl: h._supportsSIMD && e.modernWasmUrl ? e.modernWasmUrl : e.wasmUrl || "jassub-worker.wasm",
+        legacyWasmUrl: e.legacyWasmUrl || "jassub-worker.wasm.js",
+        asyncRender: typeof createImageBitmap < "u" && (e.asyncRender ?? !0),
+        onDemandRender: this._onDemandRender,
+        width: this._canvasctrl.width || 0,
+        height: this._canvasctrl.height || 0,
+        blendMode: e.blendMode || "js",
+        subUrl: e.subUrl,
+        subContent: e.subContent || null,
+        fonts: e.fonts || [],
+        availableFonts: e.availableFonts || { "liberation sans": "./default.woff2" },
+        fallbackFont: e.fallbackFont || "liberation sans",
+        debug: this.debug,
+        targetFps: e.targetFps || 24,
+        dropAllAnimations: e.dropAllAnimations,
+        dropAllBlur: e.dropAllBlur,
+        libassMemoryLimit: e.libassMemoryLimit || 0,
+        libassGlyphLimit: e.libassGlyphLimit || 0,
+        // @ts-ignore
+        useLocalFonts: typeof queryLocalFonts < "u" && (e.useLocalFonts ?? !0),
+        hasBitmapBug: h._hasBitmapBug
+      }), this._offscreenRender === !0 && this.sendMessage("offscreenCanvas", null, [this._canvasctrl]);
+    });
   }
   _createCanvas() {
-    this._canvas = document.createElement("canvas"), this._canvas.style.display = "block", this._canvas.style.position = "absolute", this._canvas.style.pointerEvents = "none", this._canvasParent.appendChild(this._canvas);
+    return this._canvas = document.createElement("canvas"), this._canvas.style.display = "block", this._canvas.style.position = "absolute", this._canvas.style.pointerEvents = "none", this._canvasParent.appendChild(this._canvas), this._canvas;
   }
   // test support for WASM, ImageData, alphaBug, but only once, on init so it doesn't run when first running the page
+  /** @type {boolean|null} */
   static _supportsSIMD = null;
+  /** @type {boolean|null} */
   static _hasAlphaBug = null;
-  static _test() {
-    if (h._supportsSIMD !== null)
+  /** @type {boolean|null} */
+  static _hasBitmapBug = null;
+  static async _test() {
+    if (h._hasBitmapBug !== null)
       return null;
     try {
       h._supportsSIMD = WebAssembly.validate(Uint8Array.of(0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11));
@@ -113,21 +134,37 @@ class h extends EventTarget {
       h._supportsSIMD = !1;
     }
     const e = document.createElement("canvas"), t = e.getContext("2d", { willReadFrequently: !0 });
+    if (!t)
+      throw new Error("Canvas rendering not supported");
     if (typeof ImageData.prototype.constructor == "function")
       try {
         new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1);
       } catch {
         console.log("Detected that ImageData is not constructable despite browser saying so"), self.ImageData = function(o, d, l) {
-          const c = t.createImageData(d, l);
-          return o && c.data.set(o), c;
+          const _ = t.createImageData(d, l);
+          return o && _.data.set(o), _;
         };
       }
     const s = document.createElement("canvas"), a = s.getContext("2d", { willReadFrequently: !0 });
+    if (!a)
+      throw new Error("Canvas rendering not supported");
     e.width = s.width = 1, e.height = s.height = 1, t.clearRect(0, 0, 1, 1), a.clearRect(0, 0, 1, 1);
     const n = a.getImageData(0, 0, 1, 1).data;
     t.putImageData(new ImageData(new Uint8ClampedArray([0, 255, 0, 0]), 1, 1), 0, 0), a.drawImage(e, 0, 0);
     const r = a.getImageData(0, 0, 1, 1).data;
-    h._hasAlphaBug = n[1] !== r[1], h._hasAlphaBug && console.log("Detected a browser having issue with transparent pixels, applying workaround"), e.remove(), s.remove();
+    if (h._hasAlphaBug = n[1] !== r[1], h._hasAlphaBug && console.log("Detected a browser having issue with transparent pixels, applying workaround"), typeof createImageBitmap < "u") {
+      const i = new Uint8ClampedArray([255, 0, 255, 0, 255]).subarray(1, 5);
+      a.drawImage(await createImageBitmap(new ImageData(i, 1)), 0, 0);
+      const { data: o } = a.getImageData(0, 0, 1, 1);
+      h._hasBitmapBug = !1;
+      for (const [d, l] of o.entries())
+        if (Math.abs(i[d] - l) > 15) {
+          h._hasBitmapBug = !0, console.log("Detected a browser having issue with partial bitmaps, applying workaround");
+          break;
+        }
+    } else
+      h._hasBitmapBug = !1;
+    e.remove(), s.remove();
   }
   /**
    * Resize the canvas to given parameters. Auto-generated if values are ommited.
@@ -267,7 +304,7 @@ class h extends EventTarget {
   }
   /**
    * Get all ASS events.
-   * @param  {function(Error|null, ASS_Event)} callback Function to callback when worker returns the events.
+   * @param  {function(Error|null, ASS_Event): void} callback Function to callback when worker returns the events.
    */
   getEvents(e) {
     this._fetchFromWorker({
@@ -307,7 +344,7 @@ class h extends EventTarget {
   */
   /**
    * Create a new ASS style directly.
-   * @param  {ASS_Style} event
+   * @param  {ASS_Style} style
    */
   createStyle(e) {
     this.sendMessage("createStyle", { style: e });
@@ -329,7 +366,7 @@ class h extends EventTarget {
   }
   /**
    * Get all ASS styles.
-   * @param  {function(Error|null, ASS_Style)} callback Function to callback when worker returns the styles.
+   * @param  {function(Error|null, ASS_Style): void} callback Function to callback when worker returns the styles.
    */
   getStyles(e) {
     this._fetchFromWorker({
@@ -403,8 +440,9 @@ class h extends EventTarget {
   }
   /**
    * Veryify the color spaces for subtitles and videos, then apply filters to correct the color of subtitles.
-   * @param  {String} subtitleColorSpace Subtitle color space. One of: BT601 BT709 SMPTE240M FCC
-   * @param  {String} videoColorSpace Video color space. One of: BT601 BT709
+   * @param  {Object} options
+   * @param  {String} options.subtitleColorSpace Subtitle color space. One of: BT601 BT709 SMPTE240M FCC
+   * @param  {String=} options.videoColorSpace Video color space. One of: BT601 BT709
    */
   _verifyColorSpace({ subtitleColorSpace: e, videoColorSpace: t = this._videoColorSpace }) {
     !e || !t || e !== t && (this._detachOffscreen(), this._ctx.filter = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='f'><feColorMatrix type='matrix' values='${f[e][t]} 0 0 0 0 0 1 0'/></filter></svg>#f")`);
@@ -470,17 +508,17 @@ class h extends EventTarget {
   }
   _error(e) {
     const t = e instanceof Error ? e : e instanceof ErrorEvent ? e.error : new Error(e), s = e instanceof Event ? new ErrorEvent(e.type, e) : new ErrorEvent("error", { error: t });
-    this.dispatchEvent(s), console.error(t);
+    return this.dispatchEvent(s), console.error(t), t;
   }
   _removeListeners() {
     this._video && (this._ro && this._ro.unobserve(this._video), this._ctx && (this._ctx.filter = "none"), this._video.removeEventListener("timeupdate", this._boundTimeUpdate), this._video.removeEventListener("progress", this._boundTimeUpdate), this._video.removeEventListener("waiting", this._boundTimeUpdate), this._video.removeEventListener("seeking", this._boundTimeUpdate), this._video.removeEventListener("playing", this._boundTimeUpdate), this._video.removeEventListener("ratechange", this._boundSetRate), this._video.removeEventListener("resize", this._boundResize), this._video.removeEventListener("loadedmetadata", this._boundUpdateColorSpace));
   }
   /**
    * Destroy the object, worker, listeners and all data.
-   * @param  {String} [err] Error to throw when destroying.
+   * @param  {String|Error} [err] Error to throw when destroying.
    */
   destroy(e) {
-    e && this._error(e), this._video && this._canvasParent && this._video.parentNode.removeChild(this._canvasParent), this._destroyed = !0, this._removeListeners(), this.sendMessage("destroy"), this._worker.terminate();
+    return e && (e = this._error(e)), this._video && this._canvasParent && this._video.parentNode?.removeChild(this._canvasParent), this._destroyed = !0, this._removeListeners(), this.sendMessage("destroy"), this._worker?.terminate(), e;
   }
 }
 export {

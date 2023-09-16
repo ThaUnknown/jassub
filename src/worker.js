@@ -301,7 +301,8 @@ const paintImages = ({ times, images, buffers }) => {
         } else {
           bufferCanvas.width = image.w
           bufferCanvas.height = image.h
-          bufferCtx.putImageData(new ImageData(self.HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h), 0, 0)
+          const data = hasBitmapBug ? self.HEAPU8C.slice(image.image, image.image + image.w * image.h * 4) : self.HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4)
+          bufferCtx.putImageData(new ImageData(data, image.w, image.h), 0, 0)
           offCanvasCtx.drawImage(bufferCanvas, image.x, image.y)
         }
       }
@@ -431,8 +432,10 @@ let jassubObj
 let subtitleColorSpace
 let dropAllBlur
 let _malloc
+let hasBitmapBug
 
 self.init = data => {
+  hasBitmapBug = data.hasBitmapBug
   try {
     const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
     if (!(module instanceof WebAssembly.Module) || !(new WebAssembly.Instance(module) instanceof WebAssembly.Instance)) throw new Error('WASM not supported')

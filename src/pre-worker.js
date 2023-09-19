@@ -34,10 +34,7 @@ updateMemoryViews = (_super => {
 })(updateMemoryViews)
 
 if (!String.prototype.startsWith) {
-  String.prototype.startsWith = function (s, p) {
-    if (p === undefined) {
-      p = 0
-    }
+  String.prototype.startsWith = function (s, p = 0) {
     return this.substring(p, s.length) === s
   }
 }
@@ -48,8 +45,8 @@ if (!String.prototype.includes) {
   }
 }
 
-// if (!Uint8Array.prototype.slice) {
-//   Uint8Array.prototype.slice = function (b, e) {
-//     return new Uint8Array(this.subarray(b, e))
-//   }
-// }
+if (!Uint8Array.prototype.slice) {
+  Uint8Array.prototype.slice = function (b, e) {
+    return new Uint8Array(this.subarray(b, e))
+  }
+}

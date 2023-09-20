@@ -233,7 +233,8 @@ const render = (time, force) => {
       for (let result = renderResult, i = 0; i < jassubObj.count; result = result.next, ++i) {
         const reassigned = { w: result.w, h: result.h, x: result.x, y: result.y }
         const pointer = result.image
-        promises.push(createImageBitmap(new ImageData(self.HEAPU8C.subarray(pointer, pointer + reassigned.w * reassigned.h * 4), reassigned.w, reassigned.h)))
+        const data = hasBitmapBug ? self.HEAPU8C.slice(pointer, pointer + reassigned.w * reassigned.h * 4) : self.HEAPU8C.subarray(pointer, pointer + reassigned.w * reassigned.h * 4)
+        promises.push(createImageBitmap(new ImageData(data, reassigned.w, reassigned.h)))
         images.push(reassigned)
       }
       // use callback to not rely on async/await
@@ -301,8 +302,7 @@ const paintImages = ({ times, images, buffers }) => {
         } else {
           bufferCanvas.width = image.w
           bufferCanvas.height = image.h
-          const data = hasBitmapBug ? self.HEAPU8C.slice(image.image, image.image + image.w * image.h * 4) : self.HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4)
-          bufferCtx.putImageData(new ImageData(data, image.w, image.h), 0, 0)
+          bufferCtx.putImageData(new ImageData(self.HEAPU8C.subarray(image.image, image.image + image.w * image.h * 4), image.w, image.h), 0, 0)
           offCanvasCtx.drawImage(bufferCanvas, image.x, image.y)
         }
       }

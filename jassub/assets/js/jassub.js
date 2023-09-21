@@ -86,11 +86,7 @@ export default class JASSUB extends EventTarget {
 
       this._canvas = this._createCanvas()
 
-      if (this._video.nextSibling) {
-        this._video.parentNode.insertBefore(this._canvasParent, this._video.nextSibling)
-      } else {
-        this._video.parentNode.appendChild(this._canvasParent)
-      }
+      this._video.insertAdjacentElement('afterend', this._canvasParent)
     } else if (!this._canvas) {
       throw this.destroy('Don\'t know where to render: you should give video or canvas in options.')
     }

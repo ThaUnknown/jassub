@@ -1,7 +1,8 @@
 const renderer = new JASSUB.default({
   video: document.querySelector('video'),
   subUrl: '../../subtitles/FGOBD.ass',
-  workerUrl: '../assets/jassub-worker.js',
+  workerUrl: '../../dist/worker.js',
+  wasmUrl: '../jassub/assets/jassub-worker.wasm',
   availableFonts: {
     'liberation sans': '../../fonts/default.woff2'
   },

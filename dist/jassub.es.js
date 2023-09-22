@@ -19,7 +19,7 @@
 }, HTMLVideoElement.prototype.cancelVideoFrameCallback = function(c) {
   cancelAnimationFrame(this._rvfcpolyfillmap[c]), delete this._rvfcpolyfillmap[c];
 });
-const m = {
+const _ = {
   bt709: "BT709",
   // these might not be exactly correct? oops?
   bt470bg: "BT601",
@@ -83,7 +83,7 @@ class h extends EventTarget {
     });
     const t = h._test();
     if (this._onDemandRender = "requestVideoFrameCallback" in HTMLVideoElement.prototype && (e.onDemandRender ?? !0), this._offscreenRender = "transferControlToOffscreen" in HTMLCanvasElement.prototype && !e.canvas && (e.offscreenRender ?? !0), this.timeOffset = e.timeOffset || 0, this._video = e.video, this._videoHeight = 0, this._videoWidth = 0, this._videoColorSpace = null, this._canvas = e.canvas, this._video && !this._canvas)
-      this._canvasParent = document.createElement("div"), this._canvasParent.className = "JASSUB", this._canvasParent.style.position = "relative", this._canvas = this._createCanvas(), this._video.nextSibling ? this._video.parentNode.insertBefore(this._canvasParent, this._video.nextSibling) : this._video.parentNode.appendChild(this._canvasParent);
+      this._canvasParent = document.createElement("div"), this._canvasParent.className = "JASSUB", this._canvasParent.style.position = "relative", this._canvas = this._createCanvas(), this._video.insertAdjacentElement("afterend", this._canvasParent);
     else if (!this._canvas)
       throw this.destroy("Don't know where to render: you should give video or canvas in options.");
     if (this._bufferCanvas = document.createElement("canvas"), this._bufferCtx = this._bufferCanvas.getContext("2d"), !this._bufferCtx)
@@ -141,8 +141,8 @@ class h extends EventTarget {
         new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1);
       } catch {
         console.log("Detected that ImageData is not constructable despite browser saying so"), self.ImageData = function(o, d, l) {
-          const _ = t.createImageData(d, l);
-          return o && _.data.set(o), _;
+          const m = t.createImageData(d, l);
+          return o && m.data.set(o), m;
         };
       }
     const s = document.createElement("canvas"), a = s.getContext("2d", { willReadFrequently: !0 });
@@ -432,7 +432,7 @@ class h extends EventTarget {
     this._video.requestVideoFrameCallback(() => {
       try {
         const e = new VideoFrame(this._video);
-        this._videoColorSpace = m[e.colorSpace.matrix], e.close(), this.sendMessage("getColorSpace");
+        this._videoColorSpace = _[e.colorSpace.matrix], e.close(), this.sendMessage("getColorSpace");
       } catch (e) {
         console.warn(e);
       }

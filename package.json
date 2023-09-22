@@ -1,6 +1,6 @@
 {
   "name": "jassub",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "description": "libass Subtitle Renderer and Parser library for browsers",
   "main": "src/jassub.js",
   "type": "module",
@@ -37,6 +37,7 @@
     "rvfc-polyfill": "^1.0.6"
   },
   "devDependencies": {
+    "@types/emscripten": "^1.39.7",
     "terser": "^5.19.4",
     "vite": "^4.4.9",
     "vite-plugin-static-copy": "^0.17.0"

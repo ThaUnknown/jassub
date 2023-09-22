@@ -10,6 +10,9 @@ dependencies:
     version: 1.0.6
 
 devDependencies:
+  '@types/emscripten':
+    specifier: ^1.39.7
+    version: 1.39.7
   terser:
     specifier: ^5.19.4
     version: 5.19.4
@@ -276,6 +279,10 @@ packages:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.15.0
+    dev: true
+
+  /@types/emscripten@1.39.7:
+    resolution: {integrity: sha512-tLqYV94vuqDrXh515F/FOGtBcRMTPGvVV1LzLbtYDcQmmhtpf/gLYf+hikBbQk8MzOHNz37wpFfJbYAuSn8HqA==}
     dev: true
 
   /acorn@8.10.0:

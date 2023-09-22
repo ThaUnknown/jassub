@@ -1,3 +1,4 @@
+// @ts-ignore
 import WASM from 'wasm'
 
 const read_ = (url, ab) => {
@@ -21,6 +22,7 @@ const readAsync = (url, load, err) => {
 }
 
 if (!Date.now) Date.now = () => new Date().getTime()
+// @ts-ignore
 if (!('performance' in self)) self.performance = { now: () => Date.now() }
 
 // implement console methods if they're missing
@@ -32,8 +34,8 @@ if (typeof console === 'undefined') {
       content: JSON.stringify(Array.prototype.slice.call(a))
     })
   }
-  // eslint-disable-next-line no-global-assign
-  console = {
+  // @ts-ignore
+  self.console = {
     log: function () {
       msg('log', arguments)
     },
@@ -446,10 +448,12 @@ self.init = data => {
     eval(read_(data.legacyWasmUrl))
   }
   // hack, we want custom WASM URLs
-  const _fetch = fetch
-  const wasm = !WebAssembly.instantiateStreaming && read_(data.wasmUrl, true)
-  if (WebAssembly.instantiateStreaming) self.fetch = _ => _fetch(data.wasmUrl)
-  WASM({ wasm }).then(Module => {
+  // @ts-ignore
+  if (WebAssembly.instantiateStreaming) {
+    const _fetch = self.fetch
+    self.fetch = _ => _fetch(data.wasmUrl)
+  }
+  WASM({ wasm: !WebAssembly.instantiateStreaming && read_(data.wasmUrl, true) }).then((/** @type {EmscriptenModule} */Module) => {
     _malloc = Module._malloc
     self.width = data.width
     self.height = data.height

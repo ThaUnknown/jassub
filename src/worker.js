@@ -1,26 +1,7 @@
 // @ts-ignore
 import WASM from 'wasm'
 
-const read_ = (url, ab) => {
-  const xhr = new XMLHttpRequest()
-  xhr.open('GET', url, false)
-  xhr.responseType = ab ? 'arraybuffer' : 'text'
-  xhr.send(null)
-  return xhr.response
-}
-const readAsync = (url, load, err) => {
-  const xhr = new XMLHttpRequest()
-  xhr.open('GET', url, true)
-  xhr.responseType = 'arraybuffer'
-  xhr.onload = () => {
-    if ((xhr.status === 200 || xhr.status === 0) && xhr.response) {
-      return load(xhr.response)
-    }
-  }
-  xhr.onerror = err
-  xhr.send(null)
-}
-
+// polyfills for old or weird engines
 if (!Date.now) Date.now = () => new Date().getTime()
 // @ts-ignore
 if (!('performance' in self)) self.performance = { now: () => Date.now() }
@@ -53,6 +34,37 @@ if (typeof console === 'undefined') {
     }
   }
   console.log('Detected lack of console, overridden console')
+}
+
+// very bad promise polyfill, it's absolutely minimal just to make emscripten work
+// in engines that don't have promises, Promise should never be used otherwise
+if (typeof Promise === 'undefined') {
+  // @ts-ignore
+  self.Promise = function (cb) {
+    let then = () => {}
+    cb(a => setTimeout(() => then(a), 0))
+    return { then: fn => then = fn }
+  }
+}
+
+const read_ = (url, ab) => {
+  const xhr = new XMLHttpRequest()
+  xhr.open('GET', url, false)
+  xhr.responseType = ab ? 'arraybuffer' : 'text'
+  xhr.send(null)
+  return xhr.response
+}
+const readAsync = (url, load, err) => {
+  const xhr = new XMLHttpRequest()
+  xhr.open('GET', url, true)
+  xhr.responseType = 'arraybuffer'
+  xhr.onload = () => {
+    if ((xhr.status === 200 || xhr.status === 0) && xhr.response) {
+      return load(xhr.response)
+    }
+  }
+  xhr.onerror = err
+  xhr.send(null)
 }
 
 let lastCurrentTime = 0

@@ -1,7 +1,60 @@
+/* eslint-disable no-extend-native */
 // @ts-ignore
 import WASM from 'wasm'
 
 // polyfills for old or weird engines
+
+if (!String.prototype.startsWith) {
+  String.prototype.startsWith = function (s, p = 0) {
+    return this.substring(p, s.length) === s
+  }
+}
+
+if (!String.prototype.includes) {
+  String.prototype.includes = function (s, p) {
+    return this.indexOf(s, p) !== -1
+  }
+}
+
+if (!Uint8Array.prototype.slice) {
+  Uint8Array.prototype.slice = function (b, e) {
+    return new Uint8Array(this.subarray(b, e))
+  }
+}
+
+if (!Uint8Array.prototype.fill) {
+  Int8Array.prototype.fill = Int16Array.prototype.fill = Int32Array.prototype.fill = Uint8Array.prototype.fill = Uint16Array.prototype.fill = Uint32Array.prototype.fill = Float32Array.prototype.fill = Float64Array.prototype.fill = Array.prototype.fill = function (value) {
+    if (this == null) throw new TypeError('this is null or not defined')
+
+    const O = Object(this)
+
+    const len = O.length >>> 0
+
+    const start = arguments[1]
+    const relativeStart = start >> 0
+
+    let k = relativeStart < 0
+      ? Math.max(len + relativeStart, 0)
+      : Math.min(relativeStart, len)
+
+    const end = arguments[2]
+    const relativeEnd = end === undefined
+      ? len
+      : end >> 0
+
+    const final = relativeEnd < 0
+      ? Math.max(len + relativeEnd, 0)
+      : Math.min(relativeEnd, len)
+
+    while (k < final) {
+      O[k] = value
+      k++
+    }
+
+    return O
+  }
+}
+
 if (!Date.now) Date.now = () => new Date().getTime()
 // @ts-ignore
 if (!('performance' in self)) self.performance = { now: () => Date.now() }

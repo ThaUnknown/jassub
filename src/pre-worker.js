@@ -32,21 +32,3 @@ updateMemoryViews = (_super => {
     self.HEAPU8 = new Uint8Array(wasmMemory.buffer)
   }
 })(updateMemoryViews)
-
-if (!String.prototype.startsWith) {
-  String.prototype.startsWith = function (s, p = 0) {
-    return this.substring(p, s.length) === s
-  }
-}
-
-if (!String.prototype.includes) {
-  String.prototype.includes = function (s, p) {
-    return this.indexOf(s, p) !== -1
-  }
-}
-
-if (!Uint8Array.prototype.slice) {
-  Uint8Array.prototype.slice = function (b, e) {
-    return new Uint8Array(this.subarray(b, e))
-  }
-}

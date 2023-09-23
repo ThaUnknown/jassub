@@ -3,6 +3,7 @@ import { resolve, dirname } from 'path'
 import { build } from 'vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 import { fileURLToPath } from 'url'
+import { appendFile } from 'fs/promises'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -58,9 +59,7 @@ await build({
   configFile: false,
   build: {
     terserOptions: {
-      mangle: {
-        reserved: ['WebAssembly']
-      },
+      mangle: false,
       compress: false,
       format: {
         comments: false
@@ -82,3 +81,5 @@ await build({
     emptyOutDir: false
   }
 })
+
+await appendFile(resolve(__dirname, 'dist/jassub-worker.wasm.js'), 'self.WebAssembly=WebAssembly')

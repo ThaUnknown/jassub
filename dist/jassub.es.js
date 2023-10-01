@@ -351,11 +351,11 @@ class h extends EventTarget {
   }
   /**
    * Overwrite the data of the style with the specified index.
-   * @param  {ASS_Style} event
+   * @param  {ASS_Style} style
    * @param  {Number} index
    */
   setStyle(e, t) {
-    this.sendMessage("setStyle", { event: e, index: t });
+    this.sendMessage("setStyle", { style: e, index: t });
   }
   /**
    * Remove the style with the specified index.

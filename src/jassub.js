@@ -520,11 +520,11 @@ export default class JASSUB extends EventTarget {
 
   /**
    * Overwrite the data of the style with the specified index.
-   * @param  {ASS_Style} event
+   * @param  {ASS_Style} style
    * @param  {Number} index
    */
-  setStyle (event, index) {
-    this.sendMessage('setStyle', { event, index })
+  setStyle (style, index) {
+    this.sendMessage('setStyle', { style, index })
   }
 
   /**

@@ -6,8 +6,8 @@ settings:
 
 dependencies:
   rvfc-polyfill:
-    specifier: ^1.0.6
-    version: 1.0.6
+    specifier: ^1.0.7
+    version: 1.0.7
 
 devDependencies:
   '@types/emscripten':
@@ -520,8 +520,8 @@ packages:
       queue-microtask: 1.2.3
     dev: true
 
-  /rvfc-polyfill@1.0.6:
-    resolution: {integrity: sha512-y7tu9Bh19CTnzBZWEQEEEo5UYvhVi5Ud9C3ndeWtm9m+tUO5vK8qqbpAMJfEDgRSFZokrVHmehnhGjd9LyazBg==}
+  /rvfc-polyfill@1.0.7:
+    resolution: {integrity: sha512-seBl7J1J3/k0LuzW2T9fG6JIOpni5AbU+/87LA+zTYKgTVhsfShmS8K/yOo1eeEjGJHnAdkVAUUM+PEjN9Mpkw==}
     dev: false
 
   /source-map-js@1.0.2:

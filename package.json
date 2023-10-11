@@ -34,7 +34,7 @@
   },
   "homepage": "https://github.com/ThaUnknown/jassub",
   "dependencies": {
-    "rvfc-polyfill": "^1.0.6"
+    "rvfc-polyfill": "^1.0.7"
   },
   "devDependencies": {
     "@types/emscripten": "^1.39.7",

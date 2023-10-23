@@ -22,36 +22,49 @@ if (!Uint8Array.prototype.slice) {
   }
 }
 
+function toAbsoluteIndex (index, length) {
+  const integer = index >> 0
+  return integer < 0 ? Math.max(integer + length, 0) : Math.min(integer, length)
+}
+
 if (!Uint8Array.prototype.fill) {
   Int8Array.prototype.fill = Int16Array.prototype.fill = Int32Array.prototype.fill = Uint8Array.prototype.fill = Uint16Array.prototype.fill = Uint32Array.prototype.fill = Float32Array.prototype.fill = Float64Array.prototype.fill = Array.prototype.fill = function (value) {
     if (this == null) throw new TypeError('this is null or not defined')
 
     const O = Object(this)
 
+    const length = O.length >>> 0
+
+    const argumentsLength = arguments.length
+    let index = toAbsoluteIndex(argumentsLength > 1 ? arguments[1] : undefined, length)
+    const end = argumentsLength > 2 ? arguments[2] : undefined
+    const endPos = end === undefined ? length : toAbsoluteIndex(end, length)
+    while (endPos > index) O[index++] = value
+    return O
+  }
+}
+
+if (!Uint8Array.prototype.copyWithin) {
+  Int8Array.prototype.copyWithin = Int16Array.prototype.copyWithin = Int32Array.prototype.copyWithin = Uint8Array.prototype.copyWithin = Uint16Array.prototype.copyWithin = Uint32Array.prototype.copyWithin = Float32Array.prototype.copyWithin = Float64Array.prototype.copyWithin = Array.prototype.copyWithin = function (target, start) {
+    const O = Object(this)
     const len = O.length >>> 0
 
-    const start = arguments[1]
-    const relativeStart = start >> 0
-
-    let k = relativeStart < 0
-      ? Math.max(len + relativeStart, 0)
-      : Math.min(relativeStart, len)
-
-    const end = arguments[2]
-    const relativeEnd = end === undefined
-      ? len
-      : end >> 0
-
-    const final = relativeEnd < 0
-      ? Math.max(len + relativeEnd, 0)
-      : Math.min(relativeEnd, len)
-
-    while (k < final) {
-      O[k] = value
-      k++
+    let to = toAbsoluteIndex(target, len)
+    let from = toAbsoluteIndex(start, len)
+    const end = arguments.length > 2 ? arguments[2] : undefined
+    let count = Math.min((end === undefined ? len : toAbsoluteIndex(end, len)) - from, len - to)
+    let inc = 1
+    if (from < to && to < from + count) {
+      inc = -1
+      from += count - 1
+      to += count - 1
     }
-
-    return O
+    while (count-- > 0) {
+      if (from in O) O[to] = O[from]
+      else delete O[to]
+      to += inc
+      from += inc
+    } return O
   }
 }
 

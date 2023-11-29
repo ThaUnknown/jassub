@@ -207,6 +207,8 @@ COMPAT_ARGS = \
 		-s EXPORT_KEEPALIVE=1 \
 		-s EXPORTED_RUNTIME_METHODS="['getTempRet0', 'setTempRet0']" \
 		-s IMPORTED_MEMORY=1 \
+		-s MIN_CHROME_VERSION=27 \
+		-s MIN_SAFARI_VERSION=60005 \
 		-mbulk-memory \
 		--memory-init-file 0 
 

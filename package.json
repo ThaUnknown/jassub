@@ -5,7 +5,9 @@
   "main": "src/jassub.js",
   "type": "module",
   "files": [
-    "dist/*",
+    "dist/COPYRIGHT",
+    "dist/default.woff2",
+    "dist/jassub*",
     "src/jassub.js",
     "index.d.ts"
   ],

@@ -102,9 +102,23 @@ if (typeof console === 'undefined') {
   console.log('Detected lack of console, overridden console')
 }
 
+let promiseSupported = typeof Promise !== 'undefined'
+
+// some engines report that Promise resolve isn't a function... what?...
+if (promiseSupported) {
+  try {
+    let res
+    // eslint-disable-next-line no-new
+    new Promise(resolve => { res = resolve })
+    res()
+  } catch (error) {
+    promiseSupported = false
+  }
+}
+
 // very bad promise polyfill, it's absolutely minimal just to make emscripten work
 // in engines that don't have promises, Promise should never be used otherwise
-if (typeof Promise === 'undefined') {
+if (!promiseSupported) {
   // @ts-ignore
   self.Promise = function (cb) {
     let then = () => {}

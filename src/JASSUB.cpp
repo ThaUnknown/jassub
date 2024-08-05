@@ -365,6 +365,7 @@ public:
   /* CANVAS */
   void resizeCanvas(int frame_w, int frame_h) {
     ass_set_frame_size(ass_renderer, frame_w, frame_h);
+    ass_set_storage_size(ass_renderer, frame_w, frame_h);
     canvas_h = frame_h;
     canvas_w = frame_w;
   }

@@ -79,8 +79,8 @@ interface JassubOptions {
   libassGlyphLimit?: number;
 }
 
-type ASS_EventCallback = (error: Error | null, event: ASS_Event) => void;
-type ASS_StyleCallback = (error: Error | null, event: ASS_Style) => void;
+type ASS_EventCallback = (error: Error | null, event: ASS_Event[]) => void;
+type ASS_StyleCallback = (error: Error | null, event: ASS_Style[]) => void;
 
 export default class JASSUB {
   constructor (options: JassubOptions);
@@ -111,4 +111,7 @@ export default class JASSUB {
 
   sendMessage (target: string, data?: Record<string, unknown>, transferable?: Transferable[]): void;
   destroy (err?: string): void;
+
+  protected _ctx: CanvasRenderingContext2D;
+  protected _canvas: HTMLCanvasElement;
 }

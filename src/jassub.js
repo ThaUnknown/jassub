@@ -567,8 +567,8 @@ export default class JASSUB extends EventTarget {
     try {
       // @ts-ignore
       queryLocalFonts().then(fontData => {
-        const font = fontData?.find(obj => obj.fullName.toLowerCase() === name)
-        if (font) {
+        const fonts = fontData?.filter(obj => obj.family.toLowerCase() === name)
+        for (const font of fonts) {
           font.blob().then(blob => {
             blob.arrayBuffer().then(buffer => {
               this.addFont(new Uint8Array(buffer))

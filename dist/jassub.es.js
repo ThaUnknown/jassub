@@ -1,11 +1,11 @@
 typeof HTMLVideoElement < "u" && !("requestVideoFrameCallback" in HTMLVideoElement.prototype) && "getVideoPlaybackQuality" in HTMLVideoElement.prototype && (HTMLVideoElement.prototype._rvfcpolyfillmap = {}, HTMLVideoElement.prototype.requestVideoFrameCallback = function(c) {
-  const e = performance.now(), t = this.getVideoPlaybackQuality(), s = this.mozPresentedFrames || this.mozPaintedFrames || t.totalVideoFrames - t.droppedVideoFrames, i = (n, r) => {
-    const a = this.getVideoPlaybackQuality(), h = this.mozPresentedFrames || this.mozPaintedFrames || a.totalVideoFrames - a.droppedVideoFrames;
+  const e = performance.now(), t = this.getVideoPlaybackQuality(), s = this.mozPresentedFrames || this.mozPaintedFrames || t.totalVideoFrames - t.droppedVideoFrames, r = (n, a) => {
+    const i = this.getVideoPlaybackQuality(), h = this.mozPresentedFrames || this.mozPaintedFrames || i.totalVideoFrames - i.droppedVideoFrames;
     if (h > s) {
-      const d = this.mozFrameDelay || a.totalFrameDelay - t.totalFrameDelay || 0, l = r - n;
-      c(r, {
-        presentationTime: r + d * 1e3,
-        expectedDisplayTime: r + l,
+      const d = this.mozFrameDelay || i.totalFrameDelay - t.totalFrameDelay || 0, l = a - n;
+      c(a, {
+        presentationTime: a + d * 1e3,
+        expectedDisplayTime: a + l,
         width: this.videoWidth,
         height: this.videoHeight,
         mediaTime: Math.max(0, this.currentTime || 0) + l / 1e3,
@@ -13,9 +13,9 @@ typeof HTMLVideoElement < "u" && !("requestVideoFrameCallback" in HTMLVideoEleme
         processingDuration: d
       }), delete this._rvfcpolyfillmap[e];
     } else
-      this._rvfcpolyfillmap[e] = requestAnimationFrame((d) => i(r, d));
+      this._rvfcpolyfillmap[e] = requestAnimationFrame((d) => r(a, d));
   };
-  return this._rvfcpolyfillmap[e] = requestAnimationFrame((n) => i(e, n)), e;
+  return this._rvfcpolyfillmap[e] = requestAnimationFrame((n) => r(e, n)), e;
 }, HTMLVideoElement.prototype.cancelVideoFrameCallback = function(c) {
   cancelAnimationFrame(this._rvfcpolyfillmap[c]), delete this._rvfcpolyfillmap[c];
 });
@@ -73,8 +73,10 @@ class o extends EventTarget {
    * @param {Number} [options.libassGlyphLimit] libass glyph cache memory limit in MiB (approximate).
    */
   constructor(e) {
-    if (super(), !globalThis.Worker) throw this.destroy("Worker not supported");
-    if (!e) throw this.destroy("No options provided");
+    if (super(), !globalThis.Worker)
+      throw this.destroy("Worker not supported");
+    if (!e)
+      throw this.destroy("No options provided");
     this._loaded = /** @type {Promise<void>} */
     new Promise((s) => {
       this._init = s;
@@ -84,7 +86,8 @@ class o extends EventTarget {
       this._canvasParent = document.createElement("div"), this._canvasParent.className = "JASSUB", this._canvasParent.style.position = "relative", this._canvas = this._createCanvas(), this._video.insertAdjacentElement("afterend", this._canvasParent);
     else if (!this._canvas)
       throw this.destroy("Don't know where to render: you should give video or canvas in options.");
-    if (this._bufferCanvas = document.createElement("canvas"), this._bufferCtx = this._bufferCanvas.getContext("2d"), !this._bufferCtx) throw this.destroy("Canvas rendering not supported");
+    if (this._bufferCanvas = document.createElement("canvas"), this._bufferCtx = this._bufferCanvas.getContext("2d"), !this._bufferCtx)
+      throw this.destroy("Canvas rendering not supported");
     this._canvasctrl = this._offscreenRender ? this._canvas.transferControlToOffscreen() : this._canvas, this._ctx = !this._offscreenRender && this._canvasctrl.getContext("2d"), this._lastRenderTime = 0, this.debug = !!e.debug, this.prescaleFactor = e.prescaleFactor || 1, this.prescaleHeightLimit = e.prescaleHeightLimit || 1080, this.maxRenderHeight = e.maxRenderHeight || 0, this._boundResize = this.resize.bind(this), this._boundTimeUpdate = this._timeupdate.bind(this), this._boundSetRate = this.setRate.bind(this), this._boundUpdateColorSpace = this._updateColorSpace.bind(this), this._video && this.setVideo(e.video), this._onDemandRender && (this.busy = !1, this._lastDemandTime = null), this._worker = new Worker(e.workerUrl || "jassub-worker.js"), this._worker.onmessage = (s) => this._onmessage(s), this._worker.onerror = (s) => this._error(s), t.then(() => {
       this._worker.postMessage({
         target: "init",
@@ -131,9 +134,11 @@ class o extends EventTarget {
       }
   }
   static async _testImageBugs() {
-    if (o._hasBitmapBug !== null) return;
+    if (o._hasBitmapBug !== null)
+      return;
     const e = document.createElement("canvas"), t = e.getContext("2d", { willReadFrequently: !0 });
-    if (!t) throw new Error("Canvas rendering not supported");
+    if (!t)
+      throw new Error("Canvas rendering not supported");
     if (typeof ImageData.prototype.constructor == "function")
       try {
         new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1);
@@ -143,19 +148,20 @@ class o extends EventTarget {
           return h && m.data.set(h), m;
         };
       }
-    const s = document.createElement("canvas"), i = s.getContext("2d", { willReadFrequently: !0 });
-    if (!i) throw new Error("Canvas rendering not supported");
-    e.width = s.width = 1, e.height = s.height = 1, t.clearRect(0, 0, 1, 1), i.clearRect(0, 0, 1, 1);
-    const n = i.getImageData(0, 0, 1, 1).data;
-    t.putImageData(new ImageData(new Uint8ClampedArray([0, 255, 0, 0]), 1, 1), 0, 0), i.drawImage(e, 0, 0);
-    const r = i.getImageData(0, 0, 1, 1).data;
-    if (o._hasAlphaBug = n[1] !== r[1], o._hasAlphaBug && console.log("Detected a browser having issue with transparent pixels, applying workaround"), typeof createImageBitmap < "u") {
-      const a = new Uint8ClampedArray([255, 0, 255, 0, 255]).subarray(1, 5);
-      i.drawImage(await createImageBitmap(new ImageData(a, 1)), 0, 0);
-      const { data: h } = i.getImageData(0, 0, 1, 1);
+    const s = document.createElement("canvas"), r = s.getContext("2d", { willReadFrequently: !0 });
+    if (!r)
+      throw new Error("Canvas rendering not supported");
+    e.width = s.width = 1, e.height = s.height = 1, t.clearRect(0, 0, 1, 1), r.clearRect(0, 0, 1, 1);
+    const n = r.getImageData(0, 0, 1, 1).data;
+    t.putImageData(new ImageData(new Uint8ClampedArray([0, 255, 0, 0]), 1, 1), 0, 0), r.drawImage(e, 0, 0);
+    const a = r.getImageData(0, 0, 1, 1).data;
+    if (o._hasAlphaBug = n[1] !== a[1], o._hasAlphaBug && console.log("Detected a browser having issue with transparent pixels, applying workaround"), typeof createImageBitmap < "u") {
+      const i = new Uint8ClampedArray([255, 0, 255, 0, 255]).subarray(1, 5);
+      r.drawImage(await createImageBitmap(new ImageData(i, 1)), 0, 0);
+      const { data: h } = r.getImageData(0, 0, 1, 1);
       o._hasBitmapBug = !1;
       for (const [d, l] of h.entries())
-        if (Math.abs(a[d] - l) > 15) {
+        if (Math.abs(i[d] - l) > 15) {
           o._hasBitmapBug = !0, console.log("Detected a browser having issue with partial bitmaps, applying workaround");
           break;
         }
@@ -174,33 +180,33 @@ class o extends EventTarget {
    * @param  {Number} [left=0]
    * @param  {Boolean} [force=false]
    */
-  resize(e = 0, t = 0, s = 0, i = 0, n = this._video?.paused) {
+  resize(e = 0, t = 0, s = 0, r = 0, n = this._video?.paused) {
     if ((!e || !t) && this._video) {
-      const r = this._getVideoPosition();
-      let a = null;
+      const a = this._getVideoPosition();
+      let i = null;
       if (this._videoWidth) {
         const h = this._video.videoWidth / this._videoWidth, d = this._video.videoHeight / this._videoHeight;
-        a = this._computeCanvasSize((r.width || 0) / h, (r.height || 0) / d);
+        i = this._computeCanvasSize((a.width || 0) / h, (a.height || 0) / d);
       } else
-        a = this._computeCanvasSize(r.width || 0, r.height || 0);
-      e = a.width, t = a.height, this._canvasParent && (s = r.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top), i = r.x), this._canvas.style.width = r.width + "px", this._canvas.style.height = r.height + "px";
+        i = this._computeCanvasSize(a.width || 0, a.height || 0);
+      e = i.width, t = i.height, this._canvasParent && (s = a.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top), r = a.x), this._canvas.style.width = a.width + "px", this._canvas.style.height = a.height + "px";
     }
-    this._canvas.style.top = s + "px", this._canvas.style.left = i + "px", n && this.busy === !1 ? this.busy = !0 : n = !1, this.sendMessage("canvas", { width: e, height: t, force: n });
+    this._canvas.style.top = s + "px", this._canvas.style.left = r + "px", n && this.busy === !1 ? this.busy = !0 : n = !1, this.sendMessage("canvas", { width: e, height: t, force: n });
   }
   _getVideoPosition(e = this._video.videoWidth, t = this._video.videoHeight) {
-    const s = e / t, { offsetWidth: i, offsetHeight: n } = this._video, r = i / n;
-    e = i, t = n, r > s ? e = Math.floor(n * s) : t = Math.floor(i / s);
-    const a = (i - e) / 2, h = (n - t) / 2;
-    return { width: e, height: t, x: a, y: h };
+    const s = e / t, { offsetWidth: r, offsetHeight: n } = this._video, a = r / n;
+    e = r, t = n, a > s ? e = Math.floor(n * s) : t = Math.floor(r / s);
+    const i = (r - e) / 2, h = (n - t) / 2;
+    return { width: e, height: t, x: i, y: h };
   }
   _computeCanvasSize(e = 0, t = 0) {
-    const s = this.prescaleFactor <= 0 ? 1 : this.prescaleFactor, i = self.devicePixelRatio || 1;
-    if (e = e * i, t = t * i, t <= 0 || e <= 0)
+    const s = this.prescaleFactor <= 0 ? 1 : this.prescaleFactor, r = self.devicePixelRatio || 1;
+    if (t <= 0 || e <= 0)
       e = 0, t = 0;
     else {
       const n = s < 1 ? -1 : 1;
-      let r = t * i;
-      n * r * s <= n * this.prescaleHeightLimit ? r *= s : n * r < n * this.prescaleHeightLimit && (r = this.prescaleHeightLimit), this.maxRenderHeight > 0 && r > this.maxRenderHeight && (r = this.maxRenderHeight), e *= r / t, t = r;
+      let a = t * r;
+      n * a * s <= n * this.prescaleHeightLimit ? a *= s : n * a < n * this.prescaleHeightLimit && (a = this.prescaleHeightLimit), this.maxRenderHeight > 0 && a > this.maxRenderHeight && (a = this.maxRenderHeight), e *= a / t, t = a;
     }
     return { width: e, height: t };
   }
@@ -385,9 +391,9 @@ class o extends EventTarget {
   _sendLocalFont(e) {
     try {
       queryLocalFonts().then((t) => {
-        const s = t?.find((i) => i.fullName.toLowerCase() === e);
-        s && s.blob().then((i) => {
-          i.arrayBuffer().then((n) => {
+        const s = t?.find((r) => r.fullName.toLowerCase() === e);
+        s && s.blob().then((r) => {
+          r.arrayBuffer().then((n) => {
             this.addFont(new Uint8Array(n));
           });
         });
@@ -408,21 +414,24 @@ class o extends EventTarget {
   _unbusy() {
     this._lastDemandTime ? this._demandRender(this._lastDemandTime) : this.busy = !1;
   }
-  _handleRVFC(e, { mediaTime: t, width: s, height: i }) {
-    if (this._destroyed) return null;
-    this.busy ? this._lastDemandTime = { mediaTime: t, width: s, height: i } : (this.busy = !0, this._demandRender({ mediaTime: t, width: s, height: i })), this._video.requestVideoFrameCallback(this._handleRVFC.bind(this));
+  _handleRVFC(e, { mediaTime: t, width: s, height: r }) {
+    if (this._destroyed)
+      return null;
+    this.busy ? this._lastDemandTime = { mediaTime: t, width: s, height: r } : (this.busy = !0, this._demandRender({ mediaTime: t, width: s, height: r })), this._video.requestVideoFrameCallback(this._handleRVFC.bind(this));
   }
   _demandRender({ mediaTime: e, width: t, height: s }) {
     this._lastDemandTime = null, (t !== this._videoWidth || s !== this._videoHeight) && (this._videoWidth = t, this._videoHeight = s, this.resize()), this.sendMessage("demand", { time: e + this.timeOffset });
   }
   // if we're using offscreen render, we can't use ctx filters, so we can't use a transfered canvas
   _detachOffscreen() {
-    if (!this._offscreenRender || this._ctx) return null;
+    if (!this._offscreenRender || this._ctx)
+      return null;
     this._canvas.remove(), this._createCanvas(), this._canvasctrl = this._canvas, this._ctx = this._canvasctrl.getContext("2d"), this.sendMessage("detachOffscreen"), this.busy = !1, this.resize(0, 0, 0, 0, !0);
   }
   // if the video or track changed, we need to re-attach the offscreen canvas
   _reAttachOffscreen() {
-    if (!this._offscreenRender || !this._ctx) return null;
+    if (!this._offscreenRender || !this._ctx)
+      return null;
     this._canvas.remove(), this._createCanvas(), this._canvasctrl = this._canvas.transferControlToOffscreen(), this._ctx = !1, this.sendMessage("offscreenCanvas", null, [this._canvasctrl]), this.resize(0, 0, 0, 0, !0);
   }
   _updateColorSpace() {
@@ -444,17 +453,18 @@ class o extends EventTarget {
   _verifyColorSpace({ subtitleColorSpace: e, videoColorSpace: t = this._videoColorSpace }) {
     !e || !t || e !== t && (this._detachOffscreen(), this._ctx.filter = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='f'><feColorMatrix type='matrix' values='${f[e][t]} 0 0 0 0 0 1 0'/></filter></svg>#f")`);
   }
-  _render({ images: e, asyncRender: t, times: s, width: i, height: n, colorSpace: r }) {
-    this._unbusy(), this.debug && (s.IPCTime = Date.now() - s.JSRenderTime), (this._canvasctrl.width !== i || this._canvasctrl.height !== n) && (this._canvasctrl.width = i, this._canvasctrl.height = n, this._verifyColorSpace({ subtitleColorSpace: r })), this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height);
-    for (const a of e)
-      a.image && (t ? (this._ctx.drawImage(a.image, a.x, a.y), a.image.close()) : (this._bufferCanvas.width = a.w, this._bufferCanvas.height = a.h, this._bufferCtx.putImageData(new ImageData(this._fixAlpha(new Uint8ClampedArray(a.image)), a.w, a.h), 0, 0), this._ctx.drawImage(this._bufferCanvas, a.x, a.y)));
+  _render({ images: e, asyncRender: t, times: s, width: r, height: n, colorSpace: a }) {
+    this._unbusy(), this.debug && (s.IPCTime = Date.now() - s.JSRenderTime), (this._canvasctrl.width !== r || this._canvasctrl.height !== n) && (this._canvasctrl.width = r, this._canvasctrl.height = n, this._verifyColorSpace({ subtitleColorSpace: a })), this._ctx.clearRect(0, 0, this._canvasctrl.width, this._canvasctrl.height);
+    for (const i of e)
+      i.image && (t ? (this._ctx.drawImage(i.image, i.x, i.y), i.image.close()) : (this._bufferCanvas.width = i.w, this._bufferCanvas.height = i.h, this._bufferCtx.putImageData(new ImageData(this._fixAlpha(new Uint8ClampedArray(i.image)), i.w, i.h), 0, 0), this._ctx.drawImage(this._bufferCanvas, i.x, i.y)));
     if (this.debug) {
       s.JSRenderTime = Date.now() - s.JSRenderTime - s.IPCTime;
-      let a = 0;
+      let i = 0;
       const h = s.bitmaps || e.length;
       delete s.bitmaps;
-      for (const d in s) a += s[d];
-      console.log("Bitmaps: " + h + " Total: " + (a | 0) + "ms", s);
+      for (const d in s)
+        i += s[d];
+      console.log("Bitmaps: " + h + " Total: " + (i | 0) + "ms", s);
     }
   }
   _fixAlpha(e) {
@@ -484,14 +494,14 @@ class o extends EventTarget {
   }
   _fetchFromWorker(e, t) {
     try {
-      const s = e.target, i = setTimeout(() => {
-        r(new Error("Error: Timeout while try to fetch " + s));
-      }, 5e3), n = ({ data: a }) => {
-        a.target === s && (t(null, a), this._worker.removeEventListener("message", n), this._worker.removeEventListener("error", r), clearTimeout(i));
-      }, r = (a) => {
-        t(a), this._worker.removeEventListener("message", n), this._worker.removeEventListener("error", r), clearTimeout(i);
+      const s = e.target, r = setTimeout(() => {
+        a(new Error("Error: Timeout while try to fetch " + s));
+      }, 5e3), n = ({ data: i }) => {
+        i.target === s && (t(null, i), this._worker.removeEventListener("message", n), this._worker.removeEventListener("error", a), clearTimeout(r));
+      }, a = (i) => {
+        t(i), this._worker.removeEventListener("message", n), this._worker.removeEventListener("error", a), clearTimeout(r);
       };
-      this._worker.addEventListener("message", n), this._worker.addEventListener("error", r), this._worker.postMessage(e);
+      this._worker.addEventListener("message", n), this._worker.addEventListener("error", a), this._worker.postMessage(e);
     } catch (s) {
       this._error(s);
     }

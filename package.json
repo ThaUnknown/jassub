@@ -1,6 +1,6 @@
 {
   "name": "jassub",
-  "version": "1.7.18",
+  "version": "1.7.19",
   "description": "libass Subtitle Renderer and Parser library for browsers",
   "main": "src/jassub.js",
   "type": "module",

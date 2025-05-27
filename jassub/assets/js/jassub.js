@@ -123,8 +123,8 @@ export default class JASSUB extends EventTarget {
     test.then(() => {
       this._worker.postMessage({
         target: 'init',
-        wasmUrl: JASSUB._supportsSIMD && options.modernWasmUrl ? options.modernWasmUrl : options.wasmUrl || 'jassub-worker.wasm',
-        legacyWasmUrl: options.legacyWasmUrl || 'jassub-worker.wasm.js',
+        wasmUrl: JASSUB._supportsSIMD && options.modernWasmUrl ? options.modernWasmUrl : options.wasmUrl ?? 'jassub-worker.wasm',
+        legacyWasmUrl: options.legacyWasmUrl ?? 'jassub-worker.wasm.js',
         asyncRender: typeof createImageBitmap !== 'undefined' && (options.asyncRender ?? true),
         onDemandRender: this._onDemandRender,
         width: this._canvasctrl.width || 0,
@@ -167,15 +167,18 @@ export default class JASSUB extends EventTarget {
   /** @type {boolean|null} */
   static _hasBitmapBug = null
 
-  static async _test () {
-    // check if ran previously
-    if (JASSUB._hasBitmapBug !== null) return null
+  static _testSIMD () {
+    if (JASSUB._supportsSIMD !== null) return
 
     try {
       JASSUB._supportsSIMD = WebAssembly.validate(Uint8Array.of(0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11))
     } catch (e) {
       JASSUB._supportsSIMD = false
     }
+  }
+
+  static async _testImageBugs () {
+    if (JASSUB._hasBitmapBug !== null) return
 
     const canvas1 = document.createElement('canvas')
     const ctx1 = canvas1.getContext('2d', { willReadFrequently: true })
@@ -235,6 +238,11 @@ export default class JASSUB extends EventTarget {
 
     canvas1.remove()
     canvas2.remove()
+  }
+
+  static async _test () {
+    JASSUB._testSIMD()
+    await JASSUB._testImageBugs()
   }
 
   /**
@@ -299,8 +307,6 @@ export default class JASSUB extends EventTarget {
     const scalefactor = this.prescaleFactor <= 0 ? 1.0 : this.prescaleFactor
     const ratio = self.devicePixelRatio || 1
 
-    width = width * ratio
-    height = height * ratio
     if (height <= 0 || width <= 0) {
       width = 0
       height = 0

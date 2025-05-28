@@ -694,15 +694,7 @@ public:
   }
 
   void styleOverride(ASS_Style style) {
-    int set_force_flags = 0
-      | ASS_OVERRIDE_BIT_FONT_NAME
-      | ASS_OVERRIDE_BIT_FONT_SIZE_FIELDS
-      | ASS_OVERRIDE_BIT_COLORS
-      | ASS_OVERRIDE_BIT_BORDER
-      | ASS_OVERRIDE_BIT_SELECTIVE_FONT_SCALE
-      | ASS_OVERRIDE_BIT_BLUR
-      | ASS_OVERRIDE_BIT_ALIGNMENT
-      | ASS_OVERRIDE_BIT_JUSTIFY;
+    int set_force_flags = ASS_OVERRIDE_FULL_STYLE;
     
     ass_set_selective_style_override_enabled(ass_renderer, set_force_flags);
     ass_set_selective_style_override(ass_renderer, &style);

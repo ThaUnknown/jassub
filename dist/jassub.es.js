@@ -320,6 +320,19 @@ class o extends EventTarget {
     });
   }
   /**
+   * Set a style override.
+   * @param  {ASS_Style} style
+   */
+  styleOverride(e) {
+    this.sendMessage("styleOverride", { style: e });
+  }
+  /**
+   * Disable style override.
+   */
+  disableStyleOverride() {
+    this.sendMessage("disableStyleOverride");
+  }
+  /**
    * @typedef {Object} ASS_Style
    * @property {String} Name The name of the Style. Case sensitive. Cannot include commas.
    * @property {String} FontName The fontname as used by Windows. Case-sensitive.

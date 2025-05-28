@@ -652,7 +652,9 @@ self.removeEvent = ({ index }) => {
 }
 
 self.createStyle = ({ style }) => {
-  _applyKeys(style, jassubObj.getStyle(jassubObj.allocStyle()))
+  const alloc = jassubObj.getStyle(jassubObj.allocStyle())
+  _applyKeys(style, alloc)
+  return alloc
 }
 
 self.getStyles = () => {
@@ -676,6 +678,14 @@ self.setStyle = ({ style, index }) => {
 
 self.removeStyle = ({ index }) => {
   jassubObj.removeStyle(index)
+}
+
+self.styleOverride = (data) => {
+  jassubObj.styleOverride(self.createStyle(data))
+}
+
+self.disableStyleOverride = () => {
+  jassubObj.disableStyleOverride()
 }
 
 onmessage = ({ data }) => {

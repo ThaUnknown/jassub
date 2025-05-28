@@ -17,10 +17,10 @@ interface ASS_Style {
   Name: string;
   FontName: string;
   FontSize: number;
-  PrimaryColour: number;
-  SecondaryColour: number;
-  OutlineColour: number;
-  BackColour: number;
+  PrimaryColour: number; // uint32_t RGBA
+  SecondaryColour: number; // uint32_t RGBA
+  OutlineColour: number; // uint32_t RGBA
+  BackColour: number; // uint32_t RGBA
   Bold: number;
   Italic: number;
   Underline: number;
@@ -106,12 +106,14 @@ export default class JASSUB {
   setStyle (style: ASS_Style, index: number): void;
   removeStyle (index: number): void;
   getStyles (callback: ASS_StyleCallback): void;
+  styleOverride (style: ASS_Style): void;
+  disableStyleOverride();
 
   addFont (font: string | Uint8Array): void;
 
   sendMessage (target: string, data?: Record<string, unknown>, transferable?: Transferable[]): void;
   destroy (err?: string): void;
 
-  protected _ctx: CanvasRenderingContext2D;
-  protected _canvas: HTMLCanvasElement;
+  _ctx: CanvasRenderingContext2D;
+  _canvas: HTMLCanvasElement;
 }

@@ -692,6 +692,25 @@ public:
   ASS_Style *getStyle(int i) {
     return &track->styles[i];
   }
+
+  void styleOverride(ASS_Style style) {
+    int set_force_flags = 0
+      | ASS_OVERRIDE_BIT_FONT_NAME
+      | ASS_OVERRIDE_BIT_FONT_SIZE_FIELDS
+      | ASS_OVERRIDE_BIT_COLORS
+      | ASS_OVERRIDE_BIT_BORDER
+      | ASS_OVERRIDE_BIT_SELECTIVE_FONT_SCALE
+      | ASS_OVERRIDE_BIT_BLUR
+      | ASS_OVERRIDE_BIT_ALIGNMENT
+      | ASS_OVERRIDE_BIT_JUSTIFY;
+    
+    ass_set_selective_style_override_enabled(ass_renderer, set_force_flags);
+    ass_set_selective_style_override(ass_renderer, &style);
+  }
+
+  void disableStyleOverride() {
+    ass_set_selective_style_override_enabled(ass_renderer, 0);
+  }
 };
 
 static char *copyString(const std::string &str) {
@@ -833,6 +852,8 @@ EMSCRIPTEN_BINDINGS(JASSUB) {
     .function("renderImage", &JASSUB::renderImage, emscripten::allow_raw_pointers())
     .function("getEvent", &JASSUB::getEvent, emscripten::allow_raw_pointers())
     .function("getStyle", &JASSUB::getStyle, emscripten::allow_raw_pointers())
+    .function("styleOverride", &JASSUB::styleOverride, emscripten::allow_raw_pointers())
+    .function("disableStyleOverride", &JASSUB::disableStyleOverride)
     .property("trackColorSpace", &JASSUB::trackColorSpace)
     .property("changed", &JASSUB::changed)
     .property("count", &JASSUB::count)

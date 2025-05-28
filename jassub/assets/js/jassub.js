@@ -487,6 +487,21 @@ export default class JASSUB extends EventTarget {
   }
 
   /**
+   * Set a style override.
+   * @param  {ASS_Style} style
+   */
+  styleOverride(style) {
+    this.sendMessage('styleOverride', { style })
+  }
+
+  /**
+   * Disable style override.
+   */
+  disableStyleOverride() {
+    this.sendMessage('disableStyleOverride')
+  }
+
+  /**
    * @typedef {Object} ASS_Style
    * @property {String} Name The name of the Style. Case sensitive. Cannot include commas.
    * @property {String} FontName The fontname as used by Windows. Case-sensitive.

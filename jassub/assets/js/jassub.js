@@ -282,7 +282,7 @@ export default class JASSUB extends EventTarget {
     } else {
       force = false
     }
-    this.sendMessage('canvas', { width, height, force })
+    this.sendMessage('canvas', { width, height, videoWidth: this._videoWidth || this._video.videoWidth, videoHeight: this._videoHeight || this._video.videoHeight, force })
   }
 
   _getVideoPosition (width = this._video.videoWidth, height = this._video.videoHeight) {

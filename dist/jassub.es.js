@@ -191,7 +191,7 @@ class o extends EventTarget {
         i = this._computeCanvasSize(a.width || 0, a.height || 0);
       e = i.width, t = i.height, this._canvasParent && (s = a.y - (this._canvasParent.getBoundingClientRect().top - this._video.getBoundingClientRect().top), r = a.x), this._canvas.style.width = a.width + "px", this._canvas.style.height = a.height + "px";
     }
-    this._canvas.style.top = s + "px", this._canvas.style.left = r + "px", n && this.busy === !1 ? this.busy = !0 : n = !1, this.sendMessage("canvas", { width: e, height: t, force: n });
+    this._canvas.style.top = s + "px", this._canvas.style.left = r + "px", n && this.busy === !1 ? this.busy = !0 : n = !1, this.sendMessage("canvas", { width: e, height: t, videoWidth: this._videoWidth || this._video.videoWidth, videoHeight: this._videoHeight || this._video.videoHeight, force: n });
   }
   _getVideoPosition(e = this._video.videoWidth, t = this._video.videoHeight) {
     const s = e / t, { offsetWidth: r, offsetHeight: n } = this._video, a = r / n;

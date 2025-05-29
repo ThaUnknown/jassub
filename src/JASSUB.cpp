@@ -280,13 +280,13 @@ public:
   int changed = 0;
   int count = 0;
   int time = 0;
-  JASSUB(int frame_w, int frame_h, const std::string &df, bool debug) {
+  JASSUB(int canvas_w, int canvas_h, const std::string &df, bool debug) {
     status = 0;
     ass_library = NULL;
     ass_renderer = NULL;
     track = NULL;
-    canvas_w = 0;
-    canvas_h = 0;
+    this->canvas_w = canvas_w;
+    this->canvas_h = canvas_h;
     drop_animations = false;
     scanned_events = 0;
     this->debug = debug;
@@ -312,7 +312,7 @@ public:
     }
     ass_set_extract_fonts(ass_library, true);
 
-    resizeCanvas(frame_w, frame_h);
+    resizeCanvas(canvas_w, canvas_h, canvas_w, canvas_h);
 
     reloadFonts();
     m_buffer.clear();
@@ -363,11 +363,11 @@ public:
   /* TRACK */
 
   /* CANVAS */
-  void resizeCanvas(int frame_w, int frame_h) {
-    ass_set_frame_size(ass_renderer, frame_w, frame_h);
-    ass_set_storage_size(ass_renderer, frame_w, frame_h);
-    canvas_h = frame_h;
-    canvas_w = frame_w;
+  void resizeCanvas(int canvas_w, int canvas_h, int video_w, int video_h) {
+    ass_set_storage_size(ass_renderer, video_w, video_h);
+    ass_set_frame_size(ass_renderer, canvas_w, canvas_h);
+    this->canvas_h = canvas_h;
+    this->canvas_w = canvas_w;
   }
   int getBufferSize(ASS_Image *img) {
     int size = 0;
@@ -694,10 +694,12 @@ public:
   }
 
   void styleOverride(ASS_Style style) {
-    int set_force_flags = ASS_OVERRIDE_FULL_STYLE;
+    int set_force_flags = ASS_OVERRIDE_BIT_STYLE
+      | ASS_OVERRIDE_BIT_SELECTIVE_FONT_SCALE;
     
     ass_set_selective_style_override_enabled(ass_renderer, set_force_flags);
     ass_set_selective_style_override(ass_renderer, &style);
+    ass_set_font_scale(ass_renderer, 0.4);
   }
 
   void disableStyleOverride() {

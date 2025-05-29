@@ -609,11 +609,11 @@ self.detachOffscreen = () => {
   offscreenRender = 'hybrid'
 }
 
-self.canvas = ({ width, height, force }) => {
+self.canvas = ({ width, height, videoWidth, videoHeight, force }) => {
   if (width == null) throw new Error('Invalid canvas size specified')
   self.width = width
   self.height = height
-  if (jassubObj) jassubObj.resizeCanvas(width, height)
+  if (jassubObj) jassubObj.resizeCanvas(width, height, videoWidth, videoHeight)
   if (force) render(lastCurrentTime, true)
 }
 

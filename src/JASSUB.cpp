@@ -699,11 +699,12 @@ public:
     
     ass_set_selective_style_override_enabled(ass_renderer, set_force_flags);
     ass_set_selective_style_override(ass_renderer, &style);
-    ass_set_font_scale(ass_renderer, 0.4);
+    ass_set_font_scale(ass_renderer, 0.3);
   }
 
   void disableStyleOverride() {
     ass_set_selective_style_override_enabled(ass_renderer, 0);
+    ass_set_font_scale(ass_renderer, 1);
   }
 };
 

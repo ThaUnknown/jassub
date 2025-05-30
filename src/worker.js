@@ -688,6 +688,10 @@ self.disableStyleOverride = () => {
   jassubObj.disableStyleOverride()
 }
 
+self.defaultFont = ({ font }) => {
+  jassubObj.setDefaultFont(font)
+}
+
 onmessage = ({ data }) => {
   if (self[data.target]) {
     self[data.target](data)

@@ -271,7 +271,7 @@ private:
 
   int status;
 
-  char m_defaultFont[256];
+  const char *defaultFont;
 
 public:
   ASS_Track *track;
@@ -291,12 +291,7 @@ public:
     scanned_events = 0;
     this->debug = debug;
 
-    const char *defaultFont = df.c_str();
-    if (strlen(defaultFont) >= sizeof(m_defaultFont)) {
-      printf("defaultFont is too large!\n");
-      exit(4);
-    }
-    strcpy(m_defaultFont, defaultFont);
+    defaultFont = copyString(df);
     ass_library = ass_library_init();
     if (!ass_library) {
       fprintf(stderr, "JASSUB: ass_library_init failed!\n");
@@ -449,12 +444,18 @@ public:
     m_buffer.clear();
   }
 
+  void setDefaultFont(const std::string &name) {
+    defaultFont = copyString(name);
+    reloadFonts();
+  }
+
   void reloadFonts() {
     ass_set_fonts(ass_renderer, NULL, m_defaultFont, ASS_FONTPROVIDER_NONE, NULL, 1);
   }
 
   void addFont(const std::string &name, int data, unsigned long data_size) {
     ass_add_font(ass_library, name.c_str(), (char *)data, (size_t)data_size);
+    free((char *)data);
   }
 
   void setMargin(int top, int bottom, int left, int right) {
@@ -849,6 +850,7 @@ EMSCRIPTEN_BINDINGS(JASSUB) {
     .function("getStyle", &JASSUB::getStyle, emscripten::allow_raw_pointers())
     .function("styleOverride", &JASSUB::styleOverride, emscripten::allow_raw_pointers())
     .function("disableStyleOverride", &JASSUB::disableStyleOverride)
+    .function("setDefaultFont", &JASSUB::setDefaultFont)
     .property("trackColorSpace", &JASSUB::trackColorSpace)
     .property("changed", &JASSUB::changed)
     .property("count", &JASSUB::count)

@@ -107,13 +107,16 @@ export default class JASSUB {
   removeStyle (index: number): void;
   getStyles (callback: ASS_StyleCallback): void;
   styleOverride (style: ASS_Style): void;
-  disableStyleOverride();
+  disableStyleOverride(): void;
+  setDefaultFont(font: string): void;
 
   addFont (font: string | Uint8Array): void;
 
   sendMessage (target: string, data?: Record<string, unknown>, transferable?: Transferable[]): void;
   destroy (err?: string): void;
 
+  static _hasAlphaBug: boolean;
+  static _hasBitmapBug: boolean;
   _ctx: CanvasRenderingContext2D;
   _canvas: HTMLCanvasElement;
 }

@@ -575,6 +575,13 @@ export default class JASSUB extends EventTarget {
   addFont (font) {
     this.sendMessage('addFont', { font })
   }
+  /**
+   * Changes the font family of the default font, this font needs to be previously added via addFont or fonts array on construction.
+   * @param  {String} font Font family to change to.
+   */
+  setDefaultFont(font) {
+    this.sendMessage('defaultFont', { font })
+  }
 
   _sendLocalFont (name) {
     try {

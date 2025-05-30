@@ -401,6 +401,13 @@ class o extends EventTarget {
   addFont(e) {
     this.sendMessage("addFont", { font: e });
   }
+  /**
+   * Changes the font family of the default font, this font needs to be previously added via addFont or fonts array on construction.
+   * @param  {String} font Font family to change to.
+   */
+  setDefaultFont(e) {
+    this.sendMessage("defaultFont", { font: e });
+  }
   _sendLocalFont(e) {
     try {
       queryLocalFonts().then((t) => {

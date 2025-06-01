@@ -450,7 +450,7 @@ public:
   }
 
   void reloadFonts() {
-    ass_set_fonts(ass_renderer, NULL, m_defaultFont, ASS_FONTPROVIDER_NONE, NULL, 1);
+    ass_set_fonts(ass_renderer, NULL, defaultFont, ASS_FONTPROVIDER_NONE, NULL, 1);
   }
 
   void addFont(const std::string &name, int data, unsigned long data_size) {

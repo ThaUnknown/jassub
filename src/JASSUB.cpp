@@ -256,6 +256,12 @@ static bool _is_event_animated(ASS_Event *event, bool drop_animations) {
   return false;
 }
 
+static char *copyString(const std::string &str) {
+  char *result = new char[str.length() + 1];
+  strcpy(result, str.data());
+  return result;
+}
+
 class JASSUB {
 private:
   ReusableBuffer m_buffer;
@@ -708,12 +714,6 @@ public:
     ass_set_font_scale(ass_renderer, 1);
   }
 };
-
-static char *copyString(const std::string &str) {
-  char *result = new char[str.length() + 1];
-  strcpy(result, str.data());
-  return result;
-}
 
 static uint32_t getDuration(const ASS_Event &evt) {
   return (uint32_t)evt.Duration;

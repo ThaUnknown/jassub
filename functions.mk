@@ -35,10 +35,11 @@ endif
 
 # @arg1: path to source directory; defaults to current working directory
 define CONFIGURE_AUTO
+	CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
+	CC=emcc CXX=em++ \
 	emconfigure $(or $(1),.)/configure \
 		--prefix="$(DIST_DIR)" \
-		--host=x86-none-linux \
-		--build=x86_64 \
+		--host=wasm32-unknown-emscripten \
 		--enable-static \
 		--disable-shared \
 		--disable-debug \

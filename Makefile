@@ -158,7 +158,8 @@ $(DIST_DIR)/lib/libass.a: $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/libfribi
 	cd build/lib/libass && \
 	$(call CONFIGURE_AUTO,../../../lib/libass) \
 		--enable-large-tiles \
-		--enable-fontconfig \
+		--disable-fontconfig \
+		--disable-require-system-font-provider \
 	&& \
 	$(JSO_MAKE) install
 

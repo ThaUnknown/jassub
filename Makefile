@@ -221,7 +221,7 @@ dist/js/$(WORKER_NAME).js: src/JASSUB.cpp src/worker.js src/pre-worker.js
 		--pre-js src/pre-worker.js \
 		-s ENVIRONMENT=worker \
 		-s EXIT_RUNTIME=0 \
-		-s WASM_BIGINT=1 \
+		-s WASM_BIGINT=0 \
 		-s ALLOW_MEMORY_GROWTH=1 \
 		-s MODULARIZE=1 \
 		-s EXPORT_ES6=1 \

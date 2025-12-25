@@ -2,7 +2,17 @@
 
 # make - Build Dependencies and the JASSUB.js
 BASE_DIR:=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))
-DIST_DIR:=$(BASE_DIR)dist/libraries
+
+# The MODERN build enables SIMD flags which affect all compiled artifacts.
+# Keep caches separate so legacy and modern builds can coexist.
+ifeq (${MODERN},1)
+	BUILD_VARIANT := modern
+else
+	BUILD_VARIANT := legacy
+endif
+
+BUILD_LIB_DIR := $(BASE_DIR)build/lib/$(BUILD_VARIANT)
+DIST_DIR := $(BASE_DIR)dist/libraries/$(BUILD_VARIANT)
 
 export CFLAGS = -O3 -flto -fno-rtti -fno-exceptions -s USE_PTHREADS=0
 export CXXFLAGS = $(CFLAGS)
@@ -47,12 +57,12 @@ jassub: dist
 include functions.mk
 
 # FriBidi
-build/lib/fribidi/configure: lib/fribidi $(wildcard $(BASE_DIR)build/patches/fribidi/*.patch)
+$(BUILD_LIB_DIR)/fribidi/configure: lib/fribidi $(wildcard $(BASE_DIR)build/patches/fribidi/*.patch)
 	$(call PREPARE_SRC_PATCHED,fribidi)
-	cd build/lib/fribidi && $(RECONF_AUTO)
+	cd $(BUILD_LIB_DIR)/fribidi && $(RECONF_AUTO)
 
-$(DIST_DIR)/lib/libfribidi.a: build/lib/fribidi/configure
-	cd build/lib/fribidi && \
+$(DIST_DIR)/lib/libfribidi.a: $(BUILD_LIB_DIR)/fribidi/configure
+	cd $(BUILD_LIB_DIR)/fribidi && \
 	$(call CONFIGURE_AUTO) --disable-debug && \
 	$(JSO_MAKE) -C lib/ fribidi-unicode-version.h && \
 	$(JSO_MAKE) -C lib/ install && \
@@ -76,13 +86,13 @@ $(DIST_DIR)/lib/libfribidi.a: build/lib/fribidi/configure
 # 	$(JSO_MAKE) install
 
 # Brotli
-build/lib/brotli/configured: lib/brotli $(wildcard $(BASE_DIR)build/patches/brotli/*.patch)
+$(BUILD_LIB_DIR)/brotli/configured: lib/brotli $(wildcard $(BASE_DIR)build/patches/brotli/*.patch)
 	$(call PREPARE_SRC_PATCHED,brotli)
-	touch build/lib/brotli/configured
+	touch $(BUILD_LIB_DIR)/brotli/configured
 
 $(DIST_DIR)/lib/libbrotlidec.a: $(DIST_DIR)/lib/libbrotlicommon.a
-$(DIST_DIR)/lib/libbrotlicommon.a: build/lib/brotli/configured
-	cd build/lib/brotli && \
+$(DIST_DIR)/lib/libbrotlicommon.a: $(BUILD_LIB_DIR)/brotli/configured
+	cd $(BUILD_LIB_DIR)/brotli && \
 	$(call CONFIGURE_CMAKE) && \
 	$(JSO_MAKE) install
 	# Normalise static lib names
@@ -91,12 +101,12 @@ $(DIST_DIR)/lib/libbrotlicommon.a: build/lib/brotli/configured
 
 
 # Freetype without Harfbuzz
-build/lib/freetype/configure: lib/freetype $(wildcard $(BASE_DIR)build/patches/freetype/*.patch)
+$(BUILD_LIB_DIR)/freetype/configure: lib/freetype $(wildcard $(BASE_DIR)build/patches/freetype/*.patch)
 	$(call PREPARE_SRC_PATCHED,freetype)
-	cd build/lib/freetype && $(RECONF_AUTO)
+	cd $(BUILD_LIB_DIR)/freetype && $(RECONF_AUTO)
 
-build/lib/freetype/build_hb/dist_hb/lib/libfreetype.a: $(DIST_DIR)/lib/libbrotlidec.a build/lib/freetype/configure
-	cd build/lib/freetype && \
+$(BUILD_LIB_DIR)/freetype/build_hb/dist_hb/lib/libfreetype.a: $(DIST_DIR)/lib/libbrotlidec.a $(BUILD_LIB_DIR)/freetype/configure
+	cd $(BUILD_LIB_DIR)/freetype && \
 		mkdir -p build_hb && \
 		cd build_hb && \
 		$(call CONFIGURE_AUTO,..) \
@@ -107,13 +117,13 @@ build/lib/freetype/build_hb/dist_hb/lib/libfreetype.a: $(DIST_DIR)/lib/libbrotli
 		$(JSO_MAKE) install
 
 # Harfbuzz
-build/lib/harfbuzz/configure: lib/harfbuzz $(wildcard $(BASE_DIR)build/patches/harfbuzz/*.patch)
+$(BUILD_LIB_DIR)/harfbuzz/configure: lib/harfbuzz $(wildcard $(BASE_DIR)build/patches/harfbuzz/*.patch)
 	$(call PREPARE_SRC_PATCHED,harfbuzz)
-	cd build/lib/harfbuzz && $(RECONF_AUTO)
+	cd $(BUILD_LIB_DIR)/harfbuzz && $(RECONF_AUTO)
 
-$(DIST_DIR)/lib/libharfbuzz.a: build/lib/freetype/build_hb/dist_hb/lib/libfreetype.a build/lib/harfbuzz/configure
-	cd build/lib/harfbuzz && \
-	EM_PKG_CONFIG_PATH=$(PKG_CONFIG_PATH):$(BASE_DIR)build/lib/freetype/build_hb/dist_hb/lib/pkgconfig \
+$(DIST_DIR)/lib/libharfbuzz.a: $(BUILD_LIB_DIR)/freetype/build_hb/dist_hb/lib/libfreetype.a $(BUILD_LIB_DIR)/harfbuzz/configure
+	cd $(BUILD_LIB_DIR)/harfbuzz && \
+	EM_PKG_CONFIG_PATH=$(PKG_CONFIG_PATH):$(BUILD_LIB_DIR)/freetype/build_hb/dist_hb/lib/pkgconfig \
 	CFLAGS="-DHB_NO_MT $(CFLAGS)" \
 	CXXFLAGS="-DHB_NO_MT $(CFLAGS)" \
 	$(call CONFIGURE_AUTO) \
@@ -124,8 +134,8 @@ $(DIST_DIR)/lib/libharfbuzz.a: build/lib/freetype/build_hb/dist_hb/lib/libfreety
 
 # Freetype with Harfbuzz
 $(DIST_DIR)/lib/libfreetype.a: $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/libbrotlidec.a
-	cd build/lib/freetype && \
-	EM_PKG_CONFIG_PATH=$(PKG_CONFIG_PATH):$(BASE_DIR)build/lib/freetype/build_hb/dist_hb/lib/pkgconfig \
+	cd $(BUILD_LIB_DIR)/freetype && \
+	EM_PKG_CONFIG_PATH=$(PKG_CONFIG_PATH):$(BUILD_LIB_DIR)/freetype/build_hb/dist_hb/lib/pkgconfig \
 	$(call CONFIGURE_AUTO) \
 		--with-brotli=yes \
 		--with-harfbuzz \
@@ -149,14 +159,14 @@ $(DIST_DIR)/lib/libfreetype.a: $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/lib
 
 
 # libass
-build/lib/libass/configured: lib/libass
+$(BUILD_LIB_DIR)/libass/configured: lib/libass
 	cd lib/libass && $(RECONF_AUTO)
 	$(call PREPARE_SRC_VPATH,libass)
-	touch build/lib/libass/configured
+	touch $(BUILD_LIB_DIR)/libass/configured
 
-$(DIST_DIR)/lib/libass.a: $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/libfribidi.a $(DIST_DIR)/lib/libfreetype.a $(DIST_DIR)/lib/libbrotlidec.a build/lib/libass/configured
-	cd build/lib/libass && \
-	$(call CONFIGURE_AUTO,../../../lib/libass) \
+$(DIST_DIR)/lib/libass.a: $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/libfribidi.a $(DIST_DIR)/lib/libfreetype.a $(DIST_DIR)/lib/libbrotlidec.a $(BUILD_LIB_DIR)/libass/configured
+	cd $(BUILD_LIB_DIR)/libass && \
+	$(call CONFIGURE_AUTO,$(BASE_DIR)lib/libass) \
 		--enable-large-tiles \
 		--disable-fontconfig \
 		--disable-require-system-font-provider \

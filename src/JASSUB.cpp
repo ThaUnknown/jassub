@@ -6,7 +6,6 @@
 #include <string.h>
 #include <string>
 
-#include <emscripten.h>
 #include <emscripten/bind.h>
 
 int log_level = 3;
@@ -285,7 +284,6 @@ public:
   int trackColorSpace;
   int changed = 0;
   int count = 0;
-  int time = 0;
   JASSUB(int canvas_w, int canvas_h, const std::string &df, bool debug) {
     status = 0;
     ass_library = NULL;
@@ -432,13 +430,10 @@ public:
   }
 
   RenderResult *renderImage(double tm, int force) {
-    time = 0;
     count = 0;
 
     ASS_Image *imgs = ass_render_frame(ass_renderer, track, (int)(tm * 1000), &changed);
     if (imgs == NULL || (changed == 0 && !force)) return NULL;
-
-    if (debug) time = emscripten_get_now();
 
     return processImages(imgs);
   }
@@ -502,7 +497,6 @@ public:
   }
 
   RenderResult *renderBlend(double tm, int force) {
-    time = 0;
     count = 0;
 
     ASS_Image *img = ass_render_frame(ass_renderer, track, (int)(tm * 1000), &changed);
@@ -510,7 +504,6 @@ public:
       return NULL;
     }
 
-    if (debug) time = emscripten_get_now();
     for (int i = 0; i < MAX_BLEND_STORAGES; i++) {
       m_blendParts[i].taken = false;
     }
@@ -853,6 +846,5 @@ EMSCRIPTEN_BINDINGS(JASSUB) {
     .function("setDefaultFont", &JASSUB::setDefaultFont)
     .property("trackColorSpace", &JASSUB::trackColorSpace)
     .property("changed", &JASSUB::changed)
-    .property("count", &JASSUB::count)
-    .property("time", &JASSUB::time);
+    .property("count", &JASSUB::count);
 }

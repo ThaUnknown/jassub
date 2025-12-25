@@ -1,4 +1,4 @@
-FROM docker.io/emscripten/emsdk:3.1.40
+FROM docker.io/emscripten/emsdk:4.0.22
 
 RUN apt-get update && \
     apt-get install curl -y --no-install-recommends && \

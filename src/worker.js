@@ -311,12 +311,10 @@ const render = (time, force) => {
   const renderResult = blendMode === 'wasm' ? jassubObj.renderBlend(time, force || 0) : jassubObj.renderImage(time, force || 0)
   if (debug) {
     const decodeEndTime = performance.now()
-    const renderEndTime = jassubObj.time
-    times.WASMRenderTime = renderEndTime - renderStartTime
-    times.WASMBitmapDecodeTime = decodeEndTime - renderEndTime
+    times.WASMRenderTime = decodeEndTime - renderStartTime
     // performance.now is relative to the creation of the scope, since this time MIGHT be used to calculate a time difference
     // on the main thread, we need absolute time, not relative
-    times.JSRenderTime = Date.now()
+    times.JSRenderTime = performance.now()
   }
   if (jassubObj.changed !== 0 || force) {
     const images = []
@@ -336,7 +334,7 @@ const render = (time, force) => {
         for (let i = 0; i < images.length; i++) {
           images[i].image = bitmaps[i]
         }
-        if (debug) times.JSBitmapGenerationTime = Date.now() - times.JSRenderTime
+        if (debug) times.JSRenderTime = performance.now() - times.JSRenderTime
         paintImages({ images, buffers: bitmaps, times })
       })
     } else {
@@ -414,7 +412,6 @@ const paintImages = ({ times, images, buffers }) => {
       }
     } else {
       if (debug) {
-        times.JSRenderTime = Date.now() - times.JSRenderTime - (times.JSBitmapGenerationTime || 0)
         let total = 0
         for (const key in times) total += times[key]
         console.log('Bitmaps: ' + images.length + ' Total: ' + (total | 0) + 'ms', times)

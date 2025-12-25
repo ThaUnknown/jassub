@@ -45,7 +45,7 @@ ifeq (${MODERN},1)
 else
 	WORKER_NAME = jassub-worker
 	WORKER_ARGS = \
-		-s WASM=2 
+		-s WASM=2
 
 endif
 
@@ -192,9 +192,9 @@ PERFORMANCE_ARGS = \
 		-s BINARYEN_EXTRA_PASSES=--one-caller-inline-max-function-size=19306 \
 		-s INVOKE_RUN=0 \
 		-s DISABLE_EXCEPTION_CATCHING=1 \
-		-s TEXTDECODER=1 \
+		-s TEXTDECODER=2 \
+		-s INITIAL_MEMORY=60MB \
 		-s MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION=1 \
-		--no-heap-copy \
 		-flto \
 		-fno-exceptions \
 		-O3
@@ -216,10 +216,7 @@ COMPAT_ARGS = \
 		-s EXPORT_KEEPALIVE=1 \
 		-s EXPORTED_RUNTIME_METHODS="['getTempRet0', 'setTempRet0']" \
 		-s IMPORTED_MEMORY=1 \
-		-s MIN_CHROME_VERSION=27 \
-		-s MIN_SAFARI_VERSION=60005 \
-		-mbulk-memory \
-		--memory-init-file 0 
+		-mbulk-memory
 
 dist/js/$(WORKER_NAME).js: src/JASSUB.cpp src/worker.js src/pre-worker.js
 	mkdir -p dist/js

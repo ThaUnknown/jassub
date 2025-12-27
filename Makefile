@@ -186,14 +186,14 @@ COMPAT_ARGS = \
 		-s IMPORTED_MEMORY=1 \
 		-mbulk-memory
 
-src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/pre-worker.js
+src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js
 	mkdir -p src/wasm
 	emcc src/JASSUB.cpp $(LIBASS_DEPS) \
 		$(WORKER_ARGS) \
 		$(PERFORMANCE_ARGS) \
 		$(SIZE_ARGS) \
 		$(COMPAT_ARGS) \
-		--pre-js src/pre-worker.js \
+		--pre-js src/worker/pre-worker.js \
 		--emit-tsd='types.d.ts' \
 		-s ENVIRONMENT=worker \
 		-s EXIT_RUNTIME=0 \

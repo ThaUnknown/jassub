@@ -12,7 +12,6 @@ import type { ASS_Event, ASS_Image, ASS_Style, JASSUB, MainModule } from '../was
 declare const self: DedicatedWorkerGlobalScope &
   typeof globalThis & {
     HEAPU8RAW: Uint8Array<ArrayBuffer>
-    wasmMemory: WebAssembly.Memory
   }
 
 interface opts {
@@ -36,7 +35,6 @@ export class ASSRenderer {
   _subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC' | null
   _videoColorSpace?: 'BT709' | 'BT601'
   _malloc!: (size: number) => number
-  _lastCurrentTime = 0
   _gpurender = new WebGPURenderer()
 
   debug = false
@@ -228,13 +226,10 @@ export class ASSRenderer {
     }
   }
 
-  _canvas ({ width, height, videoWidth, videoHeight, force }: { width: number, height: number, videoWidth: number, videoHeight: number, force: boolean }) {
-    if (width == null) throw new Error('Invalid canvas size specified')
-    if (this._offCanvas) {
-      this._gpurender.setCanvas(this._offCanvas, width, height)
-    }
-    if (this._wasm) this._wasm.resizeCanvas(width, height, videoWidth, videoHeight)
-    if (force) this._draw(this._lastCurrentTime, true)
+  _canvas (width: number, height: number, videoWidth: number, videoHeight: number) {
+    if (this._offCanvas) this._gpurender.setCanvas(this._offCanvas, width, height)
+
+    this._wasm.resizeCanvas(width, height, videoWidth, videoHeight)
   }
 
   [finalizer] () {
@@ -247,9 +242,8 @@ export class ASSRenderer {
     this._availableFonts = {}
   }
 
-  async _draw (time: number, force = false) {
+  _draw (time: number, force = false) {
     if (!this._offCanvas) return
-    this._lastCurrentTime = time
 
     const result: ASS_Image = this._wasm.rawRender(time, Number(force))!
     if (this._wasm.changed === 0 && !force) return

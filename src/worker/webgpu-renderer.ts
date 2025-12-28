@@ -308,20 +308,19 @@ export class WebGPURenderer {
     canvas.width = width
     canvas.height = height
 
-    // Unconfigure old context if switching canvases
-    this.context?.unconfigure()
-
-    // Get canvas context
-    this.context = canvas.getContext('webgpu')
     if (!this.context) {
-      throw new Error('Could not get WebGPU context')
-    }
+    // Get canvas context
+      this.context = canvas.getContext('webgpu')
+      if (!this.context) {
+        throw new Error('Could not get WebGPU context')
+      }
 
-    this.context.configure({
-      device: this.device,
-      format: this.format,
-      alphaMode: 'premultiplied'
-    })
+      this.context.configure({
+        device: this.device,
+        format: this.format,
+        alphaMode: 'premultiplied'
+      })
+    }
 
     // Update uniform buffer with resolution
     this.device.queue.writeBuffer(

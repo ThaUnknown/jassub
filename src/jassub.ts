@@ -54,10 +54,11 @@ export default class JASSUB {
   _videoColorSpace: string | null = null
   _canvas
   _canvasParent
-  _boundUpdateColorSpace: () => void
-  _ro: ResizeObserver | null = null
+  _ctrl = new AbortController()
+  _ro = new ResizeObserver(() => this.resize())
   _destroyed = false
-  _lastDemandTime: { mediaTime: number, width: number, height: number } | null = null
+  _lastDemandTime!: VideoFrameCallbackMetadata
+  _skipped = false
   _worker
   constructor (opts: JASSUBOptions) {
     if (!globalThis.Worker) throw new Error('Worker not supported')
@@ -89,8 +90,6 @@ export default class JASSUB {
     this.prescaleFactor = opts.prescaleFactor ?? 1.0
     this.prescaleHeightLimit = opts.prescaleHeightLimit ?? 1080
     this.maxRenderHeight = opts.maxRenderHeight ?? 0 // 0 - no limit.
-
-    this._boundUpdateColorSpace = this._updateColorSpace.bind(this)
 
     this._worker = new Worker(opts.workerUrl ?? new URL('./worker/worker.ts', import.meta.url), { name: 'jassub-worker', type: 'module' })
 
@@ -138,7 +137,7 @@ export default class JASSUB {
     if (!(module instanceof WebAssembly.Module) || !(new WebAssembly.Instance(module) instanceof WebAssembly.Instance)) throw new Error('WASM not supported')
   }
 
-  async resize (width = 0, height = 0, top = 0, left = 0, force = !!this._video?.paused) {
+  async resize (force = !!this._video?.paused, width = 0, height = 0, top = 0, left = 0) {
     await this.ready
     if ((!width || !height) && this._video) {
       const videoSize = this._getVideoPosition()
@@ -164,23 +163,14 @@ export default class JASSUB {
     this._canvas.style.top = top + 'px'
     this._canvas.style.left = left + 'px'
 
-    force = force && !this.busy
-    if (force) this.busy = true
-
-    await this.renderer._canvas({
+    await this.renderer._canvas(
       width,
       height,
-      videoWidth: (this._videoWidth || this._video?.videoWidth) ?? width,
-      videoHeight: (this._videoHeight || this._video?.videoHeight) ?? height,
-      force
-    })
-    if (force) {
-      if (this._lastDemandTime) {
-        this._demandRender(this._lastDemandTime)
-      } else {
-        this.busy = false
-      }
-    }
+      (this._videoWidth || this._video?.videoWidth) ?? width,
+      (this._videoHeight || this._video?.videoHeight) ?? height
+    )
+
+    if (force && this._lastDemandTime) this._demandRender()
   }
 
   _getVideoPosition (width = this._video!.videoWidth, height = this._video!.videoHeight) {
@@ -231,18 +221,14 @@ export default class JASSUB {
     if (video instanceof HTMLVideoElement) {
       this._removeListeners()
       this._video = video
-      this._video.requestVideoFrameCallback((now, data) => this._handleRVFC(now, data))
+      this._video.requestVideoFrameCallback((now, data) => this._handleRVFC(data))
       // everything else is unreliable for this, loadedmetadata and loadeddata included.
       if ('VideoFrame' in globalThis) {
-        video.addEventListener('loadedmetadata', this._boundUpdateColorSpace, false)
+        video.addEventListener('loadedmetadata', () => this._updateColorSpace(), { signal: this._ctrl.signal })
         if (video.readyState > 2) this._updateColorSpace()
       }
       if (video.videoWidth > 0) this.resize()
-      // Support Element Resize Observer
-      if (typeof ResizeObserver !== 'undefined') {
-        this._ro ??= new ResizeObserver(() => this.resize())
-        this._ro.observe(video)
-      }
+      this._ro.observe(video)
     } else {
       throw new Error('Video element invalid!')
     }
@@ -281,30 +267,35 @@ export default class JASSUB {
     }
   }
 
-  _handleRVFC (now: number, { mediaTime, width, height }: { mediaTime: number, width: number, height: number }) {
-    if (this._destroyed) return null
-    if (this.busy) {
-      this._lastDemandTime = { mediaTime, width, height }
-    } else {
-      this._demandRender({ mediaTime, width, height })
-    }
-    this._video!.requestVideoFrameCallback((now, data) => this._handleRVFC(now, data))
+  _handleRVFC (data: VideoFrameCallbackMetadata) {
+    if (this._destroyed) return
+
+    this._lastDemandTime = data
+    this._demandRender()
+
+    this._video!.requestVideoFrameCallback((now, data) => this._handleRVFC(data))
   }
 
-  async _demandRender ({ mediaTime, width, height }: { mediaTime: number, width: number, height: number }) {
-    this._lastDemandTime = null
+  async _demandRender () {
+    const { mediaTime, width, height } = this._lastDemandTime
     if (width !== this._videoWidth || height !== this._videoHeight) {
       this._videoWidth = width
       this._videoHeight = height
-      this.resize()
+      this.resize(false)
     }
+
+    if (this.busy) {
+      this._skipped = true
+      return
+    }
+
     this.busy = true
+    this._skipped = false
+
     await this.renderer._draw(mediaTime + this.timeOffset)
-    if (this._lastDemandTime) {
-      this._demandRender(this._lastDemandTime)
-    } else {
-      this.busy = false
-    }
+
+    this.busy = false
+    if (this._skipped) this._demandRender()
   }
 
   async _updateColorSpace () {
@@ -324,11 +315,13 @@ export default class JASSUB {
   _removeListeners () {
     if (this._video) {
       if (this._ro) this._ro.unobserve(this._video)
-      this._video.removeEventListener('loadedmetadata', this._boundUpdateColorSpace)
+      this._ctrl.abort()
+      this._ctrl = new AbortController()
     }
   }
 
   async destroy () {
+    if (this._destroyed) return
     this._destroyed = true
     if (this._video && this._canvasParent) this._video.parentNode?.removeChild(this._canvasParent)
     this._removeListeners()

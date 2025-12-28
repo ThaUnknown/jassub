@@ -91,7 +91,9 @@ export default class JASSUB {
     this.prescaleHeightLimit = opts.prescaleHeightLimit ?? 1080
     this.maxRenderHeight = opts.maxRenderHeight ?? 0 // 0 - no limit.
 
-    this._worker = new Worker(opts.workerUrl ?? new URL('./worker/worker.js', import.meta.url), { name: 'jassub-worker', type: 'module' })
+    // yes this is awful, but bundlers check for new Worker(new URL()) patterns, so can't use new Worker(workerUrl ?? new URL(...)) ... bruh
+    const workerOpts = { name: 'jassub-worker', type: 'module' } as const
+    this._worker = opts.workerUrl ? new Worker(opts.workerUrl, workerOpts) : new Worker(new URL('./worker/worker.js', import.meta.url), workerOpts)
 
     const Renderer = wrap<typeof ASSRenderer>(this._worker)
 

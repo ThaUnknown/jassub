@@ -162,6 +162,8 @@ PERFORMANCE_ARGS = \
 		-s DISABLE_EXCEPTION_CATCHING=1 \
 		-s TEXTDECODER=2 \
 		-s INITIAL_MEMORY=60MB \
+		-s MALLOC=mimalloc \
+		-s WASM_BIGINT=1 \
 		-s MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION=1 \
 		-flto \
 		-fno-exceptions \
@@ -197,7 +199,6 @@ src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js
 		--emit-tsd='types.d.ts' \
 		-s ENVIRONMENT=worker \
 		-s EXIT_RUNTIME=0 \
-		-s WASM_BIGINT=1 \
 		-s ALLOW_MEMORY_GROWTH=1 \
 		-s GROWABLE_ARRAYBUFFERS=0 \
 		-s MODULARIZE=1 \

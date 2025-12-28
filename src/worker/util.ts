@@ -1,5 +1,4 @@
-/* eslint-disable camelcase */
-import type { ASS_Event, ASS_Style } from '../wasm/types'
+import type { ASSEvent, ASSStyle } from '../jassub'
 
 export const read_ = (url: string, ab = false) => {
   const xhr = new XMLHttpRequest()
@@ -29,7 +28,7 @@ const d = 'FCC'
 
 export const libassYCbCrMap = [null, a, null, a, a, b, b, c, c, d, d] as const
 
-export function _applyKeys<T extends (ASS_Event | ASS_Style)> (input: T, output: T) {
+export function _applyKeys<T extends (ASSEvent | ASSStyle)> (input: T, output: T) {
   for (const v of Object.keys(input) as Array<keyof T>) {
     output[v] = input[v]
   }

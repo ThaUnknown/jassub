@@ -1,9 +1,12 @@
 // @ts-nocheck
-// hacky patches/fixes for emscripten
+// very cursed patches/fixes for emscripten
 
+// must be loaded before the emscripten module... minimalRuntime causes this....
 var asm = null
 var _scriptName
 
+// emscripten doesn't support conditional memory growth out of the box
+// so we hack around it by checking for WebAssembly.Memory.prototype.toResizableBuffer
 const supportsGrowth = !!WebAssembly.Memory.prototype.toResizableBuffer
 
 updateMemoryViews = () => {
@@ -20,4 +23,25 @@ updateMemoryViews = () => {
   HEAPF64 = new Float64Array(b)
   HEAP64 = new BigInt64Array(b)
   HEAPU64 = new BigUint64Array(b)
+}
+
+// emscripten doesnt support conditional loading of wasm modules out of the box
+// so we hack around it by passing the url and simd support via the worker name
+// hopefully not bad?
+if (self.name.startsWith('em-pthread')) {
+  const isModern = self.name.startsWith('em-pthread-modern')
+  const url = self.name.split('-').slice(3).join('-')
+
+  const _fetch = globalThis.fetch
+  globalThis.fetch = _ => _fetch(url)
+} else {
+  const OriginalWorker = globalThis.Worker
+  globalThis.Worker = class extends OriginalWorker {
+    constructor(scriptURL, options = {}) {
+      super(scriptURL, {
+        ...options,
+        name: `em-pthread-${moduleArg.__supportsSIMD ? 'modern' : 'legacy'}-${moduleArg.__url}`
+      })
+    }
+  }
 }

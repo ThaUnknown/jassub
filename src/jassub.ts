@@ -1,8 +1,10 @@
+/* eslint-disable camelcase */
 import 'rvfc-polyfill'
 
 import { proxy, releaseProxy } from 'abslink'
 import { wrap } from 'abslink/w3c'
 
+import type { ASS_Event, ASS_Image, ASS_Style, ClassHandle } from './wasm/types'
 import type { ASSRenderer } from './worker/worker'
 import type { Remote } from 'abslink'
 
@@ -13,6 +15,10 @@ const webYCbCrMap = {
   bt470bg: 'BT601', // alias BT.601 PAL... whats the difference?
   smpte170m: 'BT601'// alias BT.601 NTSC... whats the difference?
 } as const
+
+export type ASSEvent = Omit<ASS_Event, keyof ClassHandle>
+export type ASSStyle = Omit<ASS_Style, keyof ClassHandle>
+export type ASSImage = Omit<ASS_Image, keyof ClassHandle>
 
 export type JASSUBOptions = {
   timeOffset?: number
@@ -104,6 +110,7 @@ export default class JASSUB {
     this.ready = (async () => {
       this.renderer = await new Renderer({
         wasmUrl: JASSUB._supportsSIMD ? modern : fallback,
+        supportsSIMD: JASSUB._supportsSIMD ?? false,
         width: ctrl.width,
         height: ctrl.height,
         subUrl: opts.subUrl,

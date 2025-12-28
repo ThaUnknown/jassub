@@ -4,7 +4,27 @@ declare namespace RuntimeExports {
     function setTempRet0(val: any): any;
 }
 interface WasmModule {
+  __ZdlPvm(_0: number, _1: number): void;
   _malloc(_0: number): number;
+  _calloc(_0: number, _1: number): number;
+  _emscripten_builtin_free(_0: number): void;
+  ___libc_free(_0: number): void;
+  _emscripten_builtin_malloc(_0: number): number;
+  ___libc_malloc(_0: number): number;
+  __ZdaPv(_0: number): void;
+  __ZdaPvm(_0: number, _1: number): void;
+  __ZdlPv(_0: number): void;
+  __Znaj(_0: number): number;
+  __ZnajSt11align_val_t(_0: number, _1: number): number;
+  __Znwj(_0: number): number;
+  __ZnwjSt11align_val_t(_0: number, _1: number): number;
+  ___libc_calloc(_0: number, _1: number): number;
+  ___libc_realloc(_0: number, _1: number): number;
+  _emscripten_builtin_calloc(_0: number, _1: number): number;
+  _emscripten_builtin_realloc(_0: number, _1: number): number;
+  _malloc_size(_0: number): number;
+  _malloc_usable_size(_0: number): number;
+  _reallocf(_0: number, _1: number): number;
 }
 
 type EmbindString = ArrayBuffer|Uint8Array|Uint8ClampedArray|Int8Array|string;

@@ -7,7 +7,8 @@ import WASM from '../wasm/jassub-worker.js'
 import { libassYCbCrMap, read_, readAsync, _applyKeys } from './util'
 import { colorMatrixConversionMap, WebGPURenderer } from './webgpu-renderer'
 
-import type { ASS_Event, ASS_Image, ASS_Style, JASSUB, MainModule } from '../wasm/types.js'
+import type { ASSEvent, ASSImage, ASSStyle } from '../jassub'
+import type { JASSUB, MainModule } from '../wasm/types.js'
 
 declare const self: DedicatedWorkerGlobalScope &
   typeof globalThis & {
@@ -27,6 +28,7 @@ interface opts {
   libassMemoryLimit: number
   libassGlyphLimit: number
   useLocalFonts: boolean
+  supportsSIMD: boolean
 }
 
 export class ASSRenderer {
@@ -66,7 +68,7 @@ export class ASSRenderer {
     }
     addEventListener('message', handleMessage)
 
-    this._ready = (WASM() as Promise<MainModule>).then(Module => {
+    this._ready = (WASM({ __supportsSIMD: data.supportsSIMD, __url: data.wasmUrl }) as Promise<MainModule>).then(Module => {
       // eslint-disable-next-line @typescript-eslint/unbound-method
       this._malloc = Module._malloc
 
@@ -100,12 +102,12 @@ export class ASSRenderer {
     this._asyncWrite(fontOrURL)
   }
 
-  createEvent (event: ASS_Event) {
+  createEvent (event: ASSEvent) {
     _applyKeys(event, this._wasm.getEvent(this._wasm.allocEvent())!)
   }
 
   getEvents () {
-    const events: Array<Partial<ASS_Event>> = []
+    const events: Array<Partial<ASSEvent>> = []
     for (let i = 0; i < this._wasm.getEventCount(); i++) {
       const { Start, Duration, ReadOrder, Layer, Style, MarginL, MarginR, MarginV, Name, Text, Effect } = this._wasm.getEvent(i)!
       events.push({ Start, Duration, ReadOrder, Layer, Style, MarginL, MarginR, MarginV, Name, Text, Effect })
@@ -113,7 +115,7 @@ export class ASSRenderer {
     return events
   }
 
-  setEvent (event: ASS_Event, index: number) {
+  setEvent (event: ASSEvent, index: number) {
     _applyKeys(event, this._wasm.getEvent(index)!)
   }
 
@@ -121,14 +123,14 @@ export class ASSRenderer {
     this._wasm.removeEvent(index)
   }
 
-  createStyle (style: ASS_Style) {
+  createStyle (style: ASSStyle) {
     const alloc = this._wasm.getStyle(this._wasm.allocStyle())!
     _applyKeys(style, alloc)
     return alloc
   }
 
   getStyles () {
-    const styles: Array<Partial<ASS_Style>> = []
+    const styles: ASSStyle[] = []
     for (let i = 0; i < this._wasm.getStyleCount(); i++) {
     // eslint-disable-next-line @typescript-eslint/naming-convention
       const { Name, FontName, FontSize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding, treat_fontname_as_pattern, Blur, Justify } = this._wasm.getStyle(i)!
@@ -138,7 +140,7 @@ export class ASSRenderer {
     return styles
   }
 
-  setStyle (style: ASS_Style, index: number) {
+  setStyle (style: ASSStyle, index: number) {
     _applyKeys(style, this._wasm.getStyle(index)!)
   }
 
@@ -146,7 +148,7 @@ export class ASSRenderer {
     this._wasm.removeStyle(index)
   }
 
-  styleOverride (style: ASS_Style) {
+  styleOverride (style: ASSStyle) {
     this._wasm.styleOverride(this.createStyle(style))
   }
 
@@ -216,7 +218,7 @@ export class ASSRenderer {
     if (!this._availableFonts) return
 
     for (const { FontName } of this.getStyles()) {
-      this._findAvailableFonts(FontName!)
+      this._findAvailableFonts(FontName)
     }
 
     const regex = /\\fn([^\\}]*?)[\\}]/g
@@ -245,10 +247,10 @@ export class ASSRenderer {
   _draw (time: number, force = false) {
     if (!this._offCanvas) return
 
-    const result: ASS_Image = this._wasm.rawRender(time, Number(force))!
+    const result: ASSImage = this._wasm.rawRender(time, Number(force))!
     if (this._wasm.changed === 0 && !force) return
 
-    const bitmaps: ASS_Image[] = []
+    const bitmaps: ASSImage[] = []
 
     for (let image = result, i = 0; i < this._wasm.count; image = image.next!, ++i) {
       // @ts-expect-error internal emsc types

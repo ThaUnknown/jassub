@@ -1,5 +1,4 @@
-/* eslint-disable camelcase */
-import type { ASS_Image } from '../wasm/types'
+import type { ASSImage } from '../jassub'
 
 const IDENTITY_MATRIX = new Float32Array([
   1, 0, 0, 0,
@@ -355,7 +354,7 @@ export class WebGPURenderer {
     }
   }
 
-  render (images: ASS_Image[], heap: Uint8Array): void {
+  render (images: ASSImage[], heap: Uint8Array): void {
     if (!this.device || !this.context || !this.pipeline || images.length === 0) return
 
     const commandEncoder = this.device.createCommandEncoder()

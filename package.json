@@ -5,8 +5,9 @@
   "main": "dist/jassub.js",
   "type": "module",
   "files": [
-    "dist/*",
-    "!dist/libraries/*",
+    "dist/wasm/*",
+    "dist/worker/*",
+    "dist/jassub.*",
     "README.md",
     "LICENSE",
     "index.d.ts"

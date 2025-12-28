@@ -20,7 +20,7 @@ JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>
 * Doesn't manipulate the DOM to render subtitles
 * Easy to use - just connect it to video element
 
-## Usage
+## Requirements
 
 ```json
 {
@@ -31,7 +31,11 @@ JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>
 
 Headers are recommended to use this library, as it uses SharedArrayBuffer for multi-threading, but if you can't set them, it will still work in single-threaded mode.
 
-Then install the library via:
+See https://github.com/gpuweb/gpuweb/wiki/Implementation-Status for a WebGPU support table, and what flags you might need to enable it in your browser.
+
+## Usage
+
+Install the library via:
 
 ```shell
 [p]npm i jassub

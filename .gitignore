@@ -9,3 +9,5 @@ build/lib/*
 test
 .pnpm-store
 dist/*
+src/wasm/jassub-worker-modern.js
+

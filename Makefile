@@ -205,7 +205,7 @@ src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js
 		-s EXPORT_ES6=1 \
 		-lembind \
 		-pthread \
-		-s PTHREAD_POOL_SIZE='Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8)' \
+		-s PTHREAD_POOL_SIZE='globalThis.crossOriginIsolated ? Math.min(Math.max(0, navigator.hardwareConcurrency - 3), 7) : 0' \
 		-o $@
 
 # dist/license/all:

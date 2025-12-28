@@ -74,7 +74,7 @@ export class ASSRenderer {
 
       const fallbackFont = data.fallbackFont.toLowerCase()
       this._wasm = new Module.JASSUB(data.width, data.height, fallbackFont)
-      this._wasm.setThreads(Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8))
+      this._wasm.setThreads(self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1)
 
       if (fallbackFont) this._findAvailableFonts(fallbackFont)
 

@@ -29,7 +29,9 @@ JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>
 }
 ```
 
-Headers are required to use this library, as it uses SharedArrayBuffer for multi-threading!!!
+Headers are recommended to use this library, as it uses SharedArrayBuffer for multi-threading, but if you can't set them, it will still work in single-threaded mode.
+
+Then install the library via:
 
 ```shell
 [p]npm i jassub

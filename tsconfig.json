@@ -1,9 +1,9 @@
 {
   "extends": "eslint-config-standard-universal/tsconfig.json",
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "esnext",
     "lib": [
-      "ES2022",
+      "ESNext",
       "DOM",
       "DOM.Iterable",
       "WebWorker"

@@ -91,7 +91,7 @@ export default class JASSUB {
     this.prescaleHeightLimit = opts.prescaleHeightLimit ?? 1080
     this.maxRenderHeight = opts.maxRenderHeight ?? 0 // 0 - no limit.
 
-    this._worker = new Worker(opts.workerUrl ?? new URL('./worker/worker.ts', import.meta.url), { name: 'jassub-worker', type: 'module' })
+    this._worker = new Worker(opts.workerUrl ?? new URL('./worker/worker.js', import.meta.url), { name: 'jassub-worker', type: 'module' })
 
     const Renderer = wrap<typeof ASSRenderer>(this._worker)
 

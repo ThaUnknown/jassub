@@ -92,8 +92,9 @@ export default class JASSUB {
     this.maxRenderHeight = opts.maxRenderHeight ?? 0 // 0 - no limit.
 
     // yes this is awful, but bundlers check for new Worker(new URL()) patterns, so can't use new Worker(workerUrl ?? new URL(...)) ... bruh
-    const workerOpts = { name: 'jassub-worker', type: 'module' } as const
-    this._worker = opts.workerUrl ? new Worker(opts.workerUrl, workerOpts) : new Worker(new URL('./worker/worker.js', import.meta.url), workerOpts)
+    this._worker = opts.workerUrl
+      ? new Worker(opts.workerUrl, { name: 'jassub-worker', type: 'module' })
+      : new Worker(new URL('./worker/worker.js', import.meta.url), { name: 'jassub-worker', type: 'module' })
 
     const Renderer = wrap<typeof ASSRenderer>(this._worker)
 

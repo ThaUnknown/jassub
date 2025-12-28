@@ -388,16 +388,20 @@ export class WebGPURenderer {
     }
 
     // Render each image
-    for (let i = 0; i < images.length; i++) {
+    for (let i = 0, texIndex = 0; i < images.length; i++, texIndex++) {
       const img = images[i]!
-      let texInfo = this.textures[i]!
+
+      // Skip images with invalid dimensions (WebGPU doesn't allow 0-sized textures)
+      if (img.w <= 0 || img.h <= 0) continue
+
+      let texInfo = this.textures[texIndex]!
 
       // Recreate texture if size changed (use actual w, not stride)
       if (texInfo.width !== img.w || texInfo.height !== img.h) {
         // Defer destruction until after submit to avoid destroying textures still in use
         this.pendingDestroyTextures.push(texInfo.texture)
         texInfo = this.createTextureInfo(img.w, img.h)
-        this.textures[i] = texInfo
+        this.textures[texIndex] = texInfo
       }
 
       // Upload bitmap data using bytesPerRow to handle stride
@@ -433,7 +437,7 @@ export class WebGPURenderer {
         (img.color & 0xFF) / 255
       ])
 
-      const imageBuffer = this.imageDataBuffers[i]!
+      const imageBuffer = this.imageDataBuffers[texIndex]!
       this.device.queue.writeBuffer(imageBuffer, 0, imageData)
 
       // Create bind group for this image

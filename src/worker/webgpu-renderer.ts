@@ -355,7 +355,7 @@ export class WebGPURenderer {
   }
 
   render (images: ASSImage[], heap: Uint8Array): void {
-    if (!this.device || !this.context || !this.pipeline || images.length === 0) return
+    if (!this.device || !this.context || !this.pipeline) return
 
     const commandEncoder = this.device.createCommandEncoder()
 

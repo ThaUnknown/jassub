@@ -22,6 +22,15 @@ JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>
 
 ## Usage
 
+```json
+{
+  "Cross-Origin-Embedder-Policy": "require-corp",
+  "Cross-Origin-Opener-Policy": "same-origin"
+}
+```
+
+Headers are required to use this library, as it uses SharedArrayBuffer for multi-threading!!!
+
 ```shell
 [p]npm i jassub
 ```

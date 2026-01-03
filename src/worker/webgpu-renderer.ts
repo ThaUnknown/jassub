@@ -57,9 +57,9 @@ export type ColorSpace = keyof typeof colorMatrixConversionMap
 const VERTEX_SHADER = /* wgsl */`
 struct VertexOutput {
   @builtin(position) position: vec4f,
-  @location(0) local: vec2f,      // local pixel coord in [0..w-1, 0..h-1]
-  @location(1) color: vec4f,
-  @location(2) texSize: vec2f,    // texture size for UV calculation
+  @location(0) @interpolate(flat) destXY: vec2f,   // destination top-left (flat, no interpolation)
+  @location(1) @interpolate(flat) color: vec4f,
+  @location(2) @interpolate(flat) texSize: vec2f,
 }
 
 struct Uniforms {
@@ -100,8 +100,7 @@ fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
   clipPos.y = -clipPos.y;  // Flip Y for canvas coordinates
   
   output.position = vec4f(clipPos, 0.0, 1.0);
-  // Local pixel coordinates in [0..w-1, 0..h-1] to avoid sampling past edge
-  output.local = quadPos * max(wh - vec2f(1.0), vec2f(0.0));
+  output.destXY = imageData.destRect.xy;
   output.color = imageData.color;
   output.texSize = imageData.srcInfo.xy;
   
@@ -109,26 +108,32 @@ fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 }
 `
 
-// WGSL Fragment Shader - sample texel centers to avoid edge artifacts
+// WGSL Fragment Shader - use textureLoad with integer coords for pixel-perfect sampling
 const FRAGMENT_SHADER = /* wgsl */`
-@group(0) @binding(2) var texSampler: sampler;
 @group(0) @binding(3) var tex: texture_2d<f32>;
 @group(0) @binding(4) var<uniform> colorMatrix: mat3x3f;
 
 struct FragmentInput {
-  @location(0) local: vec2f,
-  @location(1) color: vec4f,
-  @location(2) texSize: vec2f,
+  @builtin(position) fragCoord: vec4f,
+  @location(0) @interpolate(flat) destXY: vec2f,
+  @location(1) @interpolate(flat) color: vec4f,
+  @location(2) @interpolate(flat) texSize: vec2f,
 }
 
 @fragment
 fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
-  // Sample texel centers to avoid edge artifacts (add 0.5)
-  let uv = (input.local + vec2f(0.5)) / input.texSize;
+  // Calculate integer texel coordinates from fragment position
+  // fragCoord.xy is the pixel center (e.g., 0.5, 1.5, 2.5...)
+  let texCoord = vec2i(floor(input.fragCoord.xy - input.destXY));
   
-  // Sample mask from texture (stored in R channel)
-  // libass bitmap: 0 = transparent, 255 = opaque (NOT inverted)
-  let mask = textureSample(tex, texSampler, uv).r;
+  // Bounds check (should not be needed but prevents any out-of-bounds access)
+  let texSizeI = vec2i(input.texSize);
+  if (texCoord.x < 0 || texCoord.y < 0 || texCoord.x >= texSizeI.x || texCoord.y >= texSizeI.y) {
+    return vec4f(0.0);
+  }
+  
+  // Load texel directly using integer coordinates - no interpolation, no precision issues
+  let mask = textureLoad(tex, texCoord, 0).r;
   
   // Apply color matrix conversion (identity if no conversion needed)
   let correctedColor = colorMatrix * input.color.rgb;
@@ -155,7 +160,6 @@ export class WebGPURenderer {
   device: GPUDevice | null = null
   context: GPUCanvasContext | null = null
   pipeline: GPURenderPipeline | null = null
-  sampler: GPUSampler | null = null
   bindGroupLayout: GPUBindGroupLayout | null = null
 
   // Uniform buffer
@@ -206,14 +210,6 @@ export class WebGPURenderer {
       code: FRAGMENT_SHADER
     })
 
-    // Create sampler - use NEAREST filtering to avoid edge artifacts
-    this.sampler = this.device.createSampler({
-      magFilter: 'nearest',
-      minFilter: 'nearest',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge'
-    })
-
     // Create uniform buffer
     this.uniformBuffer = this.device.createBuffer({
       size: 16, // vec2f resolution + padding
@@ -228,7 +224,7 @@ export class WebGPURenderer {
     // Initialize with identity matrix
     this.setColorMatrix()
 
-    // Create bind group layout
+    // Create bind group layout (no sampler needed - using textureLoad for pixel-perfect sampling)
     this.bindGroupLayout = this.device.createBindGroupLayout({
       entries: [
         {
@@ -242,14 +238,9 @@ export class WebGPURenderer {
           buffer: { type: 'read-only-storage' }
         },
         {
-          binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'non-filtering' } // Must match 'nearest' filter sampler
-        },
-        {
           binding: 3,
           visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' }
+          texture: { sampleType: 'unfilterable-float' } // textureLoad requires unfilterable
         },
         {
           binding: 4,
@@ -439,13 +430,12 @@ export class WebGPURenderer {
       const imageBuffer = this.imageDataBuffers[texIndex]!
       this.device.queue.writeBuffer(imageBuffer, 0, imageData)
 
-      // Create bind group for this image
+      // Create bind group for this image (no sampler - using textureLoad)
       const bindGroup = this.device.createBindGroup({
         layout: this.bindGroupLayout!,
         entries: [
           { binding: 0, resource: { buffer: this.uniformBuffer! } },
           { binding: 1, resource: { buffer: imageBuffer } },
-          { binding: 2, resource: this.sampler! },
           { binding: 3, resource: texInfo.view },
           { binding: 4, resource: { buffer: this.colorMatrixBuffer! } }
         ]

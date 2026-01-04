@@ -28,7 +28,6 @@ interface opts {
   libassMemoryLimit: number
   libassGlyphLimit: number
   useLocalFonts: boolean
-  supportsSIMD: boolean
 }
 
 export class ASSRenderer {
@@ -68,7 +67,7 @@ export class ASSRenderer {
     }
     addEventListener('message', handleMessage)
 
-    this._ready = (WASM({ __supportsSIMD: data.supportsSIMD, __url: data.wasmUrl }) as Promise<MainModule>).then(Module => {
+    this._ready = (WASM({ __url: data.wasmUrl }) as Promise<MainModule>).then(Module => {
       // eslint-disable-next-line @typescript-eslint/unbound-method
       this._malloc = Module._malloc
 

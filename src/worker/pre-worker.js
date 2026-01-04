@@ -29,8 +29,7 @@ updateMemoryViews = () => {
 // so we hack around it by passing the url and simd support via the worker name
 // hopefully not bad?
 if (self.name.startsWith('em-pthread')) {
-  const isModern = self.name.startsWith('em-pthread-modern')
-  const url = self.name.split('-').slice(3).join('-')
+  const url = self.name.split('-').slice(2).join('-')
 
   const _fetch = globalThis.fetch
   globalThis.fetch = _ => _fetch(url)
@@ -40,7 +39,7 @@ if (self.name.startsWith('em-pthread')) {
     constructor(scriptURL, options = {}) {
       super(scriptURL, {
         ...options,
-        name: `em-pthread-${moduleArg.__supportsSIMD ? 'modern' : 'legacy'}-${moduleArg.__url}`
+        name: 'em-pthread-' + moduleArg.__url
       })
     }
   }

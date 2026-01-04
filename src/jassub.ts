@@ -110,7 +110,6 @@ export default class JASSUB {
     this.ready = (async () => {
       this.renderer = await new Renderer({
         wasmUrl: JASSUB._supportsSIMD ? modern : fallback,
-        supportsSIMD: JASSUB._supportsSIMD ?? false,
         width: ctrl.width,
         height: ctrl.height,
         subUrl: opts.subUrl,
@@ -234,7 +233,7 @@ export default class JASSUB {
       this._video.requestVideoFrameCallback((now, data) => this._handleRVFC(data))
       // everything else is unreliable for this, loadedmetadata and loadeddata included.
       if ('VideoFrame' in globalThis) {
-        video.addEventListener('loadedmetadata', () => this._updateColorSpace(), { signal: this._ctrl.signal })
+        video.addEventListener('loadedmetadata', () => this._updateColorSpace(), this._ctrl)
         if (video.readyState > 2) this._updateColorSpace()
       }
       if (video.videoWidth > 0) this.resize()

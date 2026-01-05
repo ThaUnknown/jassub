@@ -295,6 +295,9 @@ export class WebGPURenderer {
       throw new Error('WebGPU device not initialized. Did you await the constructor promise?')
     }
 
+    // WebGPU doesn't allow 0-sized textures/swapchains
+    if (width <= 0 || height <= 0) return
+
     canvas.width = width
     canvas.height = height
 
@@ -348,9 +351,13 @@ export class WebGPURenderer {
   render (images: ASSImage[], heap: Uint8Array): void {
     if (!this.device || !this.context || !this.pipeline) return
 
+    // getCurrentTexture fails if canvas has 0 dimensions
+    const currentTexture = this.context.getCurrentTexture()
+    if (currentTexture.width === 0 || currentTexture.height === 0) return
+
     const commandEncoder = this.device.createCommandEncoder()
 
-    const textureView = this.context.getCurrentTexture().createView()
+    const textureView = currentTexture.createView()
 
     // Begin render pass
     const renderPass = commandEncoder.beginRenderPass({
@@ -378,13 +385,13 @@ export class WebGPURenderer {
     }
 
     // Render each image
-    for (let i = 0, texIndex = 0; i < images.length; i++, texIndex++) {
+    for (let i = 0, texIndex = -1; i < images.length; i++) {
       const img = images[i]!
 
       // Skip images with invalid dimensions (WebGPU doesn't allow 0-sized textures)
       if (img.w <= 0 || img.h <= 0) continue
 
-      let texInfo = this.textures[texIndex]!
+      let texInfo = this.textures[++texIndex]!
 
       // Recreate texture if size changed (use actual w, not stride)
       if (texInfo.width !== img.w || texInfo.height !== img.h) {
@@ -454,27 +461,6 @@ export class WebGPURenderer {
       tex.destroy()
     }
     this.pendingDestroyTextures = []
-  }
-
-  clear (): void {
-    if (!this.device || !this.context) return
-
-    const commandEncoder = this.device.createCommandEncoder()
-    const textureView = this.context.getCurrentTexture().createView()
-
-    const renderPass = commandEncoder.beginRenderPass({
-      colorAttachments: [
-        {
-          view: textureView,
-          clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          loadOp: 'clear',
-          storeOp: 'store'
-        }
-      ]
-    })
-
-    renderPass.end()
-    this.device.queue.submit([commandEncoder.finish()])
   }
 
   destroy (): void {

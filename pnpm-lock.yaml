@@ -14,6 +14,9 @@ importers:
       rvfc-polyfill:
         specifier: ^1.0.7
         version: 1.0.7
+      throughput:
+        specifier: ^1.0.2
+        version: 1.0.2
     devDependencies:
       '@webgpu/types':
         specifier: ^0.1.68
@@ -1356,6 +1359,9 @@ packages:
   tapable@2.3.0:
     resolution: {integrity: sha512-g9ljZiwki/LfxmQADO3dEY1CbpmXT5Hm2fJ+QaGKwSXUylMybePR7/67YW7jOrrvjEgL1Fmz5kzyAjWVWLlucg==}
     engines: {node: '>=6'}
+
+  throughput@1.0.2:
+    resolution: {integrity: sha512-jvK1ZXuhsggjb3qYQjMiU/AVYYiTeqT5thWvYR2yuy2LGM84P5MSSyAinwHahGsdBYKR9m9HncVR/3f3nFKkxg==}
 
   tinyglobby@0.2.15:
     resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
@@ -2960,6 +2966,8 @@ snapshots:
       periscopic: 3.1.0
 
   tapable@2.3.0: {}
+
+  throughput@1.0.2: {}
 
   tinyglobby@0.2.15:
     dependencies:

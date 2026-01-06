@@ -1,6 +1,6 @@
 {
   "name": "jassub",
-  "version": "2.0.14",
+  "version": "2.0.15",
   "description": "libass subtitle renderer for modern browsers",
   "main": "dist/jassub.js",
   "type": "module",
@@ -43,7 +43,8 @@
   "homepage": "https://github.com/ThaUnknown/jassub",
   "dependencies": {
     "abslink": "^1.1.6",
-    "rvfc-polyfill": "^1.0.7"
+    "rvfc-polyfill": "^1.0.7",
+    "throughput": "^1.0.2"
   },
   "devDependencies": {
     "@webgpu/types": "^0.1.68",

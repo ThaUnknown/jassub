@@ -4,6 +4,8 @@ import 'rvfc-polyfill'
 import { proxy, releaseProxy } from 'abslink'
 import { wrap } from 'abslink/w3c'
 
+import { Debug } from './debug'
+
 import type { ASS_Event, ASS_Image, ASS_Style, ClassHandle } from './wasm/types'
 import type { ASSRenderer } from './worker/worker'
 import type { Remote } from 'abslink'
@@ -91,7 +93,7 @@ export default class JASSUB {
 
     const ctrl = this._canvas.transferControlToOffscreen()
 
-    this.debug = !!opts.debug
+    this.debug = opts.debug ? new Debug() : null
 
     this.prescaleFactor = opts.prescaleFactor ?? 1.0
     this.prescaleHeightLimit = opts.prescaleHeightLimit ?? 1080
@@ -295,13 +297,16 @@ export default class JASSUB {
 
     if (this.busy) {
       this._skipped = true
+      this.debug?._drop()
       return
     }
 
     this.busy = true
     this._skipped = false
 
+    this.debug?._startFrame()
     await this.renderer._draw(mediaTime + this.timeOffset)
+    this.debug?._endFrame(this._lastDemandTime)
 
     this.busy = false
     if (this._skipped) this._demandRender()

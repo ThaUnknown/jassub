@@ -38,7 +38,7 @@ export class Debug {
     const fps = this.fps(1)
     const now = performance.now()
     const processingDuration = this.processingDuration((now - this._startTime) / fps)
-    const frameDelay = Math.max(0, meta.expectedDisplayTime - now)
+    const frameDelay = Math.max(0, now - meta.expectedDisplayTime)
     if (frameDelay) ++this.mistimedFrames
 
     this.onsubtitleFrameCallback?.(now, {

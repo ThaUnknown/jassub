@@ -1,6 +1,6 @@
 {
   "name": "jassub",
-  "version": "2.0.15",
+  "version": "2.0.20",
   "description": "libass subtitle renderer for modern browsers",
   "main": "dist/jassub.js",
   "type": "module",
@@ -8,6 +8,7 @@
     "dist/wasm/*",
     "dist/worker/*",
     "dist/jassub.*",
+    "dist/debug.*",
     "!dist/wasm/jassub-worker-modern.js",
     "README.md",
     "LICENSE",

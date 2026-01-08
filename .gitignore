@@ -1,13 +1,29 @@
-*.bc
-*.lo
-*.la
-*.o
-*.pyc
-*.tgz
-venv/
 node_modules/
 build/lib
-src/JASSUBInterface.cpp
-src/JASSUBInterface.js
-lib/
-dist/
+/lib/
+/test/
+/dist/
+
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*

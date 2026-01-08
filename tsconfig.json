@@ -1,0 +1,55 @@
+{
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "esnext",
+		"lib": [
+			"esnext",
+			"DOM",
+			"DOM.Iterable"
+		],
+		"allowJs": true,
+		"checkJs": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"outDir": "./dist",
+		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"rewriteRelativeImportExtensions": true,
+		"emitDeclarationOnly": false,
+		"noImplicitAny": true,
+		"strictNullChecks": true,
+		"verbatimModuleSyntax": true,
+		"isolatedModules": true,
+		"noEmit": false,
+		"noUncheckedIndexedAccess": true,
+		"declaration": true,
+		"alwaysStrict": true,
+		"strict": true,
+		"maxNodeModuleJsDepth": 3,
+		"allowSyntheticDefaultImports": true,
+		"types": [
+			"vite/client"
+		]
+	},
+	"typeAcquisition": {
+		"enable": false
+	},
+	"include": [
+		"src/**/*.js",
+		"src/**/*.cjs",
+		"src/**/*.ts",
+		"src/**/*.d.ts",
+		"src/**/*.json",
+		"src/**/*.svelte"
+	],
+	"exclude": [
+		"node_modules",
+		".svelte-kit",
+		"build",
+		"public"
+	],
+}

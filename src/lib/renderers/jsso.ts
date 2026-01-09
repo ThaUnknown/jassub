@@ -1,5 +1,6 @@
 import JSSO from '@jellyfin/libass-wasm'
 import workerUrl from '@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker.js?url'
+import throughput from 'throughput'
 
 import type { PerfCallback } from '$lib/constants'
 import '@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker.wasm?url'
@@ -21,6 +22,8 @@ export default async function (subUrl: string, video: HTMLVideoElement, timeOffs
   })
 
   const originalLog = console.log
+  const _fps = throughput(5)
+  const _processingDuration = throughput(5)
 
   let presentedFrames = 0
 
@@ -28,13 +31,15 @@ export default async function (subUrl: string, video: HTMLVideoElement, timeOffs
     if (typeof log === 'string' && log.startsWith('render:')) {
       const totalMatch = log.match(/TOTAL=(\d+)\s+ms/)
       if (totalMatch) {
-        const processingDuration = parseInt(totalMatch[1]!, 10)
+        const fps = _fps(1)
+        const total = parseInt(totalMatch[1]!, 10)
+        const processingDuration = _processingDuration(total / fps)
         ++presentedFrames
         cb({
           presentedFrames,
           mistimedFrames: presentedFrames,
           droppedFrames: -1,
-          fps: 0,
+          fps,
           processingDuration
         })
       }

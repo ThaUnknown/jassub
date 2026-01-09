@@ -7,19 +7,15 @@
 
   function renderer (node: HTMLVideoElement) {
     const impl = data.renderer as (typeof renderers)[number]
-    const rend = import(`$lib/renderers/${impl}.ts`).then(mod => mod.default(data.subUrl, node, data.delay, data.fonts, info => { perf = info }))
+    const rend = import(`$lib/renderers/${impl}.ts`).then(mod => mod.default(data.subUrl, node, data.delay, data.fonts, (info: PerfInfo) => { perf = info }))
 
     return {
-      destroy () {
-        rend.then(destroyer => {
-          destroyer()
-        })
-      }
+      destroy: () => rend.then(destroyer => destroyer())
     }
   }
 </script>
 
-<video src={data.videoUrl} controls use:renderer />
+<video src={data.videoUrl} controls use:renderer loop muted />
 
 <div style='position: absolute; top: 0; left: 0; color: white; background: rgba(0, 0, 0, 0.5); padding: 5px; font-family: monospace; font-size: 12px;'>
   {#if perf}

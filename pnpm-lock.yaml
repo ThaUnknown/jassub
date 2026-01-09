@@ -18,8 +18,8 @@ importers:
         specifier: ^1.0.8
         version: 1.0.8
       jassub:
-        specifier: ^2.0.19
-        version: 2.0.19
+        specifier: ^2.0.20
+        version: 2.0.20
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.9
@@ -1115,8 +1115,8 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
-  jassub@2.0.19:
-    resolution: {integrity: sha512-4S8j5aHcHXICOWCu+lJfucRBYgYkiM2MT5QUZQ8EAaCN2RWEDEa8yLTJxocD5d/09/X6rfqxMfiJIanY6EunjQ==}
+  jassub@2.0.20:
+    resolution: {integrity: sha512-uPOuIgbh9mSzR+jyGdcZhwT4Nsxl1wycApBow98QJ2PPWpfy49voE+pDFlqsZQYrmyESQMlXBQA0fmVKw7thMA==}
 
   js-yaml@4.1.1:
     resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
@@ -2799,7 +2799,7 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  jassub@2.0.19:
+  jassub@2.0.20:
     dependencies:
       abslink: 1.1.6
       rvfc-polyfill: 1.0.7

@@ -21,6 +21,8 @@ updateMemoryViews = () => {
   HEAPU32 = new Uint32Array(b)
   HEAPF32 = new Float32Array(b)
   HEAPF64 = new Float64Array(b)
+  HEAP64 = new BigInt64Array(b)
+  HEAPU64 = new BigUint64Array(b);
   self.HEAPU8RAW = new Uint8Array(b)
   self.WASMMEMORY = wasmMemory
 }

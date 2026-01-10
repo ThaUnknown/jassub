@@ -163,7 +163,7 @@ PERFORMANCE_ARGS = \
 		-s TEXTDECODER=2 \
 		-s INITIAL_MEMORY=60MB \
 		-s MALLOC=mimalloc \
-		-s WASM_BIGINT=0 \
+		-s WASM_BIGINT=1 \
 		-s MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION=1 \
 		-flto \
 		-fno-exceptions \
@@ -186,7 +186,6 @@ SIZE_ARGS = \
 COMPAT_ARGS = \
 		-s EXPORTED_FUNCTIONS="['_malloc']" \
 		-s EXPORT_KEEPALIVE=1 \
-		-s WASM_BIGINT=0 \
 		-mbulk-memory
 
 src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js

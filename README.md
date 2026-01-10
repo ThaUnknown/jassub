@@ -114,6 +114,7 @@ WASM:              57 11 52    /  51 11 47
 WebGL2:            56 15 51    /  43 10.1 42
 TextDecoder:       38 10.1 20  /  38 10.1 19
 OffscreenCanvas:   69 17 105   /  58 16.2 44
+BigInt:            67 15 68
 Web Workers:       4 4 3.5
 Promise:           33 7.1 29   /  4 3.1 2
 Proxy:             49 10 18
@@ -122,7 +123,7 @@ Fetch:             42 10.1 39  /  41 10.1 34
 getVPQ/rVFC:       80 8 42     /  28 8 42
 -->
 
-JASSUB supports Chrome/Safari/Firefox 80/17/105, you bring the support down to 58/16.2/47 if you enable some flags/settings in your browser for these features, and polyfill AbortController and getVideoPlaybackQuality. For other engines other polyfills might be needed. Babel is also recommended if you need to support older JS engines as JASSUB ships as modern ES modules with modern syntax.
+JASSUB supports Chrome/Safari/Firefox 80/17/105, you bring the support down to 67/16.2/68 if you enable some flags/settings in your browser for these features, and polyfill AbortController and getVideoPlaybackQuality. For other engines other polyfills might be needed. Babel is also recommended if you need to support older JS engines as JASSUB ships as modern ES modules with modern syntax.
 
 If you want to support even older engines, then please check the [v1.8.8 tag](https://github.com/ThaUnknown/jassub/releases/tag/1.8.8), or install it via:
 

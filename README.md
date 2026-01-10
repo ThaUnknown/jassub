@@ -4,23 +4,25 @@
 <p align="center">
   The Fastest JavaScript SSA/ASS Subtitle Renderer For Browsers.
 </p>
-JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>, which renders <a href="https://en.wikipedia.org/wiki/SubStation_Alpha">SSA/ASS subtitles</a> directly in your browser. It uses Emscripten to compile libass' C++ code to WASM, and WebGPU/WebGL for hardware acceleration.
+JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>, which renders <a href="https://en.wikipedia.org/wiki/SubStation_Alpha">SSA/ASS subtitles</a> directly in your browser. It uses Emscripten to compile libass' C++ code to WASM, and WebGL for hardware acceleration.
 
 ## Features
 
 * Supports all SSA/ASS features (everything libass supports)
 * Supports all OpenType, TrueType and WOFF fonts, as well as embedded fonts
-* Supports anamorphic videos
-* Supports color space mangling
+* Supports anamorphic videos [(on browsers which support it)](https://caniuse.com/mdn-api_htmlvideoelement_requestvideoframecallback)
+* Supports color space mangling [(on browsers which support it)](https://caniuse.com/mdn-api_videocolorspace)
 * Capable of using local fonts [(on browsers which support it)](https://caniuse.com/mdn-api_window_querylocalfonts)
-* Works fast (all the heavy lifting is done by WebAssembly and WebGPU/WebGL, with absolutely minimal JS glue)
+* Works fast (all the heavy lifting is done by WebAssembly and WebGL, with absolutely minimal JS glue)
 * Is fully multi-threaded
 * Is asynchronous (renders when available, not in order of execution)
-* Benefits from hardware acceleration (uses WebGPU/WebGL)
+* Benefits from hardware acceleration (uses WebGL)
 * Doesn't manipulate the DOM to render subtitles
 * Easy to use - just connect it to video element
 
 ## Requirements
+
+The
 
 ```json
 {
@@ -29,9 +31,27 @@ JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>
 }
 ```
 
-Headers are recommended to use this library, as it uses SharedArrayBuffer for multi-threading, but if you can't set them, it will still work in single-threaded mode.
+headers are recommended to use this library, as it uses SharedArrayBuffer for multi-threading, but if you can't set them, it will fallback automatically to work in single-threaded mode.
 
-See https://github.com/gpuweb/gpuweb/wiki/Implementation-Status for a WebGPU support table, and what flags you might need to enable it in your browser if you want to utilise it instead of WebGL2.
+At minimum WASM + WebGL2 + TextDecoder + OffscreenCanvas + Web Workers + Proxy + AbortController + Fetch + Promise + getVideoPlaybackQuality/requestVideoFrameCallback are required for JASSUB to work.
+
+<!-- 
+WASM:              57 11 52    /  51 11 47
+WebGL2:            56 15 51    /  43 10.1 42
+TextDecoder:       38 10.1 20  /  38 10.1 19
+OffscreenCanvas:   69 17 105   /  58 16.2 44
+BigInt:            67 15 68
+Web Workers:       4 4 3.5
+Promise:           33 7.1 29   /  4 3.1 2
+Proxy:             49 10 18
+AbortController:   66 12 57    /  4 3.1 2
+Fetch:             42 10.1 39  /  41 10.1 34
+getVPQ/rVFC:       80 8 42     /  28 8 42
+-->
+
+JASSUB supports Chrome/Safari/Firefox 80/17/105, you bring the support down to 67/16.2/68 if you enable some flags/settings in your browser for these features, and polyfill AbortController and getVideoPlaybackQuality. For other engines other polyfills might be needed. Babel is also recommended if you need to support older JS engines as JASSUB ships as ES modules with modern syntax.
+
+<!-- See https://github.com/gpuweb/gpuweb/wiki/Implementation-Status for a WebGPU support table, and what flags you might need to enable it in your browser if you want to utilise it instead of WebGL2. -->
 
 ## Usage
 
@@ -107,31 +127,13 @@ Make sure to always `await instance.ready` before running any methods!!!
 
 ## Looking for backwards compatibility with much older browser engines?
 
-At minimum WASM + WebGL2 + TextDecoder + OffscreenCanvas + Web Workers + Proxy + AbortController + Fetch + Promise + getVideoPlaybackQuality/requestVideoFrameCallback are required for JASSUB to work.
-
-<!-- 
-WASM:              57 11 52    /  51 11 47
-WebGL2:            56 15 51    /  43 10.1 42
-TextDecoder:       38 10.1 20  /  38 10.1 19
-OffscreenCanvas:   69 17 105   /  58 16.2 44
-BigInt:            67 15 68
-Web Workers:       4 4 3.5
-Promise:           33 7.1 29   /  4 3.1 2
-Proxy:             49 10 18
-AbortController:   66 12 57    /  4 3.1 2
-Fetch:             42 10.1 39  /  41 10.1 34
-getVPQ/rVFC:       80 8 42     /  28 8 42
--->
-
-JASSUB supports Chrome/Safari/Firefox 80/17/105, you bring the support down to 67/16.2/68 if you enable some flags/settings in your browser for these features, and polyfill AbortController and getVideoPlaybackQuality. For other engines other polyfills might be needed. Babel is also recommended if you need to support older JS engines as JASSUB ships as modern ES modules with modern syntax.
-
 If you want to support even older engines, then please check the [v1.8.8 tag](https://github.com/ThaUnknown/jassub/releases/tag/1.8.8), or install it via:
 
 ```shell
 [p]npm i jassub@1.8.8
 ```
 
-Support for older browsers (without WebGPU/WebGL, WebAssembly threads, etc) has been dropped in v2.0.0 and later.
+Support for older browsers (without WebGL, WebAssembly threads, etc) has been dropped in v2.0.0 and later.
 
 # How to build?
 

@@ -1,3 +1,7 @@
+// WARN:
+// This has been deprecated as WebGL is simply faster
+// Know how to optimise this to beat WebGL? submit a PR!
+
 import type { ASSImage } from '../jassub'
 
 const IDENTITY_MATRIX = new Float32Array([

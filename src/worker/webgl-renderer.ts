@@ -6,6 +6,9 @@ declare const self: DedicatedWorkerGlobalScope &
     WASMMEMORY: WebAssembly.Memory
   }
 
+// @ts-expect-error new experimental API
+const SUPPORTS_GROWTH = !!WebAssembly.Memory.prototype.toResizableBuffer
+
 const IDENTITY_MATRIX = new Float32Array([
   1, 0, 0,
   0, 1, 0,
@@ -59,78 +62,96 @@ export const colorMatrixConversionMap = {
 
 export type ColorSpace = keyof typeof colorMatrixConversionMap
 
-// GLSL Vertex Shader
-const VERTEX_SHADER = `#version 300 es
+// GLSL ES 3.0 Vertex Shader
+const VERTEX_SHADER = /* glsl */`#version 300 es
 precision highp float;
 
-uniform vec2 u_resolution;
-uniform vec4 u_destRect;    // x, y, w, h
-uniform vec4 u_color;       // RGBA
-
-out vec2 v_texCoord;
-out vec4 v_color;
-
-// Quad vertices (0,0 to 1,1)
 const vec2 QUAD_POSITIONS[6] = vec2[6](
-    vec2(0.0, 0.0),
-    vec2(1.0, 0.0),
-    vec2(0.0, 1.0),
-    vec2(1.0, 0.0),
-    vec2(1.0, 1.0),
-    vec2(0.0, 1.0)
+  vec2(0.0, 0.0),
+  vec2(1.0, 0.0),
+  vec2(0.0, 1.0),
+  vec2(1.0, 0.0),
+  vec2(1.0, 1.0),
+  vec2(0.0, 1.0)
 );
 
+uniform vec2 u_resolution;
+uniform vec4 u_destRect;  // x, y, w, h
+uniform vec4 u_color;     // r, g, b, a
+uniform float u_texLayer;
+
+flat out vec2 v_destXY;
+flat out vec4 v_color;
+flat out vec2 v_texSize;
+flat out float v_texLayer;
+
 void main() {
-    vec2 quadPos = QUAD_POSITIONS[gl_VertexID];
-    
-    // Calculate pixel position
-    vec2 pixelPos = u_destRect.xy + quadPos * u_destRect.zw;
-    
-    // Convert to clip space (-1 to 1)
-    vec2 clipPos = (pixelPos / u_resolution) * 2.0 - 1.0;
-    clipPos.y = -clipPos.y;  // Flip Y for canvas coordinates
-    
-    gl_Position = vec4(clipPos, 0.0, 1.0);
-    v_texCoord = quadPos;
-    v_color = u_color;
+  vec2 quadPos = QUAD_POSITIONS[gl_VertexID];
+  vec2 pixelPos = u_destRect.xy + quadPos * u_destRect.zw;
+  vec2 clipPos = (pixelPos / u_resolution) * 2.0 - 1.0;
+  clipPos.y = -clipPos.y;
+
+  gl_Position = vec4(clipPos, 0.0, 1.0);
+  v_destXY = u_destRect.xy;
+  v_color = u_color;
+  v_texSize = u_destRect.zw;
+  v_texLayer = u_texLayer;
 }
 `
 
-// GLSL Fragment Shader
-const FRAGMENT_SHADER = `#version 300 es
+// GLSL ES 3.0 Fragment Shader - use texelFetch for pixel-perfect sampling
+const FRAGMENT_SHADER = /* glsl */`#version 300 es
 precision highp float;
+precision highp sampler2DArray;
 
-uniform sampler2D u_texture;
+uniform sampler2DArray u_texArray;
 uniform mat3 u_colorMatrix;
+uniform vec2 u_resolution;
 
-in vec2 v_texCoord;
-in vec4 v_color;
+flat in vec2 v_destXY;
+flat in vec4 v_color;
+flat in vec2 v_texSize;
+flat in float v_texLayer;
 
 out vec4 fragColor;
 
 void main() {
-    // Sample texture
-    float mask = texture(u_texture, v_texCoord).r;
-    
-    // Apply color matrix conversion (identity if no conversion needed)
-    vec3 correctedColor = u_colorMatrix * v_color.rgb;
-    
-    // libass color alpha: 0 = opaque, 255 = transparent (inverted)
-    float colorAlpha = 1.0 - v_color.a;
-    
-    // Final alpha = colorAlpha * mask
-    float a = colorAlpha * mask;
-    
-    // Premultiplied alpha output
-    fragColor = vec4(correctedColor * a, a);
+  // Flip Y: WebGL's gl_FragCoord.y is 0 at bottom, but destXY.y is from top
+  vec2 fragPos = vec2(gl_FragCoord.x, u_resolution.y - gl_FragCoord.y);
+
+  // Calculate local position within the quad (screen coords)
+  vec2 localPos = fragPos - v_destXY;
+
+  // Convert to integer texel coordinates for texelFetch
+  ivec2 texCoord = ivec2(floor(localPos));
+
+  // Bounds check (prevents out-of-bounds access)
+  ivec2 texSizeI = ivec2(v_texSize);
+  if (texCoord.x < 0 || texCoord.y < 0 || texCoord.x >= texSizeI.x || texCoord.y >= texSizeI.y) {
+    fragColor = vec4(0.0);
+    return;
+  }
+
+  // texelFetch: integer coords, no interpolation, no precision issues
+  float mask = texelFetch(u_texArray, ivec3(texCoord, int(v_texLayer)), 0).r;
+
+  // Apply color matrix conversion (identity if no conversion needed)
+  vec3 correctedColor = u_colorMatrix * v_color.rgb;
+
+  // libass color alpha: 0 = opaque, 255 = transparent (inverted)
+  float colorAlpha = 1.0 - v_color.a;
+
+  // Final alpha = colorAlpha * mask
+  float a = colorAlpha * mask;
+
+  // Premultiplied alpha output
+  fragColor = vec4(correctedColor * a, a);
 }
 `
 
-interface TextureInfo {
-    texture: WebGLTexture
-    width: number
-    height: number
-}
+// Texture array configuration
+const TEX_ARRAY_SIZE = 64 // Fixed layer count
+const TEX_INITIAL_SIZE = 256 // Initial width/height
 
 export class WebGL2Renderer {
   gl: WebGL2RenderingContext | null = null
@@ -141,11 +162,14 @@ export class WebGL2Renderer {
   u_resolution: WebGLUniformLocation | null = null
   u_destRect: WebGLUniformLocation | null = null
   u_color: WebGLUniformLocation | null = null
-  u_texture: WebGLUniformLocation | null = null
+  u_texArray: WebGLUniformLocation | null = null
   u_colorMatrix: WebGLUniformLocation | null = null
+  u_texLayer: WebGLUniformLocation | null = null
 
-  // Textures created on-demand (no fixed limit)
-  textures: TextureInfo[] = []
+  // Single texture array instead of individual textures
+  texArray: WebGLTexture | null = null
+  texArrayWidth = 0
+  texArrayHeight = 0
 
   colorMatrix: Float32Array = IDENTITY_MATRIX
 
@@ -165,7 +189,8 @@ export class WebGL2Renderer {
         premultipliedAlpha: true,
         antialias: false,
         depth: false,
-        stencil: false
+        stencil: false,
+        desynchronized: true
       })
 
       if (!this.gl) {
@@ -191,12 +216,16 @@ export class WebGL2Renderer {
         throw new Error('Failed to link program: ' + info)
       }
 
+      this.gl.deleteShader(vertexShader)
+      this.gl.deleteShader(fragmentShader)
+
       // Get uniform locations
       this.u_resolution = this.gl.getUniformLocation(this.program, 'u_resolution')
       this.u_destRect = this.gl.getUniformLocation(this.program, 'u_destRect')
       this.u_color = this.gl.getUniformLocation(this.program, 'u_color')
-      this.u_texture = this.gl.getUniformLocation(this.program, 'u_texture')
+      this.u_texArray = this.gl.getUniformLocation(this.program, 'u_texArray')
       this.u_colorMatrix = this.gl.getUniformLocation(this.program, 'u_colorMatrix')
+      this.u_texLayer = this.gl.getUniformLocation(this.program, 'u_texLayer')
 
       // Create a VAO (required for WebGL2)
       this.vao = this.gl.createVertexArray()
@@ -210,7 +239,7 @@ export class WebGL2Renderer {
       this.gl.useProgram(this.program)
 
       // Set texture unit
-      this.gl.uniform1i(this.u_texture, 0)
+      this.gl.uniform1i(this.u_texArray, 0)
 
       // Set initial color matrix
       this.gl.uniformMatrix3fv(this.u_colorMatrix, false, this.colorMatrix)
@@ -219,6 +248,9 @@ export class WebGL2Renderer {
       this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1)
       this.gl.clearColor(0, 0, 0, 0)
       this.gl.activeTexture(this.gl.TEXTURE0)
+
+      // Create initial texture array
+      this.createTexArray(TEX_INITIAL_SIZE, TEX_INITIAL_SIZE)
     }
 
     // Update viewport and resolution uniform
@@ -253,98 +285,95 @@ export class WebGL2Renderer {
     }
   }
 
-  createTextureInfo (width: number, height: number): TextureInfo {
-    const texture = this.gl!.createTexture()
-
-    this.gl!.bindTexture(this.gl!.TEXTURE_2D, texture)
-
-    // Set texture parameters for nearest-neighbor sampling (pixel-perfect)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D, this.gl!.TEXTURE_MIN_FILTER, this.gl!.NEAREST)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D, this.gl!.TEXTURE_MAG_FILTER, this.gl!.NEAREST)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D, this.gl!.TEXTURE_WRAP_S, this.gl!.CLAMP_TO_EDGE)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D, this.gl!.TEXTURE_WRAP_T, this.gl!.CLAMP_TO_EDGE)
-
-    return {
-      texture,
-      width,
-      height
+  createTexArray (width: number, height: number) {
+    if (this.texArray) {
+      this.gl!.deleteTexture(this.texArray)
     }
+
+    this.texArray = this.gl!.createTexture()
+    this.gl!.bindTexture(this.gl!.TEXTURE_2D_ARRAY, this.texArray)
+
+    // Allocate storage for texture array
+    this.gl!.texImage3D(
+      this.gl!.TEXTURE_2D_ARRAY,
+      0,
+      this.gl!.R8,
+      width,
+      height,
+      TEX_ARRAY_SIZE,
+      0,
+      this.gl!.RED,
+      this.gl!.UNSIGNED_BYTE,
+      null
+    )
+
+    // Set texture parameters (no filtering needed for texelFetch, but set anyway)
+    this.gl!.texParameteri(this.gl!.TEXTURE_2D_ARRAY, this.gl!.TEXTURE_MIN_FILTER, this.gl!.NEAREST)
+    this.gl!.texParameteri(this.gl!.TEXTURE_2D_ARRAY, this.gl!.TEXTURE_MAG_FILTER, this.gl!.NEAREST)
+    this.gl!.texParameteri(this.gl!.TEXTURE_2D_ARRAY, this.gl!.TEXTURE_WRAP_S, this.gl!.CLAMP_TO_EDGE)
+    this.gl!.texParameteri(this.gl!.TEXTURE_2D_ARRAY, this.gl!.TEXTURE_WRAP_T, this.gl!.CLAMP_TO_EDGE)
+
+    this.texArrayWidth = width
+    this.texArrayHeight = height
   }
 
   render (images: ASSImage[], heap: Uint8Array): void {
-    if (!this.gl || !this.program || !this.vao) return
+    if (!this.gl || !this.program || !this.vao || !this.texArray) return
 
     // Hack: work around shared memory issues, webGL doesnt support shared memory, so there are race conditions when growing memory
-    if (self.HEAPU8RAW.buffer !== self.WASMMEMORY.buffer) {
+    if ((self.HEAPU8RAW.buffer !== self.WASMMEMORY.buffer) || SUPPORTS_GROWTH) {
       heap = self.HEAPU8RAW = new Uint8Array(self.WASMMEMORY.buffer)
     }
 
     // Clear canvas
     this.gl.clear(this.gl.COLOR_BUFFER_BIT)
 
-    // Grow texture array if needed
-    while (this.textures.length < images.length) {
-      this.textures.push(this.createTextureInfo(64, 64))
+    // Find max dimensions needed
+    let maxW = this.texArrayWidth
+    let maxH = this.texArrayHeight
+    for (const img of images) {
+      if (img.w > maxW) maxW = img.w
+      if (img.h > maxH) maxH = img.h
+    }
+
+    // Resize texture array if needed
+    if (maxW > this.texArrayWidth || maxH > this.texArrayHeight) {
+      this.createTexArray(maxW, maxH)
+      this.gl.bindTexture(this.gl.TEXTURE_2D_ARRAY, this.texArray)
     }
 
     // Render each image
-    for (let i = 0, texIndex = -1; i < images.length; i++) {
+    for (let i = 0, texLayer = 0; i < images.length; i++) {
       const img = images[i]!
 
       // Skip images with invalid dimensions
       if (img.w <= 0 || img.h <= 0) continue
 
-      const texInfo = this.textures[++texIndex]!
+      // Use modulo to cycle through layers if we have more images than layers
+      const layer = texLayer % TEX_ARRAY_SIZE
+      texLayer++
 
-      // Bind texture
-      this.gl.bindTexture(this.gl.TEXTURE_2D, texInfo.texture)
+      // Upload bitmap data to texture array layer
+      this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, img.stride)
 
-      // Upload bitmap data using bytesPerRow to handle stride
-      // Only need stride * (h-1) + w bytes per ASS spec
-      this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, img.stride) // Source rows are stride bytes apart
+      this.gl.texSubImage3D(
+        this.gl.TEXTURE_2D_ARRAY,
+        0,
+        0, 0, layer, // x, y, z offset
+        img.w,
+        img.h,
+        1, // depth (1 layer)
+        this.gl.RED,
+        this.gl.UNSIGNED_BYTE,
+        heap,
+        img.bitmap
+      )
 
-      // Recreate texture if size changed (use actual w, not stride)
-      if (texInfo.width === img.w && texInfo.height === img.h) {
-        this.gl.texSubImage2D(
-          this.gl.TEXTURE_2D,
-          0,
-          0,
-          0,
-          img.w, // But we only copy w pixels per row
-          img.h,
-          this.gl.RED,
-          this.gl.UNSIGNED_BYTE,
-          heap,
-          img.bitmap
-        )
-      } else {
-        this.gl.texImage2D(
-          this.gl.TEXTURE_2D,
-          0,
-          this.gl.R8,
-          img.w,
-          img.h,
-          0,
-          this.gl.RED,
-          this.gl.UNSIGNED_BYTE,
-          heap,
-          img.bitmap
-        )
-        texInfo.width = img.w
-        texInfo.height = img.h
-      }
-
-      // Reset unpack parameters
       this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, 0)
 
-      // destRect
-      this.gl.uniform4f(
-        this.u_destRect,
-        img.dst_x,
-        img.dst_y,
-        img.w,
-        img.h
-      )
+      // Set uniforms
+      this.gl.uniform4f(this.u_destRect, img.dst_x, img.dst_y, img.w, img.h)
+      this.gl.uniform1f(this.u_texLayer, layer)
 
       // color (RGBA from 0xRRGGBBAA)
       this.gl.uniform4f(
@@ -362,10 +391,10 @@ export class WebGL2Renderer {
 
   destroy () {
     if (this.gl) {
-      for (const tex of this.textures) {
-        this.gl.deleteTexture(tex.texture)
+      if (this.texArray) {
+        this.gl.deleteTexture(this.texArray)
+        this.texArray = null
       }
-      this.textures = []
 
       if (this.vao) {
         this.gl.deleteVertexArray(this.vao)

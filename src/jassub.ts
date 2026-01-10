@@ -109,6 +109,11 @@ export default class JASSUB {
     const modern = opts.modernWasmUrl ?? new URL('./wasm/jassub-worker-modern.wasm', import.meta.url).href
     const fallback = opts.wasmUrl ?? new URL('./wasm/jassub-worker.wasm', import.meta.url).href
 
+    console.log('JASSUB: SIMD supported:', JASSUB._supportsSIMD)
+    console.log('JASSUB: Modern WASM URL:', modern)
+    console.log('JASSUB: Fallback WASM URL:', fallback)
+    console.log('JASSUB: Using:', JASSUB._supportsSIMD ? 'MODERN (SIMD)' : 'FALLBACK')
+
     this.ready = (async () => {
       this.renderer = await new Renderer({
         wasmUrl: JASSUB._supportsSIMD ? modern : fallback,

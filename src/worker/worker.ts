@@ -5,7 +5,9 @@ import { expose } from 'abslink/w3c'
 import WASM from '../wasm/jassub-worker.js'
 
 import { libassYCbCrMap, read_, readAsync, _applyKeys } from './util'
-import { colorMatrixConversionMap, WebGPURenderer } from './webgpu-renderer'
+import { colorMatrixConversionMap, detectRenderer, type Renderer } from './renderer'
+import { WebGPURenderer } from './webgpu-renderer'
+import { WebGL2Renderer } from './webgl2-renderer'
 
 import type { ASSEvent, ASSImage, ASSStyle } from '../jassub'
 import type { JASSUB, MainModule } from '../wasm/types.js'
@@ -36,7 +38,7 @@ export class ASSRenderer {
   _subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC' | null
   _videoColorSpace?: 'BT709' | 'BT601'
   _malloc!: (size: number) => number
-  _gpurender = new WebGPURenderer()
+  _renderer!: Renderer
 
   debug = false
   useLocalFonts = false
@@ -61,13 +63,60 @@ export class ASSRenderer {
     const handleMessage = ({ data }: MessageEvent) => {
       if (data.name === 'offscreenCanvas') {
         this._offCanvas = data.ctrl
-        this._gpurender.setCanvas(this._offCanvas!, this._offCanvas!.width, this._offCanvas!.height)
         removeEventListener('message', handleMessage)
       }
     }
     addEventListener('message', handleMessage)
 
-    this._ready = (WASM({ __url: data.wasmUrl }) as Promise<MainModule>).then(Module => {
+    this._ready = (async () => {
+      // Detect and create appropriate renderer
+      const rendererType = await detectRenderer()
+      console.log(`JASSUB: Using ${rendererType.toUpperCase()} renderer`)
+      this._renderer = rendererType === 'webgpu' ? new WebGPURenderer() : new WebGL2Renderer()
+      await this._renderer.ready()
+      console.log(`JASSUB: ${rendererType.toUpperCase()} renderer initialized successfully`)
+
+      // Set canvas if already received
+      if (this._offCanvas) {
+        await this._renderer.setCanvas(this._offCanvas, this._offCanvas.width, this._offCanvas.height)
+      }
+
+      console.log('JASSUB: Loading WASM module...')
+      console.log('JASSUB: crossOriginIsolated:', self.crossOriginIsolated)
+      console.log('JASSUB: SharedArrayBuffer available:', typeof SharedArrayBuffer !== 'undefined')
+      console.log('JASSUB: wasmUrl:', data.wasmUrl)
+      console.log('JASSUB: userAgent:', navigator.userAgent)
+
+      // Detect Firefox - has known bug with WebAssembly.instantiateStreaming hanging
+      const isFirefox = navigator.userAgent.toLowerCase().includes('firefox')
+      console.log('JASSUB: isFirefox:', isFirefox)
+
+      // Firefox workaround: Replace instantiateStreaming with non-streaming version
+      // See: https://github.com/emscripten-core/emscripten/issues/22685
+      if (isFirefox) {
+        console.log('JASSUB: Applying Firefox WebAssembly.instantiateStreaming polyfill')
+        const originalInstantiateStreaming = WebAssembly.instantiateStreaming
+        WebAssembly.instantiateStreaming = async (response, importObject) => {
+          console.log('JASSUB: Firefox polyfill - using non-streaming instantiate')
+          const source = await (await response).arrayBuffer()
+          return WebAssembly.instantiate(source, importObject)
+        }
+      }
+
+      let Module: MainModule
+      try {
+        console.log('JASSUB: Calling WASM loader...')
+        // Add timeout to detect hanging
+        const timeoutId = setTimeout(() => {
+          console.error('JASSUB: WASM loading timeout (10s) - likely hanging')
+        }, 10000)
+        Module = await WASM({ __url: data.wasmUrl }) as MainModule
+        clearTimeout(timeoutId)
+        console.log('JASSUB: WASM module loaded')
+      } catch (e) {
+        console.error('JASSUB: WASM loading failed:', e)
+        throw e
+      }
       // eslint-disable-next-line @typescript-eslint/unbound-method
       this._malloc = Module._malloc
 
@@ -90,7 +139,7 @@ export class ASSRenderer {
         this._wasm.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)
       }
       this._checkColorSpace()
-    })
+    })()
   }
 
   ready () {
@@ -176,7 +225,7 @@ export class ASSRenderer {
 
   _checkColorSpace () {
     if (!this._subtitleColorSpace || !this._videoColorSpace) return
-    this._gpurender.setColorMatrix(colorMatrixConversionMap[this._subtitleColorSpace][this._videoColorSpace])
+    this._renderer.setColorMatrix(colorMatrixConversionMap[this._subtitleColorSpace][this._videoColorSpace])
   }
 
   _findAvailableFonts (font: string) {
@@ -228,18 +277,18 @@ export class ASSRenderer {
   }
 
   _canvas (width: number, height: number, videoWidth: number, videoHeight: number) {
-    if (this._offCanvas) this._gpurender.setCanvas(this._offCanvas, width, height)
+    if (this._offCanvas) this._renderer.setCanvas(this._offCanvas, width, height)
 
     this._wasm.resizeCanvas(width, height, videoWidth, videoHeight)
   }
 
   [finalizer] () {
     this._wasm.quitLibrary()
-    this._gpurender.destroy()
+    this._renderer.destroy()
     // @ts-expect-error force GC
     this._wasm = null
     // @ts-expect-error force GC
-    this._gpurender = null
+    this._renderer = null
     this._availableFonts = {}
   }
 
@@ -263,7 +312,7 @@ export class ASSRenderer {
         w: image.w
       })
     }
-    this._gpurender.render(bitmaps, self.HEAPU8RAW)
+    this._renderer.render(bitmaps, self.HEAPU8RAW)
   }
 
   _setColorSpace (videoColorSpace: 'RGB' | 'BT709' | 'BT601') {

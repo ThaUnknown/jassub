@@ -1,8 +1,4 @@
 // TypeScript bindings for emscripten-generated code.  Automatically generated at compile time.
-declare namespace RuntimeExports {
-    function getTempRet0(val: any): any;
-    function setTempRet0(val: any): any;
-}
 interface WasmModule {
   __ZdlPvm(_0: number, _1: number): void;
   _malloc(_0: number): number;
@@ -134,5 +130,5 @@ interface EmbindModule {
   };
 }
 
-export type MainModule = WasmModule & typeof RuntimeExports & EmbindModule;
+export type MainModule = WasmModule & EmbindModule;
 export default function MainModuleFactory (options?: unknown): Promise<MainModule>;

@@ -31,7 +31,7 @@ export class Debug {
     this._startTime = performance.now()
   }
 
-  onsubtitleFrameCallback?: (now: DOMHighResTimeStamp, metadata: SubtitleCallbackMetadata) => void = console.log
+  onsubtitleFrameCallback?: (now: DOMHighResTimeStamp, metadata: SubtitleCallbackMetadata) => void
 
   _endFrame (meta: VideoFrameCallbackMetadata) {
     ++this.presentedFrames

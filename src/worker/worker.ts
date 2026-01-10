@@ -5,7 +5,8 @@ import { expose } from 'abslink/w3c'
 import WASM from '../wasm/jassub-worker.js'
 
 import { libassYCbCrMap, read_, readAsync, _applyKeys } from './util'
-import { colorMatrixConversionMap, WebGPURenderer } from './webgpu-renderer'
+import { WebGL2Renderer } from './webgl-renderer'
+import { WebGPURenderer } from './webgpu-renderer'
 
 import type { ASSEvent, ASSImage, ASSStyle } from '../jassub'
 import type { JASSUB, MainModule } from '../wasm/types.js'
@@ -13,6 +14,7 @@ import type { JASSUB, MainModule } from '../wasm/types.js'
 declare const self: DedicatedWorkerGlobalScope &
   typeof globalThis & {
     HEAPU8RAW: Uint8Array<ArrayBuffer>
+    WASMMEMORY: WebAssembly.Memory
   }
 
 interface opts {
@@ -36,7 +38,7 @@ export class ASSRenderer {
   _subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC' | null
   _videoColorSpace?: 'BT709' | 'BT601'
   _malloc!: (size: number) => number
-  _gpurender = new WebGPURenderer()
+  _gpurender?: WebGL2Renderer | WebGPURenderer
 
   debug = false
   useLocalFonts = false
@@ -58,16 +60,21 @@ export class ASSRenderer {
     globalThis.fetch = _ => _fetch(data.wasmUrl)
 
     // TODO: abslink doesnt support transferables yet
-    const handleMessage = ({ data }: MessageEvent) => {
+    const handleMessage = async ({ data }: MessageEvent) => {
       if (data.name === 'offscreenCanvas') {
+        await this._ready
         this._offCanvas = data.ctrl
-        this._gpurender.setCanvas(this._offCanvas!, this._offCanvas!.width, this._offCanvas!.height)
+        this._gpurender!.setCanvas(this._offCanvas!, this._offCanvas!.width, this._offCanvas!.height)
         removeEventListener('message', handleMessage)
       }
     }
     addEventListener('message', handleMessage)
 
-    this._ready = (WASM({ __url: data.wasmUrl }) as Promise<MainModule>).then(Module => {
+    const devicePromise = navigator.gpu?.requestAdapter({
+      powerPreference: 'high-performance'
+    }).then(adapter => adapter?.requestDevice())
+
+    this._ready = (WASM({ __url: data.wasmUrl }) as Promise<MainModule>).then(async Module => {
       // eslint-disable-next-line @typescript-eslint/unbound-method
       this._malloc = Module._malloc
 
@@ -89,6 +96,9 @@ export class ASSRenderer {
       if (data.libassMemoryLimit > 0 || data.libassGlyphLimit > 0) {
         this._wasm.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)
       }
+      const device = await devicePromise
+      this._gpurender = device ? new WebGPURenderer(device) : new WebGL2Renderer()
+      if (this._offCanvas) this._gpurender.setCanvas(this._offCanvas, this._offCanvas.width, this._offCanvas.height)
       this._checkColorSpace()
     })
   }
@@ -176,7 +186,7 @@ export class ASSRenderer {
 
   _checkColorSpace () {
     if (!this._subtitleColorSpace || !this._videoColorSpace) return
-    this._gpurender.setColorMatrix(colorMatrixConversionMap[this._subtitleColorSpace][this._videoColorSpace])
+    this._gpurender!.setColorMatrix(this._subtitleColorSpace, this._videoColorSpace)
   }
 
   _findAvailableFonts (font: string) {
@@ -228,14 +238,15 @@ export class ASSRenderer {
   }
 
   _canvas (width: number, height: number, videoWidth: number, videoHeight: number) {
-    if (this._offCanvas) this._gpurender.setCanvas(this._offCanvas, width, height)
+    if (this._offCanvas && this._gpurender) this._gpurender.setCanvas(this._offCanvas, width, height)
 
     this._wasm.resizeCanvas(width, height, videoWidth, videoHeight)
   }
 
-  [finalizer] () {
+  async [finalizer] () {
+    await this._ready
     this._wasm.quitLibrary()
-    this._gpurender.destroy()
+    this._gpurender!.destroy()
     // @ts-expect-error force GC
     this._wasm = null
     // @ts-expect-error force GC
@@ -244,7 +255,7 @@ export class ASSRenderer {
   }
 
   _draw (time: number, force = false) {
-    if (!this._offCanvas) return
+    if (!this._offCanvas || !this._gpurender) return
 
     const result: ASSImage = this._wasm.rawRender(time, Number(force))!
     if (this._wasm.changed === 0 && !force) return

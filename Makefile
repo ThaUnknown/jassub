@@ -152,7 +152,7 @@ LIBASS_DEPS = \
 
 dist: $(LIBASS_DEPS) src/wasm/$(WORKER_NAME).js
 
-# Dist Files https://github.com/emscripten-core/emscripten/blob/3.1.38/src/settings.js
+# Dist Files https://github.com/emscripten-core/emscripten/blob/main/src/settings.js
 
 # args for increasing performance
 # https://github.com/emscripten-core/emscripten/issues/13899
@@ -163,7 +163,7 @@ PERFORMANCE_ARGS = \
 		-s TEXTDECODER=2 \
 		-s INITIAL_MEMORY=60MB \
 		-s MALLOC=mimalloc \
-		-s WASM_BIGINT=1 \
+		-s WASM_BIGINT=0 \
 		-s MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION=1 \
 		-flto \
 		-fno-exceptions \
@@ -178,14 +178,15 @@ SIZE_ARGS = \
 		-s HTML5_SUPPORT_DEFERRING_USER_SENSITIVE_REQUESTS=0 \
 		-s INCOMING_MODULE_JS_API="[]" \
 		-s USE_SDL=0 \
+		-s EXPORTED_RUNTIME_METHODS="[]" \
+		-s IMPORTED_MEMORY=0 \
 		-s MINIMAL_RUNTIME=1 
 
 # args that are required for this to even work at all
 COMPAT_ARGS = \
 		-s EXPORTED_FUNCTIONS="['_malloc']" \
 		-s EXPORT_KEEPALIVE=1 \
-		-s EXPORTED_RUNTIME_METHODS="['getTempRet0', 'setTempRet0']" \
-		-s IMPORTED_MEMORY=1 \
+		-s WASM_BIGINT=0 \
 		-mbulk-memory
 
 src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js

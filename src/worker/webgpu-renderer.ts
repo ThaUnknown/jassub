@@ -177,118 +177,100 @@ export class WebGPURenderer {
 
   // eslint-disable-next-line no-undef
   format: GPUTextureFormat = 'bgra8unorm'
-  _ready
 
-  constructor () {
-    // Start async initialization immediately
-    this._ready = (async () => {
-    // Check WebGPU support
-      if (!navigator.gpu) {
-        throw new Error('WebGPU not supported')
-      }
+  constructor (device: GPUDevice) {
+    this.device = device
+    this.format = navigator.gpu.getPreferredCanvasFormat()
 
-      const adapter = await navigator.gpu.requestAdapter({
-        powerPreference: 'high-performance'
-      })
+    // Create shader modules
+    const vertexModule = this.device.createShaderModule({
+      code: VERTEX_SHADER
+    })
 
-      if (!adapter) {
-        throw new Error('No WebGPU adapter found')
-      }
+    const fragmentModule = this.device.createShaderModule({
+      code: FRAGMENT_SHADER
+    })
 
-      this.device = await adapter.requestDevice()
-      this.format = navigator.gpu.getPreferredCanvasFormat()
+    // Create uniform buffer
+    this.uniformBuffer = this.device.createBuffer({
+      size: 16, // vec2f resolution + padding
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    })
 
-      // Create shader modules
-      const vertexModule = this.device.createShaderModule({
-        code: VERTEX_SHADER
-      })
+    // Create color matrix buffer (mat3x3f requires 48 bytes: 3 vec3f padded to vec4f each)
+    this.colorMatrixBuffer = this.device.createBuffer({
+      size: 48, // 3 x vec4f (each column is vec3f padded to 16 bytes)
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    })
+    // Initialize with identity matrix
+    this.device.queue.writeBuffer(this.colorMatrixBuffer, 0, IDENTITY_MATRIX)
 
-      const fragmentModule = this.device.createShaderModule({
-        code: FRAGMENT_SHADER
-      })
-
-      // Create uniform buffer
-      this.uniformBuffer = this.device.createBuffer({
-        size: 16, // vec2f resolution + padding
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-      })
-
-      // Create color matrix buffer (mat3x3f requires 48 bytes: 3 vec3f padded to vec4f each)
-      this.colorMatrixBuffer = this.device.createBuffer({
-        size: 48, // 3 x vec4f (each column is vec3f padded to 16 bytes)
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-      })
-      // Initialize with identity matrix
-      this.device.queue.writeBuffer(this.colorMatrixBuffer, 0, IDENTITY_MATRIX)
-
-      // Create bind group layout (no sampler needed - using textureLoad for pixel-perfect sampling)
-      this.bindGroupLayout = this.device.createBindGroupLayout({
-        entries: [
-          {
-            binding: 0,
-            visibility: GPUShaderStage.VERTEX,
-            buffer: { type: 'uniform' }
-          },
-          {
-            binding: 1,
-            visibility: GPUShaderStage.VERTEX,
-            buffer: { type: 'read-only-storage' }
-          },
-          {
-            binding: 3,
-            visibility: GPUShaderStage.FRAGMENT,
-            texture: { sampleType: 'unfilterable-float' } // textureLoad requires unfilterable
-          },
-          {
-            binding: 4,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform' }
-          }
-        ]
-      })
-
-      // Create pipeline layout
-      const pipelineLayout = this.device.createPipelineLayout({
-        bindGroupLayouts: [this.bindGroupLayout]
-      })
-
-      // Create render pipeline
-      this.pipeline = this.device.createRenderPipeline({
-        layout: pipelineLayout,
-        vertex: {
-          module: vertexModule,
-          entryPoint: 'vertexMain'
+    // Create bind group layout (no sampler needed - using textureLoad for pixel-perfect sampling)
+    this.bindGroupLayout = this.device.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.VERTEX,
+          buffer: { type: 'uniform' }
         },
-        fragment: {
-          module: fragmentModule,
-          entryPoint: 'fragmentMain',
-          targets: [
-            {
-              format: this.format,
-              blend: {
-                color: {
-                  srcFactor: 'one',
-                  dstFactor: 'one-minus-src-alpha',
-                  operation: 'add'
-                },
-                alpha: {
-                  srcFactor: 'one',
-                  dstFactor: 'one-minus-src-alpha',
-                  operation: 'add'
-                }
+        {
+          binding: 1,
+          visibility: GPUShaderStage.VERTEX,
+          buffer: { type: 'read-only-storage' }
+        },
+        {
+          binding: 3,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'unfilterable-float' } // textureLoad requires unfilterable
+        },
+        {
+          binding: 4,
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: { type: 'uniform' }
+        }
+      ]
+    })
+
+    // Create pipeline layout
+    const pipelineLayout = this.device.createPipelineLayout({
+      bindGroupLayouts: [this.bindGroupLayout]
+    })
+
+    // Create render pipeline
+    this.pipeline = this.device.createRenderPipeline({
+      layout: pipelineLayout,
+      vertex: {
+        module: vertexModule,
+        entryPoint: 'vertexMain'
+      },
+      fragment: {
+        module: fragmentModule,
+        entryPoint: 'fragmentMain',
+        targets: [
+          {
+            format: this.format,
+            blend: {
+              color: {
+                srcFactor: 'one',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add'
+              },
+              alpha: {
+                srcFactor: 'one',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add'
               }
             }
-          ]
-        },
-        primitive: {
-          topology: 'triangle-list'
-        }
-      })
-    })()
+          }
+        ]
+      },
+      primitive: {
+        topology: 'triangle-list'
+      }
+    })
   }
 
-  async setCanvas (canvas: OffscreenCanvas, width: number, height: number) {
-    await this._ready
+  setCanvas (canvas: OffscreenCanvas, width: number, height: number) {
     if (!this.device) return
 
     // WebGPU doesn't allow 0-sized textures/swapchains
@@ -324,13 +306,13 @@ export class WebGPURenderer {
    * Pass null or undefined to use identity (no conversion).
    * Matrix should be a pre-padded Float32Array with 12 values (3 columns × 4 floats each).
    */
-  async setColorMatrix (matrix?: Float32Array<ArrayBuffer>) {
-    await this._ready
+  setColorMatrix (subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC', videoColorSpace?: 'BT601' | 'BT709') {
     if (!this.device) return
-    this.device.queue.writeBuffer(this.colorMatrixBuffer!, 0, matrix ?? IDENTITY_MATRIX)
+    const colorMatrix = (subtitleColorSpace && videoColorSpace && colorMatrixConversionMap[subtitleColorSpace]?.[videoColorSpace]) ?? IDENTITY_MATRIX
+    this.device.queue.writeBuffer(this.colorMatrixBuffer!, 0, colorMatrix)
   }
 
-  private createTextureInfo (width: number, height: number): TextureInfo {
+  createTextureInfo (width: number, height: number): TextureInfo {
     const texture = this.device!.createTexture({
       size: [width, height],
       format: 'r8unorm',

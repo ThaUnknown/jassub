@@ -1,3 +1,6 @@
 /*.wasm
   content-type: application/wasm
 
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless

@@ -25,6 +25,9 @@ importers:
       jassub:
         specifier: ^2.2.0
         version: 2.2.0
+      throughput:
+        specifier: ^1.0.2
+        version: 1.0.2
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.9

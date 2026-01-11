@@ -1,17 +1,17 @@
 import JSSO from '@jellyfin/libass-wasm'
-import workerUrl from '@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker.js?url'
 import throughput from 'throughput'
 
 import type { PerfCallback } from '$lib/constants'
-import '@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker.wasm?url'
 
 export default async function (subUrl: string, video: HTMLVideoElement, timeOffset = 0, fonts: string[] = [], cb: PerfCallback) {
+  const wasm = new URL('@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker.wasm', import.meta.url).toString()
+  console.log(wasm)
   const instance = new JSSO({
     video,
     subUrl,
     fonts,
     timeOffset,
-    workerUrl,
+    workerUrl: new URL('@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker.js', import.meta.url).toString(),
     renderMode: 'wasm-blend',
     dropAllAnimations: false,
     libassMemoryLimit: 40,

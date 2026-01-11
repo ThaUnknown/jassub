@@ -60,7 +60,10 @@ export const subtitleList: Record<string, Subtitle> = {
   },
   kusriya: {
     delay: 0,
-    fonts: [],
+    fonts: [
+      '/fonts/FOT-TsukuCOldMinPr6NR.OTF',
+      '/fonts/RoughFlowers.TTF'
+    ],
     subUrl: '/subtitles/Kusriya S2 OP1v3.ass',
     videoUrl: 'https://v.animethemes.moe/KusuriyaNoHitorigotoS2-OP1-NCBD1080.webm'
   }

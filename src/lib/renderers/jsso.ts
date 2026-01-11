@@ -42,6 +42,7 @@ export default async function (subUrl: string, video: HTMLVideoElement, timeOffs
           fps,
           processingDuration
         })
+        originalLog(log)
       }
     }
   }

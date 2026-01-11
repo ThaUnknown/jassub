@@ -27,6 +27,11 @@
     "@jellyfin/libass-wasm": "^4.2.3",
     "@sabre-js/sabre": "0.5.1-pre.322713f",
     "assjs-v2": "^1.0.8",
-    "jassub": "^2.0.20"
+    "jassub": "^2.2.0"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "assjs-v2": "patches/assjs-v2.patch"
+    }
   }
 }

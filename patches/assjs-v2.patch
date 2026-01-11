@@ -1,0 +1,16 @@
+diff --git a/dist/ass.js b/dist/ass.js
+index ae264efe23daff9d98d3fc299e705af0b1702c61..a8495b2092c7d1e897d77e41898dd175bd9646e4 100644
+--- a/dist/ass.js
++++ b/dist/ass.js
+@@ -1715,7 +1715,11 @@ function clear(store) {
+   store.space = [];
+ }
+ 
++let lastMediaTime = 0
+ function framing(store, mediaTime) {
++  const timeDiff = mediaTime - lastMediaTime
++  lastMediaTime = mediaTime
++  globalThis.profile(timeDiff)
+   const { dialogues, actives } = store;
+   const vct = mediaTime - store.delay;
+   for (let i = actives.length - 1; i >= 0; i -= 1) {

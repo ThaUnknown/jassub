@@ -6,6 +6,10 @@
 </p>
 JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>, which renders <a href="https://en.wikipedia.org/wiki/SubStation_Alpha">SSA/ASS subtitles</a> directly in your browser. It uses Emscripten to compile libass' C++ code to WASM, and WebGL for hardware acceleration.
 
+<p align="center">
+  <a href="https://jassub.pages.dev" target="_blank">Demo</a>
+</h1>
+
 ## Features
 
 * Supports all SSA/ASS features (everything libass supports)
@@ -124,6 +128,8 @@ await instance.renderer.setDefaultFont('Gandhi Sans') // or you can await if if 
 ```
 
 Make sure to always `await instance.ready` before running any methods!!!
+
+Example usage can be found in the demo source [here](https://github.com/ThaUnknown/jassub/tree/gh-pages).
 
 ## Looking for backwards compatibility with much older browser engines?
 

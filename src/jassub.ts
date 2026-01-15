@@ -250,8 +250,8 @@ export default class JASSUB {
       // @ts-expect-error ts doesnt know
       const fontData = await queryLocalFonts()
       // @ts-expect-error ts doesnt know
-      const font = fontData?.find(obj => obj.fullName.toLowerCase() === name)
-      if (font) {
+      const fonts = fontData?.filter(({ fullName, family }) => fullName.toLowerCase() === name || family.toLowerCase() === name)
+      for (const font of fonts) {
         const blob: Blob = await font.blob()
         this.renderer.addFont(new Uint8Array(await blob.arrayBuffer()))
       }

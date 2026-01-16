@@ -339,7 +339,7 @@ export default class JASSUB {
     this._destroyed = true
     if (this._video && this._canvasParent) this._video.parentNode?.removeChild(this._canvasParent)
     this._removeListeners()
-    await this.renderer[releaseProxy]()
+    await this.renderer?.[releaseProxy]()
     this._worker.terminate()
   }
 }

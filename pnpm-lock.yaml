@@ -23,8 +23,8 @@ importers:
         specifier: ^1.0.8
         version: 1.0.8(patch_hash=sjlkda4uulzzsf4iwplt5cirf4)
       jassub:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: ^2.2.4
+        version: 2.2.4
       throughput:
         specifier: ^1.0.2
         version: 1.0.2
@@ -1154,8 +1154,8 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
-  jassub@2.2.0:
-    resolution: {integrity: sha512-9u/iW/BYtW0/1G5omTvCBXDaD9mFlYcbcnqgb37D8S8salnexmIQZ2rJnPcjJk0a/nd9LF8py4fum049O1H0vA==}
+  jassub@2.2.4:
+    resolution: {integrity: sha512-GCdP0xhf+zwqKqhRbxwLfhagw66sdgX1nN1wQVsWhJPDlj2FuQOOrD/kt+SiXaU71YP8SKzGMWfLDjo0FIzIZw==}
 
   js-yaml@4.1.1:
     resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
@@ -1387,8 +1387,8 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
-  rvfc-polyfill@1.0.7:
-    resolution: {integrity: sha512-seBl7J1J3/k0LuzW2T9fG6JIOpni5AbU+/87LA+zTYKgTVhsfShmS8K/yOo1eeEjGJHnAdkVAUUM+PEjN9Mpkw==}
+  rvfc-polyfill@1.0.8:
+    resolution: {integrity: sha512-uA+0wwTkZ4OT8v45pfDfH+7Yq8mY6MvNngiF5Sq6VBgjJsvsfgt7Q18cyZqZjfAhW9rhkgXPX0cW0R9uw7yElA==}
 
   sade@1.8.1:
     resolution: {integrity: sha512-xal3CZX1Xlo/k4ApwCFrHVACi9fBqJ7V+mwhBsuf/1IOKbBy098Fex+Wa/5QMubw09pSZ/u8EY8PWgevJsXp1A==}
@@ -2866,10 +2866,10 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  jassub@2.2.0:
+  jassub@2.2.4:
     dependencies:
       abslink: 1.1.6
-      rvfc-polyfill: 1.0.7
+      rvfc-polyfill: 1.0.8
       throughput: 1.0.2
 
   js-yaml@4.1.1:
@@ -3115,7 +3115,7 @@ snapshots:
       '@rollup/rollup-win32-x64-msvc': 4.55.1
       fsevents: 2.3.3
 
-  rvfc-polyfill@1.0.7: {}
+  rvfc-polyfill@1.0.8: {}
 
   sade@1.8.1:
     dependencies:

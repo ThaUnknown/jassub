@@ -35,7 +35,7 @@ The
 }
 ```
 
-headers are recommended to use this library, as it uses SharedArrayBuffer for multi-threading, but if you can't set them, it will fallback automatically to work in single-threaded mode.
+headers are recommended to use this library, as it uses SharedArrayBuffer for multi-threading, but if you can't set them, it will fallback automatically to work in single-threaded mode. Firefox doesn't support threading so they are not required there.
 
 At minimum WASM + WebGL2 + TextDecoder + OffscreenCanvas + Web Workers + Proxy + AbortController + Fetch + Promise + getVideoPlaybackQuality/requestVideoFrameCallback are required for JASSUB to work.
 
@@ -78,7 +78,7 @@ If you use a custom bundler, and need to override the worker and wasm URLs you c
 
 ```js
 import JASSUB from 'jassub'
-import workerUrl from 'jassub/dist/jassub-worker.js?url'
+import workerUrl from 'jassub/dist/jassub-worker.js?worker&url'
 import wasmUrl from 'jassub/dist/jassub-worker.wasm?url' // non-SIMD fallback
 import modernWasmUrl from 'jassub/dist/jassub-worker-modern.wasm?url' // SIMD
 
@@ -98,7 +98,7 @@ However this shoud almost never be necessary.
 You're also able to use it without any video. However, that requires you to set the time the subtitles should render at yourself:
 
 ```js
-import JASSUB from './jassub.es.js'
+import JASSUB from 'jassub'
 
 const instance = new JASSUB({
   canvas: document.querySelector('canvas'),

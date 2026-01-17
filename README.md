@@ -53,7 +53,7 @@ Fetch:             42 10.1 39  /  41 10.1 34
 getVPQ/rVFC:       80 8 42     /  28 8 42
 -->
 
-JASSUB supports Chrome/Safari/Firefox 80/17/105, you bring the support down to 67/16.2/68 if you enable some flags/settings in your browser for these features, and polyfill AbortController and getVideoPlaybackQuality. For other engines other polyfills might be needed. Babel is also recommended if you need to support older JS engines as JASSUB ships as ES modules with modern syntax.
+JASSUB supports Chrome/Safari/Firefox 80/17/105, you bring the support down to 67/16.2/68 if you enable some flags/settings in your browser for these features, and polyfill AbortController. For other engines other polyfills might be needed. Babel is also recommended if you need to support older JS engines as JASSUB ships as ES modules with modern syntax.
 
 <!-- See https://github.com/gpuweb/gpuweb/wiki/Implementation-Status for a WebGPU support table, and what flags you might need to enable it in your browser if you want to utilise it instead of WebGL2. -->
 

@@ -31,7 +31,19 @@ export class Debug {
     this._startTime = performance.now()
   }
 
-  onsubtitleFrameCallback?: (now: DOMHighResTimeStamp, metadata: SubtitleCallbackMetadata) => void
+  onsubtitleFrameCallback?: (now: DOMHighResTimeStamp, metadata: SubtitleCallbackMetadata) => void = (_, { fps, processingDuration, droppedFrames }) => console.info(
+    '%cFPS: %c%f %c| Frame Time: %c%d ms %c| Dropped Frames: %c%d %c| 5s Avg',
+    'color: #888',
+    'color: #0f0; font-weight: bold',
+    fps.toFixed(1),
+    'color: #888',
+    'color: #0ff; font-weight: bold',
+    processingDuration,
+    'color: #888',
+    'color: #f00; font-weight: bold',
+    droppedFrames,
+    'color: #888'
+  )
 
   _endFrame (meta: VideoFrameCallbackMetadata) {
     ++this.presentedFrames
@@ -54,19 +66,5 @@ export class Debug {
       height: meta.height,
       mediaTime: meta.mediaTime
     })
-
-    console.info(
-      '%cFPS: %c%f %c| Frame Time: %c%d ms %c| Dropped Frames: %c%d %c| 5s Avg',
-      'color: #888',
-      'color: #0f0; font-weight: bold',
-      fps.toFixed(1),
-      'color: #888',
-      'color: #0ff; font-weight: bold',
-      processingDuration,
-      'color: #888',
-      'color: #f00; font-weight: bold',
-      this.droppedFrames,
-      'color: #888'
-    )
   }
 }

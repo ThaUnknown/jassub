@@ -6,8 +6,18 @@ declare const self: DedicatedWorkerGlobalScope &
     WASMMEMORY: WebAssembly.Memory
   }
 
+const IS_FIREFOX = navigator.userAgent.toLowerCase().includes('firefox')
+
+const THREAD_COUNT = !IS_FIREFOX && self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1
+
 // @ts-expect-error new experimental API
 const SUPPORTS_GROWTH = !!WebAssembly.Memory.prototype.toResizableBuffer
+
+// HACK: 3 memory hacks to support here:
+// 1. Chrome WASM Growable memory which can use a reference to the buffer to fix visual artifacts, which happen both with multithreading or without [fastest]
+// 2. Chrome WASM non-growable, but mult-threaded only memory which needs to re-create the HEAPU8 on growth because of race conditions [medium]
+// 3. Firefox non-growable memory which needs a copy of the data into a non-resizable buffer and can't use a reference [fastest single threaded, but only on Firefox, on Chrome this is slowest]
+const SHOULD_REFERENCE_MEMORY = !IS_FIREFOX && (SUPPORTS_GROWTH || THREAD_COUNT > 1)
 
 const IDENTITY_MATRIX = new Float32Array([
   1, 0, 0,
@@ -304,7 +314,7 @@ export class WebGL2Renderer {
       0,
       this.gl!.RED,
       this.gl!.UNSIGNED_BYTE,
-      null
+      null // Firefox cries about uninitialized data, but is slower with zero initialized data...
     )
 
     // Set texture parameters (no filtering needed for texelFetch, but set anyway)
@@ -320,8 +330,8 @@ export class WebGL2Renderer {
   render (images: ASSImage[], heap: Uint8Array): void {
     if (!this.gl || !this.program || !this.vao || !this.texArray) return
 
-    // Hack: work around shared memory issues, webGL doesnt support shared memory, so there are race conditions when growing memory
-    if ((self.HEAPU8RAW.buffer !== self.WASMMEMORY.buffer) || SUPPORTS_GROWTH) {
+    // HACK 1 and 2 [see above for explanation]
+    if ((self.HEAPU8RAW.buffer !== self.WASMMEMORY.buffer) || SHOULD_REFERENCE_MEMORY) {
       heap = self.HEAPU8RAW = new Uint8Array(self.WASMMEMORY.buffer)
     }
 
@@ -356,18 +366,36 @@ export class WebGL2Renderer {
       // Upload bitmap data to texture array layer
       this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, img.stride)
 
-      this.gl.texSubImage3D(
-        this.gl.TEXTURE_2D_ARRAY,
-        0,
-        0, 0, layer, // x, y, z offset
-        img.w,
-        img.h,
-        1, // depth (1 layer)
-        this.gl.RED,
-        this.gl.UNSIGNED_BYTE,
-        heap,
-        img.bitmap
-      )
+      if (IS_FIREFOX) {
+        // HACK 3 [see above for explanation]
+        const sourceView = new Uint8Array(heap.buffer, img.bitmap, img.stride * img.h)
+        const bitmapData = new Uint8Array(sourceView)
+
+        this.gl.texSubImage3D(
+          this.gl.TEXTURE_2D_ARRAY,
+          0,
+          0, 0, layer, // x, y, z offset
+          img.w,
+          img.h,
+          1, // depth (1 layer)
+          this.gl.RED,
+          this.gl.UNSIGNED_BYTE,
+          bitmapData
+        )
+      } else {
+        this.gl.texSubImage3D(
+          this.gl.TEXTURE_2D_ARRAY,
+          0,
+          0, 0, layer, // x, y, z offset
+          img.w,
+          img.h,
+          1, // depth (1 layer)
+          this.gl.RED,
+          this.gl.UNSIGNED_BYTE,
+          heap,
+          img.bitmap
+        )
+      }
 
       this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, 0)
 

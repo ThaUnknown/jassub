@@ -11,6 +11,8 @@ import { WebGL2Renderer } from './webgl-renderer'
 import type { ASSEvent, ASSImage, ASSStyle } from '../jassub'
 import type { JASSUB, MainModule } from '../wasm/types.js'
 
+const IS_FIREFOX = navigator.userAgent.toLowerCase().includes('firefox')
+
 declare const self: DedicatedWorkerGlobalScope &
   typeof globalThis & {
     HEAPU8RAW: Uint8Array<ArrayBuffer>
@@ -80,7 +82,9 @@ export class ASSRenderer {
 
       const fallbackFont = data.fallbackFont.toLowerCase()
       this._wasm = new Module.JASSUB(data.width, data.height, fallbackFont)
-      this._wasm.setThreads(self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1)
+      // Firefox seems to have issues with multithreading in workers
+      // a worker inside a worker does not recive messages properly
+      this._wasm.setThreads(!IS_FIREFOX && self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1)
 
       if (fallbackFont) this._findAvailableFonts(fallbackFont)
 

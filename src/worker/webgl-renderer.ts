@@ -72,9 +72,9 @@ export const colorMatrixConversionMap = {
 
 export type ColorSpace = keyof typeof colorMatrixConversionMap
 
-// GLSL ES 3.0 Vertex Shader
+// GLSL ES 3.0 Vertex Shader with Instancing
 const VERTEX_SHADER = /* glsl */`#version 300 es
-precision highp float;
+precision mediump float;
 
 const vec2 QUAD_POSITIONS[6] = vec2[6](
   vec2(0.0, 0.0),
@@ -86,9 +86,11 @@ const vec2 QUAD_POSITIONS[6] = vec2[6](
 );
 
 uniform vec2 u_resolution;
-uniform vec4 u_destRect;  // x, y, w, h
-uniform vec4 u_color;     // r, g, b, a
-uniform float u_texLayer;
+
+// Instance attributes
+in vec4 a_destRect;  // x, y, w, h
+in vec4 a_color;     // r, g, b, a
+in float a_texLayer;
 
 flat out vec2 v_destXY;
 flat out vec4 v_color;
@@ -97,22 +99,22 @@ flat out float v_texLayer;
 
 void main() {
   vec2 quadPos = QUAD_POSITIONS[gl_VertexID];
-  vec2 pixelPos = u_destRect.xy + quadPos * u_destRect.zw;
+  vec2 pixelPos = a_destRect.xy + quadPos * a_destRect.zw;
   vec2 clipPos = (pixelPos / u_resolution) * 2.0 - 1.0;
   clipPos.y = -clipPos.y;
 
   gl_Position = vec4(clipPos, 0.0, 1.0);
-  v_destXY = u_destRect.xy;
-  v_color = u_color;
-  v_texSize = u_destRect.zw;
-  v_texLayer = u_texLayer;
+  v_destXY = a_destRect.xy;
+  v_color = a_color;
+  v_texSize = a_destRect.zw;
+  v_texLayer = a_texLayer;
 }
 `
 
 // GLSL ES 3.0 Fragment Shader - use texelFetch for pixel-perfect sampling
 const FRAGMENT_SHADER = /* glsl */`#version 300 es
-precision highp float;
-precision highp sampler2DArray;
+precision mediump float;
+precision mediump sampler2DArray;
 
 uniform sampler2DArray u_texArray;
 uniform mat3 u_colorMatrix;
@@ -138,8 +140,7 @@ void main() {
   // Bounds check (prevents out-of-bounds access)
   ivec2 texSizeI = ivec2(v_texSize);
   if (texCoord.x < 0 || texCoord.y < 0 || texCoord.x >= texSizeI.x || texCoord.y >= texSizeI.y) {
-    fragColor = vec4(0.0);
-    return;
+    discard;
   }
 
   // texelFetch: integer coords, no interpolation, no precision issues
@@ -162,6 +163,7 @@ void main() {
 // Texture array configuration
 const TEX_ARRAY_SIZE = 64 // Fixed layer count
 const TEX_INITIAL_SIZE = 256 // Initial width/height
+const MAX_INSTANCES = 256 // Maximum instances per draw call
 
 export class WebGL2Renderer {
   gl: WebGL2RenderingContext | null = null
@@ -170,18 +172,30 @@ export class WebGL2Renderer {
 
   // Uniform locations
   u_resolution: WebGLUniformLocation | null = null
-  u_destRect: WebGLUniformLocation | null = null
-  u_color: WebGLUniformLocation | null = null
   u_texArray: WebGLUniformLocation | null = null
   u_colorMatrix: WebGLUniformLocation | null = null
-  u_texLayer: WebGLUniformLocation | null = null
 
-  // Single texture array instead of individual textures
+  // Instance attribute buffers
+  instanceDestRectBuffer: WebGLBuffer | null = null
+  instanceColorBuffer: WebGLBuffer | null = null
+  instanceTexLayerBuffer: WebGLBuffer | null = null
+
+  // Instance data arrays
+  instanceDestRectData: Float32Array
+  instanceColorData: Float32Array
+  instanceTexLayerData: Float32Array
+
   texArray: WebGLTexture | null = null
   texArrayWidth = 0
   texArrayHeight = 0
 
   colorMatrix: Float32Array = IDENTITY_MATRIX
+
+  constructor () {
+    this.instanceDestRectData = new Float32Array(MAX_INSTANCES * 4)
+    this.instanceColorData = new Float32Array(MAX_INSTANCES * 4)
+    this.instanceTexLayerData = new Float32Array(MAX_INSTANCES)
+  }
 
   setCanvas (canvas: OffscreenCanvas, width: number, height: number) {
     // WebGL2 doesn't allow 0-sized canvases
@@ -191,16 +205,15 @@ export class WebGL2Renderer {
     canvas.height = height
 
     if (!this.gl) {
-      // Get canvas context
-      // Note: preserveDrawingBuffer is false (default) - the browser handles
-      // buffer swaps for OffscreenCanvas, avoiding flicker
       this.gl = canvas.getContext('webgl2', {
         alpha: true,
         premultipliedAlpha: true,
         antialias: false,
         depth: false,
+        preserveDrawingBuffer: false,
         stencil: false,
-        desynchronized: true
+        desynchronized: true,
+        powerPreference: 'high-performance'
       })
 
       if (!this.gl) {
@@ -231,15 +244,36 @@ export class WebGL2Renderer {
 
       // Get uniform locations
       this.u_resolution = this.gl.getUniformLocation(this.program, 'u_resolution')
-      this.u_destRect = this.gl.getUniformLocation(this.program, 'u_destRect')
-      this.u_color = this.gl.getUniformLocation(this.program, 'u_color')
       this.u_texArray = this.gl.getUniformLocation(this.program, 'u_texArray')
       this.u_colorMatrix = this.gl.getUniformLocation(this.program, 'u_colorMatrix')
-      this.u_texLayer = this.gl.getUniformLocation(this.program, 'u_texLayer')
+
+      // Create instance attribute buffers
+      this.instanceDestRectBuffer = this.gl.createBuffer()
+      this.instanceColorBuffer = this.gl.createBuffer()
+      this.instanceTexLayerBuffer = this.gl.createBuffer()
 
       // Create a VAO (required for WebGL2)
       this.vao = this.gl.createVertexArray()
       this.gl.bindVertexArray(this.vao)
+
+      // Setup instance attributes
+      const destRectLoc = this.gl.getAttribLocation(this.program, 'a_destRect')
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceDestRectBuffer)
+      this.gl.enableVertexAttribArray(destRectLoc)
+      this.gl.vertexAttribPointer(destRectLoc, 4, this.gl.FLOAT, false, 0, 0)
+      this.gl.vertexAttribDivisor(destRectLoc, 1)
+
+      const colorLoc = this.gl.getAttribLocation(this.program, 'a_color')
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceColorBuffer)
+      this.gl.enableVertexAttribArray(colorLoc)
+      this.gl.vertexAttribPointer(colorLoc, 4, this.gl.FLOAT, false, 0, 0)
+      this.gl.vertexAttribDivisor(colorLoc, 1)
+
+      const texLayerLoc = this.gl.getAttribLocation(this.program, 'a_texLayer')
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceTexLayerBuffer)
+      this.gl.enableVertexAttribArray(texLayerLoc)
+      this.gl.vertexAttribPointer(texLayerLoc, 1, this.gl.FLOAT, false, 0, 0)
+      this.gl.vertexAttribDivisor(texLayerLoc, 1)
 
       // Set up blending for premultiplied alpha
       this.gl.enable(this.gl.BLEND)
@@ -283,10 +317,8 @@ export class WebGL2Renderer {
     return shader
   }
 
-  /**
-     * Set the color matrix for color space conversion.
-     * Pass null or undefined to use identity (no conversion).
-     */
+  // Set the color matrix for color space conversion.
+  // Pass null or undefined to use identity (no conversion).
   setColorMatrix (subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC', videoColorSpace?: 'BT601' | 'BT709') {
     this.colorMatrix = (subtitleColorSpace && videoColorSpace && colorMatrixConversionMap[subtitleColorSpace]?.[videoColorSpace]) ?? IDENTITY_MATRIX
     if (this.gl && this.u_colorMatrix && this.program) {
@@ -338,82 +370,102 @@ export class WebGL2Renderer {
     // Clear canvas
     this.gl.clear(this.gl.COLOR_BUFFER_BIT)
 
-    // Find max dimensions needed
+    // Find max dimensions needed and filter valid images
     let maxW = this.texArrayWidth
     let maxH = this.texArrayHeight
+    const validImages: ASSImage[] = []
+
     for (const img of images) {
+      if (img.w <= 0 || img.h <= 0) continue
+      validImages.push(img)
       if (img.w > maxW) maxW = img.w
       if (img.h > maxH) maxH = img.h
     }
 
+    if (validImages.length === 0) return
+
     // Resize texture array if needed
     if (maxW > this.texArrayWidth || maxH > this.texArrayHeight) {
       this.createTexArray(maxW, maxH)
-      this.gl.bindTexture(this.gl.TEXTURE_2D_ARRAY, this.texArray)
     }
 
-    // Render each image
-    for (let i = 0, texLayer = 0; i < images.length; i++) {
-      const img = images[i]!
+    // Process images in chunks that fit within texture array size
+    const batchSize = Math.min(TEX_ARRAY_SIZE, MAX_INSTANCES)
 
-      // Skip images with invalid dimensions
-      if (img.w <= 0 || img.h <= 0) continue
+    for (let batchStart = 0; batchStart < validImages.length; batchStart += batchSize) {
+      const batchEnd = Math.min(batchStart + batchSize, validImages.length)
+      let instanceCount = 0
 
-      // Use modulo to cycle through layers if we have more images than layers
-      const layer = texLayer % TEX_ARRAY_SIZE
-      texLayer++
+      // Upload textures for this batch
+      for (let i = batchStart; i < batchEnd; i++) {
+        const img = validImages[i]!
+        const layer = instanceCount
 
-      // Upload bitmap data to texture array layer
-      this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, img.stride)
+        // Upload bitmap data to texture array layer
+        this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, img.stride)
 
-      if (IS_FIREFOX) {
-        // HACK 3 [see above for explanation]
-        const sourceView = new Uint8Array(heap.buffer, img.bitmap, img.stride * img.h)
-        const bitmapData = new Uint8Array(sourceView)
+        if (IS_FIREFOX) {
+          // HACK 3 [see above for explanation]
+          const sourceView = new Uint8Array(heap.buffer, img.bitmap, img.stride * img.h)
+          const bitmapData = new Uint8Array(sourceView)
 
-        this.gl.texSubImage3D(
-          this.gl.TEXTURE_2D_ARRAY,
-          0,
-          0, 0, layer, // x, y, z offset
-          img.w,
-          img.h,
-          1, // depth (1 layer)
-          this.gl.RED,
-          this.gl.UNSIGNED_BYTE,
-          bitmapData
-        )
-      } else {
-        this.gl.texSubImage3D(
-          this.gl.TEXTURE_2D_ARRAY,
-          0,
-          0, 0, layer, // x, y, z offset
-          img.w,
-          img.h,
-          1, // depth (1 layer)
-          this.gl.RED,
-          this.gl.UNSIGNED_BYTE,
-          heap,
-          img.bitmap
-        )
+          this.gl.texSubImage3D(
+            this.gl.TEXTURE_2D_ARRAY,
+            0,
+            0, 0, layer, // x, y, z offset
+            img.w,
+            img.h,
+            1, // depth (1 layer)
+            this.gl.RED,
+            this.gl.UNSIGNED_BYTE,
+            bitmapData
+          )
+        } else {
+          this.gl.texSubImage3D(
+            this.gl.TEXTURE_2D_ARRAY,
+            0,
+            0, 0, layer, // x, y, z offset
+            img.w,
+            img.h,
+            1, // depth (1 layer)
+            this.gl.RED,
+            this.gl.UNSIGNED_BYTE,
+            heap,
+            img.bitmap
+          )
+        }
+        // Fill instance data
+        const idx = instanceCount * 4
+        this.instanceDestRectData[idx] = img.dst_x
+        this.instanceDestRectData[idx + 1] = img.dst_y
+        this.instanceDestRectData[idx + 2] = img.w
+        this.instanceDestRectData[idx + 3] = img.h
+
+        this.instanceColorData[idx] = ((img.color >>> 24) & 0xFF) / 255
+        this.instanceColorData[idx + 1] = ((img.color >>> 16) & 0xFF) / 255
+        this.instanceColorData[idx + 2] = ((img.color >>> 8) & 0xFF) / 255
+        this.instanceColorData[idx + 3] = (img.color & 0xFF) / 255
+
+        this.instanceTexLayerData[instanceCount] = layer
+
+        instanceCount++
       }
 
       this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, 0)
 
-      // Set uniforms
-      this.gl.uniform4f(this.u_destRect, img.dst_x, img.dst_y, img.w, img.h)
-      this.gl.uniform1f(this.u_texLayer, layer)
+      if (instanceCount === 0) continue
+      // Upload instance data to buffers
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceDestRectBuffer)
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceDestRectData.subarray(0, instanceCount * 4), this.gl.DYNAMIC_DRAW)
 
-      // color (RGBA from 0xRRGGBBAA)
-      this.gl.uniform4f(
-        this.u_color,
-        ((img.color >>> 24) & 0xFF) / 255,
-        ((img.color >>> 16) & 0xFF) / 255,
-        ((img.color >>> 8) & 0xFF) / 255,
-        (img.color & 0xFF) / 255
-      )
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceColorBuffer)
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceColorData.subarray(0, instanceCount * 4), this.gl.DYNAMIC_DRAW)
 
-      // 6 vertices for quad
-      this.gl.drawArrays(this.gl.TRIANGLES, 0, 6)
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceTexLayerBuffer)
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceTexLayerData.subarray(0, instanceCount), this.gl.DYNAMIC_DRAW)
+
+      // Single instanced draw call
+      this.gl.drawArraysInstanced(this.gl.TRIANGLES, 0, 6, instanceCount)
     }
   }
 
@@ -422,6 +474,21 @@ export class WebGL2Renderer {
       if (this.texArray) {
         this.gl.deleteTexture(this.texArray)
         this.texArray = null
+      }
+
+      if (this.instanceDestRectBuffer) {
+        this.gl.deleteBuffer(this.instanceDestRectBuffer)
+        this.instanceDestRectBuffer = null
+      }
+
+      if (this.instanceColorBuffer) {
+        this.gl.deleteBuffer(this.instanceColorBuffer)
+        this.instanceColorBuffer = null
+      }
+
+      if (this.instanceTexLayerBuffer) {
+        this.gl.deleteBuffer(this.instanceTexLayerBuffer)
+        this.instanceTexLayerBuffer = null
       }
 
       if (this.vao) {

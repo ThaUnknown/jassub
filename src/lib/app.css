@@ -36,3 +36,59 @@ video {
     color: #8e96f0
   }
 }
+
+main {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 0 10px;
+}
+
+table {
+  border-collapse: collapse;
+  border: 1px solid #ccc;
+}
+
+th,
+td {
+  border: 1px solid #ccc;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+div {
+  margin: 10px 0;
+}
+
+.notes {
+  color: #c00;
+  margin-left: 2px;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #ccc;
+}
+
+footer h3 {
+  margin: 0 0 8px;
+  font-size: 1em;
+}
+
+dl {
+  margin: 0;
+}
+
+dl span {
+  display: flex;
+  gap: 6px;
+}
+
+dt {
+  font-weight: bold;
+  color: #c00;
+}
+
+dd {
+  margin: 0;
+}

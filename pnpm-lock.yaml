@@ -23,8 +23,8 @@ importers:
         specifier: ^1.0.8
         version: 1.0.8(patch_hash=sjlkda4uulzzsf4iwplt5cirf4)
       jassub:
-        specifier: ^2.2.4
-        version: 2.2.4
+        specifier: ^2.2.5
+        version: 2.2.5
       throughput:
         specifier: ^1.0.2
         version: 1.0.2
@@ -1154,8 +1154,8 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
-  jassub@2.2.4:
-    resolution: {integrity: sha512-GCdP0xhf+zwqKqhRbxwLfhagw66sdgX1nN1wQVsWhJPDlj2FuQOOrD/kt+SiXaU71YP8SKzGMWfLDjo0FIzIZw==}
+  jassub@2.2.5:
+    resolution: {integrity: sha512-sFsyzpf3dgAchREjKrUmfxyq5VA7lusOYD3EugzBDMgYmGlWOXMQhNwt4NrZ9jqKGcSbPjfMI3LIoLUXBa+t9Q==}
 
   js-yaml@4.1.1:
     resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
@@ -2866,7 +2866,7 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  jassub@2.2.4:
+  jassub@2.2.5:
     dependencies:
       abslink: 1.1.6
       rvfc-polyfill: 1.0.8

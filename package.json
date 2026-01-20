@@ -1,6 +1,6 @@
 {
   "name": "jassub",
-  "version": "2.2.6",
+  "version": "2.2.7",
   "description": "The Fastest JavaScript SSA/ASS Subtitle Renderer For Browsers",
   "main": "dist/jassub.js",
   "type": "module",

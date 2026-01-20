@@ -66,7 +66,7 @@ export class ASSRenderer {
       if (data.name === 'offscreenCanvas') {
         // await this._ready // needed for webGPU
         this._offCanvas = data.ctrl
-        this._gpurender.setCanvas(this._offCanvas!, this._offCanvas!.width, this._offCanvas!.height)
+        this._gpurender.setCanvas(this._offCanvas!)
         removeEventListener('message', handleMessage)
       }
     }
@@ -241,10 +241,9 @@ export class ASSRenderer {
     }
   }
 
-  _canvas (width: number, height: number, videoWidth: number, videoHeight: number) {
-    if (this._offCanvas && this._gpurender) this._gpurender.setCanvas(this._offCanvas, width, height)
-
+  _resizeCanvas (width: number, height: number, videoWidth: number, videoHeight: number) {
     this._wasm.resizeCanvas(width, height, videoWidth, videoHeight)
+    this._gpurender.resizeCanvas(width, height)
   }
 
   async [finalizer] () {
@@ -258,11 +257,11 @@ export class ASSRenderer {
     this._availableFonts = {}
   }
 
-  _draw (time: number, force = false) {
+  _draw (time: number, repaint = false) {
     if (!this._offCanvas || !this._gpurender) return
 
-    const result: ASSImage = this._wasm.rawRender(time, Number(force))!
-    if (this._wasm.changed === 0 && !force) return
+    const result: ASSImage = this._wasm.rawRender(time, Number(repaint))!
+    if (this._wasm.changed === 0 && !repaint) return
 
     const bitmaps: ASSImage[] = []
 

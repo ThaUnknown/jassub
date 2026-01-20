@@ -166,6 +166,7 @@ const TEX_INITIAL_SIZE = 256 // Initial width/height
 const MAX_INSTANCES = 256 // Maximum instances per draw call
 
 export class WebGL2Renderer {
+  canvas: OffscreenCanvas | null = null
   gl: WebGL2RenderingContext | null = null
   program: WebGLProgram | null = null
   vao: WebGLVertexArrayObject | null = null
@@ -197,109 +198,107 @@ export class WebGL2Renderer {
     this.instanceTexLayerData = new Float32Array(MAX_INSTANCES)
   }
 
-  setCanvas (canvas: OffscreenCanvas, width: number, height: number) {
+  _scheduledResize?: { width: number, height: number }
+
+  resizeCanvas (width: number, height: number) {
     // WebGL2 doesn't allow 0-sized canvases
     if (width <= 0 || height <= 0) return
 
-    canvas.width = width
-    canvas.height = height
+    this._scheduledResize = { width, height }
+  }
+
+  setCanvas (canvas: OffscreenCanvas) {
+    this.canvas = canvas
+    this.gl = canvas.getContext('webgl2', {
+      alpha: true,
+      premultipliedAlpha: true,
+      antialias: false,
+      depth: false,
+      preserveDrawingBuffer: false,
+      stencil: false,
+      desynchronized: true,
+      powerPreference: 'high-performance'
+    })
 
     if (!this.gl) {
-      this.gl = canvas.getContext('webgl2', {
-        alpha: true,
-        premultipliedAlpha: true,
-        antialias: false,
-        depth: false,
-        preserveDrawingBuffer: false,
-        stencil: false,
-        desynchronized: true,
-        powerPreference: 'high-performance'
-      })
-
-      if (!this.gl) {
-        throw new Error('Could not get WebGL2 context')
-      }
-
-      // Create shaders
-      const vertexShader = this.createShader(this.gl.VERTEX_SHADER, VERTEX_SHADER)
-      const fragmentShader = this.createShader(this.gl.FRAGMENT_SHADER, FRAGMENT_SHADER)
-
-      if (!vertexShader || !fragmentShader) {
-        throw new Error('Failed to create shaders')
-      }
-
-      // Create program
-      this.program = this.gl.createProgram()!
-      this.gl.attachShader(this.program, vertexShader)
-      this.gl.attachShader(this.program, fragmentShader)
-      this.gl.linkProgram(this.program)
-
-      if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) {
-        const info = this.gl.getProgramInfoLog(this.program)
-        throw new Error('Failed to link program: ' + info)
-      }
-
-      this.gl.deleteShader(vertexShader)
-      this.gl.deleteShader(fragmentShader)
-
-      // Get uniform locations
-      this.u_resolution = this.gl.getUniformLocation(this.program, 'u_resolution')
-      this.u_texArray = this.gl.getUniformLocation(this.program, 'u_texArray')
-      this.u_colorMatrix = this.gl.getUniformLocation(this.program, 'u_colorMatrix')
-
-      // Create instance attribute buffers
-      this.instanceDestRectBuffer = this.gl.createBuffer()
-      this.instanceColorBuffer = this.gl.createBuffer()
-      this.instanceTexLayerBuffer = this.gl.createBuffer()
-
-      // Create a VAO (required for WebGL2)
-      this.vao = this.gl.createVertexArray()
-      this.gl.bindVertexArray(this.vao)
-
-      // Setup instance attributes
-      const destRectLoc = this.gl.getAttribLocation(this.program, 'a_destRect')
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceDestRectBuffer)
-      this.gl.enableVertexAttribArray(destRectLoc)
-      this.gl.vertexAttribPointer(destRectLoc, 4, this.gl.FLOAT, false, 0, 0)
-      this.gl.vertexAttribDivisor(destRectLoc, 1)
-
-      const colorLoc = this.gl.getAttribLocation(this.program, 'a_color')
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceColorBuffer)
-      this.gl.enableVertexAttribArray(colorLoc)
-      this.gl.vertexAttribPointer(colorLoc, 4, this.gl.FLOAT, false, 0, 0)
-      this.gl.vertexAttribDivisor(colorLoc, 1)
-
-      const texLayerLoc = this.gl.getAttribLocation(this.program, 'a_texLayer')
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceTexLayerBuffer)
-      this.gl.enableVertexAttribArray(texLayerLoc)
-      this.gl.vertexAttribPointer(texLayerLoc, 1, this.gl.FLOAT, false, 0, 0)
-      this.gl.vertexAttribDivisor(texLayerLoc, 1)
-
-      // Set up blending for premultiplied alpha
-      this.gl.enable(this.gl.BLEND)
-      this.gl.blendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA)
-
-      // Use the program
-      this.gl.useProgram(this.program)
-
-      // Set texture unit
-      this.gl.uniform1i(this.u_texArray, 0)
-
-      // Set initial color matrix
-      this.gl.uniformMatrix3fv(this.u_colorMatrix, false, this.colorMatrix)
-
-      // Set one-time GL state
-      this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1)
-      this.gl.clearColor(0, 0, 0, 0)
-      this.gl.activeTexture(this.gl.TEXTURE0)
-
-      // Create initial texture array
-      this.createTexArray(TEX_INITIAL_SIZE, TEX_INITIAL_SIZE)
+      throw new Error('Could not get WebGL2 context')
     }
 
-    // Update viewport and resolution uniform
-    this.gl.viewport(0, 0, width, height)
-    this.gl.uniform2f(this.u_resolution, width, height)
+    // Create shaders
+    const vertexShader = this.createShader(this.gl.VERTEX_SHADER, VERTEX_SHADER)
+    const fragmentShader = this.createShader(this.gl.FRAGMENT_SHADER, FRAGMENT_SHADER)
+
+    if (!vertexShader || !fragmentShader) {
+      throw new Error('Failed to create shaders')
+    }
+
+    // Create program
+    this.program = this.gl.createProgram()!
+    this.gl.attachShader(this.program, vertexShader)
+    this.gl.attachShader(this.program, fragmentShader)
+    this.gl.linkProgram(this.program)
+
+    if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) {
+      const info = this.gl.getProgramInfoLog(this.program)
+      throw new Error('Failed to link program: ' + info)
+    }
+
+    this.gl.deleteShader(vertexShader)
+    this.gl.deleteShader(fragmentShader)
+
+    // Get uniform locations
+    this.u_resolution = this.gl.getUniformLocation(this.program, 'u_resolution')
+    this.u_texArray = this.gl.getUniformLocation(this.program, 'u_texArray')
+    this.u_colorMatrix = this.gl.getUniformLocation(this.program, 'u_colorMatrix')
+
+    // Create instance attribute buffers
+    this.instanceDestRectBuffer = this.gl.createBuffer()
+    this.instanceColorBuffer = this.gl.createBuffer()
+    this.instanceTexLayerBuffer = this.gl.createBuffer()
+
+    // Create a VAO (required for WebGL2)
+    this.vao = this.gl.createVertexArray()
+    this.gl.bindVertexArray(this.vao)
+
+    // Setup instance attributes
+    const destRectLoc = this.gl.getAttribLocation(this.program, 'a_destRect')
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceDestRectBuffer)
+    this.gl.enableVertexAttribArray(destRectLoc)
+    this.gl.vertexAttribPointer(destRectLoc, 4, this.gl.FLOAT, false, 0, 0)
+    this.gl.vertexAttribDivisor(destRectLoc, 1)
+
+    const colorLoc = this.gl.getAttribLocation(this.program, 'a_color')
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceColorBuffer)
+    this.gl.enableVertexAttribArray(colorLoc)
+    this.gl.vertexAttribPointer(colorLoc, 4, this.gl.FLOAT, false, 0, 0)
+    this.gl.vertexAttribDivisor(colorLoc, 1)
+
+    const texLayerLoc = this.gl.getAttribLocation(this.program, 'a_texLayer')
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceTexLayerBuffer)
+    this.gl.enableVertexAttribArray(texLayerLoc)
+    this.gl.vertexAttribPointer(texLayerLoc, 1, this.gl.FLOAT, false, 0, 0)
+    this.gl.vertexAttribDivisor(texLayerLoc, 1)
+
+    // Set up blending for premultiplied alpha
+    this.gl.enable(this.gl.BLEND)
+    this.gl.blendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA)
+
+    // Use the program
+    this.gl.useProgram(this.program)
+
+    // Set texture unit
+    this.gl.uniform1i(this.u_texArray, 0)
+
+    // Set initial color matrix
+    this.gl.uniformMatrix3fv(this.u_colorMatrix, false, this.colorMatrix)
+
+    // Set one-time GL state
+    this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1)
+    this.gl.clearColor(0, 0, 0, 0)
+    this.gl.activeTexture(this.gl.TEXTURE0)
+
+    // Create initial texture array
+    this.createTexArray(TEX_INITIAL_SIZE, TEX_INITIAL_SIZE)
   }
 
   createShader (type: number, source: string): WebGLShader | null {
@@ -367,8 +366,21 @@ export class WebGL2Renderer {
       heap = self.HEAPU8RAW = new Uint8Array(self.WASMMEMORY.buffer)
     }
 
-    // Clear canvas
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT)
+    // we scheduled a resize because changing the canvas size clears it, and we don't want it to flicker
+    // so we do it here, right before rendering
+    if (this._scheduledResize) {
+      const { width, height } = this._scheduledResize
+      this._scheduledResize = undefined
+      this.canvas!.width = width
+      this.canvas!.height = height
+
+      // Update viewport and resolution uniform
+      this.gl.viewport(0, 0, width, height)
+      this.gl.uniform2f(this.u_resolution, width, height)
+    } else {
+      // Clear canvas
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT)
+    }
 
     // Find max dimensions needed and filter valid images
     let maxW = this.texArrayWidth

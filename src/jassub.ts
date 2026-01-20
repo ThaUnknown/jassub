@@ -63,7 +63,11 @@ export default class JASSUB {
   _canvas
   _canvasParent
   _ctrl = new AbortController()
-  _ro = new ResizeObserver(() => this.resize())
+  _ro = new ResizeObserver(async () => {
+    await this.ready
+    this.resize()
+  })
+
   _destroyed = false
   _lastDemandTime!: VideoFrameCallbackMetadata
   _skipped = false
@@ -148,8 +152,7 @@ export default class JASSUB {
     if (!(module instanceof WebAssembly.Module) || !(new WebAssembly.Instance(module) instanceof WebAssembly.Instance)) throw new Error('WASM not supported')
   }
 
-  async resize (force = !!this._video?.paused, width = 0, height = 0, top = 0, left = 0) {
-    await this.ready
+  async resize (forceRepaint = !!this._video?.paused, width = 0, height = 0, top = 0, left = 0) {
     if ((!width || !height) && this._video) {
       const videoSize = this._getVideoPosition()
       let renderSize = null
@@ -174,14 +177,14 @@ export default class JASSUB {
     this._canvas.style.top = top + 'px'
     this._canvas.style.left = left + 'px'
 
-    await this.renderer._canvas(
+    await this.renderer._resizeCanvas(
       width,
       height,
       (this._videoWidth || this._video?.videoWidth) ?? width,
       (this._videoHeight || this._video?.videoHeight) ?? height
     )
 
-    if (force && this._lastDemandTime) await this._demandRender()
+    if (this._lastDemandTime) await this._demandRender(forceRepaint)
   }
 
   _getVideoPosition (width = this._video!.videoWidth, height = this._video!.videoHeight) {
@@ -228,10 +231,10 @@ export default class JASSUB {
   }
 
   async setVideo (video: HTMLVideoElement) {
-    await this.ready
     if (video instanceof HTMLVideoElement) {
       this._removeListeners()
       this._video = video
+      await this.ready
       this._video.requestVideoFrameCallback((now, data) => this._handleRVFC(data))
       // everything else is unreliable for this, loadedmetadata and loadeddata included.
       if ('VideoFrame' in globalThis) {
@@ -287,12 +290,12 @@ export default class JASSUB {
     this._video!.requestVideoFrameCallback((now, data) => this._handleRVFC(data))
   }
 
-  async _demandRender () {
+  async _demandRender (repaint = false) {
     const { mediaTime, width, height } = this._lastDemandTime
     if (width !== this._videoWidth || height !== this._videoHeight) {
       this._videoWidth = width
       this._videoHeight = height
-      await this.resize(false)
+      return await this.resize(repaint)
     }
 
     if (this.busy) {
@@ -305,7 +308,7 @@ export default class JASSUB {
     this._skipped = false
 
     this.debug?._startFrame()
-    await this.renderer._draw(mediaTime + this.timeOffset)
+    await this.renderer._draw(mediaTime + this.timeOffset, repaint)
     this.debug?._endFrame(this._lastDemandTime)
 
     this.busy = false

@@ -181,7 +181,7 @@ export default class JASSUB {
       (this._videoHeight || this._video?.videoHeight) ?? height
     )
 
-    if (force && this._lastDemandTime) this._demandRender()
+    if (force && this._lastDemandTime) await this._demandRender()
   }
 
   _getVideoPosition (width = this._video!.videoWidth, height = this._video!.videoHeight) {
@@ -292,7 +292,7 @@ export default class JASSUB {
     if (width !== this._videoWidth || height !== this._videoHeight) {
       this._videoWidth = width
       this._videoHeight = height
-      this.resize(false)
+      await this.resize(false)
     }
 
     if (this.busy) {
@@ -309,7 +309,7 @@ export default class JASSUB {
     this.debug?._endFrame(this._lastDemandTime)
 
     this.busy = false
-    if (this._skipped) this._demandRender()
+    if (this._skipped) await this._demandRender()
   }
 
   async _updateColorSpace () {

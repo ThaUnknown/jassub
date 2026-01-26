@@ -36,6 +36,8 @@ if (self.name.startsWith('em-pthread')) {
   const _fetch = globalThis.fetch
   globalThis.fetch = _ => _fetch(url)
 } else {
+  if (moduleArg.__out) out = moduleArg.__out
+  if (moduleArg.__err) err = moduleArg.__err
   const OriginalWorker = globalThis.Worker
   globalThis.Worker = class extends OriginalWorker {
     constructor(scriptURL, options = {}) {

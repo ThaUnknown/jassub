@@ -1,17 +1,15 @@
 /* eslint-disable camelcase */
 import { finalizer } from 'abslink'
 import { expose } from 'abslink/w3c'
+import { queryRemoteFonts } from 'lfa-ponyfill'
 
 import WASM from '../wasm/jassub-worker.js'
 
-import { libassYCbCrMap, read_, readAsync, _applyKeys } from './util'
-import { WebGL2Renderer } from './webgl-renderer'
+import { _applyKeys, _fetch, fetchtext, IS_FIREFOX, LIBASS_YCBCR_MAP, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
+import { WebGL2Renderer } from './webgl-renderer.ts'
+
+import type { JASSUB, MainModule } from '../wasm/types.d.ts'
 // import { WebGPURenderer } from './webgpu-renderer'
-
-import type { ASSEvent, ASSImage, ASSStyle } from '../jassub'
-import type { JASSUB, MainModule } from '../wasm/types.js'
-
-const IS_FIREFOX = navigator.userAgent.toLowerCase().includes('firefox')
 
 declare const self: DedicatedWorkerGlobalScope &
   typeof globalThis & {
@@ -27,11 +25,11 @@ interface opts {
   subContent: string | null
   fonts: Array<string | Uint8Array>
   availableFonts: Record<string, Uint8Array | string>
-  fallbackFont: string
+  defaultFont: string
   debug: boolean
   libassMemoryLimit: number
   libassGlyphLimit: number
-  useLocalFonts: boolean
+  queryFonts: 'local' | 'localandremote' | false
 }
 
 export class ASSRenderer {
@@ -43,19 +41,16 @@ export class ASSRenderer {
   _gpurender = new WebGL2Renderer()
 
   debug = false
-  useLocalFonts = false
-  _availableFonts: Record<string, Uint8Array | string> = {}
-  _fontMap: Record<string, boolean> = {}
-  _fontId = 0
 
   _ready
-  _getFont
 
-  constructor (data: opts, getFont: (font: string) => Promise<void>) {
-    this._availableFonts = data.availableFonts
+  constructor (data: opts, getFont: (font: string, weight: WeightValue) => Promise<Uint8Array<ArrayBuffer> | undefined>) {
+    // remove case sensitivity
+    this._availableFonts = Object.fromEntries(Object.entries(data.availableFonts).map(([k, v]) => [k.trim().toLowerCase(), v]))
     this.debug = data.debug
-    this.useLocalFonts = data.useLocalFonts
+    this.queryFonts = data.queryFonts
     this._getFont = getFont
+    this._defaultFont = data.defaultFont.trim().toLowerCase()
 
     // hack, we want custom WASM URLs
     const _fetch = globalThis.fetch
@@ -76,26 +71,20 @@ export class ASSRenderer {
     //   powerPreference: 'high-performance'
     // }).then(adapter => adapter?.requestDevice())
 
-    this._ready = (WASM({ __url: data.wasmUrl }) as Promise<MainModule>).then(async Module => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      this._malloc = Module._malloc
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    this._ready = (WASM({ __url: data.wasmUrl, __out: (log: string) => this._log(log) }) as Promise<MainModule>).then(async ({ _malloc, JASSUB }) => {
+      this._malloc = _malloc
 
-      const fallbackFont = data.fallbackFont.toLowerCase()
-      this._wasm = new Module.JASSUB(data.width, data.height, fallbackFont)
+      this._wasm = new JASSUB(data.width, data.height, this._defaultFont)
       // Firefox seems to have issues with multithreading in workers
-      // a worker inside a worker does not recive messages properly
+      // a worker inside a worker does not recieve messages properly
       this._wasm.setThreads(!IS_FIREFOX && self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1)
 
-      if (fallbackFont) this._findAvailableFonts(fallbackFont)
+      this._loadInitialFonts(data.fonts)
 
-      const subContent = data.subContent ?? read_(data.subUrl!)
+      this._wasm.createTrackMem(data.subContent ?? await fetchtext(data.subUrl!))
 
-      for (const font of data.fonts) this._asyncWrite(font)
-
-      this._wasm.createTrackMem(subContent)
-      this._processAvailableFonts(subContent)
-
-      this._subtitleColorSpace = libassYCbCrMap[this._wasm.trackColorSpace]
+      this._subtitleColorSpace = LIBASS_YCBCR_MAP[this._wasm.trackColorSpace]
 
       if (data.libassMemoryLimit > 0 || data.libassGlyphLimit > 0) {
         this._wasm.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)
@@ -109,10 +98,6 @@ export class ASSRenderer {
 
   ready () {
     return this._ready
-  }
-
-  addFont (fontOrURL: Uint8Array | string) {
-    this._asyncWrite(fontOrURL)
   }
 
   createEvent (event: ASSEvent) {
@@ -169,23 +154,18 @@ export class ASSRenderer {
     this._wasm.disableStyleOverride()
   }
 
-  setDefaultFont (fontName: string) {
-    this._wasm.setDefaultFont(fontName)
-  }
-
   setTrack (content: string) {
     this._wasm.createTrackMem(content)
-    this._processAvailableFonts(content)
 
-    this._subtitleColorSpace = libassYCbCrMap[this._wasm.trackColorSpace]!
+    this._subtitleColorSpace = LIBASS_YCBCR_MAP[this._wasm.trackColorSpace]!
   }
 
   freeTrack () {
     this._wasm.removeTrack()
   }
 
-  setTrackByUrl (url: string) {
-    this.setTrack(read_(url))
+  async setTrackByUrl (url: string) {
+    this.setTrack(await fetchtext(url))
   }
 
   _checkColorSpace () {
@@ -193,52 +173,111 @@ export class ASSRenderer {
     this._gpurender.setColorMatrix(this._subtitleColorSpace, this._videoColorSpace)
   }
 
-  _findAvailableFonts (font: string) {
-    font = font.trim().toLowerCase()
+  _defaultFont
+  setDefaultFont (fontName: string) {
+    this._defaultFont = fontName.trim().toLowerCase()
+    this._wasm.setDefaultFont(this._defaultFont)
+  }
 
-    if (font[0] === '@') font = font.substring(1)
-
-    if (this._fontMap[font]) return
-
-    this._fontMap[font] = true
-
-    if (!this._availableFonts[font]) {
-      if (this.useLocalFonts) this._getFont(font)
-    } else {
-      this._asyncWrite(this._availableFonts[font]!)
+  _log (log: string) {
+    console.debug(log)
+    const match = log.match(/JASSUB: fontselect: Using default font family: \(([^,]+), (\d{1,4}), \d\)/)
+    if (match) {
+      this._findAvailableFont(match[1]!.trim().toLowerCase(), WEIGHT_MAP[parseInt(match[2]!, 10) / 100 - 1])
+    } else if (log.startsWith('JASSUB: fontselect: failed to find any fallback with glyph 0x0 for font:')) {
+      this._findAvailableFont(this._defaultFont)
     }
   }
 
-  _asyncWrite (font: Uint8Array | string) {
-    if (typeof font === 'string') {
-      readAsync(font, fontData => {
-        this._allocFont(new Uint8Array(fontData))
-      }, console.error)
-    } else {
-      this._allocFont(font)
+  async addFonts (fontOrURLs: Array<Uint8Array | string>) {
+    if (!fontOrURLs.length) return
+    const strings: string[] = []
+    const uint8s: Uint8Array[] = []
+
+    for (const fontOrURL of fontOrURLs) {
+      if (typeof fontOrURL === 'string') {
+        strings.push(fontOrURL)
+      } else {
+        uint8s.push(fontOrURL)
+      }
+    }
+    if (uint8s.length) this._allocFonts(uint8s)
+
+    // this isn't batched like uint8s because software like jellyfin exists, which loads 50+ fonts over the network which takes time...
+    // is connection exhaustion a concern here?
+    await Promise.allSettled(strings.map(url => this._asyncWrite(url)))
+  }
+
+  // we don't want to run _findAvailableFont before initial fonts are loaded
+  // because it could duplicate fonts
+  _loadedInitialFonts = false
+  async _loadInitialFonts (fontOrURLs: Array<Uint8Array | string>) {
+    await this.addFonts(fontOrURLs)
+    this._loadedInitialFonts = true
+  }
+
+  _getFont
+  _availableFonts: Record<string, Uint8Array | string> = {}
+  _checkedFonts = new Set<string>()
+  async _findAvailableFont (fontName: string, weight?: WeightValue) {
+    if (!this._loadedInitialFonts) return
+
+    // Roboto Medium, null -> Roboto, Medium
+    // Roboto Medium, Medium -> Roboto, Medium
+    // Roboto, null -> Roboto, Regular
+    // italic is not handled I guess
+    for (const _weight of WEIGHT_MAP) {
+      // check if fontname has this weight name in it, if yes remove it
+      if (fontName.includes(_weight)) {
+        fontName = fontName.replace(_weight, '').trim()
+        weight ??= _weight
+        break
+      }
+    }
+
+    weight ??= 'regular'
+
+    const key = fontName + ' ' + weight
+    if (this._checkedFonts.has(key)) return
+    this._checkedFonts.add(key)
+
+    try {
+      const font = this._availableFonts[key] ?? this._availableFonts[fontName] ?? await this._queryLocalFont(fontName, weight) ?? await this._queryRemoteFont(fontName, key)
+      if (font) return await this.addFonts([font])
+    } catch (e) {
+      console.warn('Error querying font', fontName, weight, e)
     }
   }
 
-  // TODO: this should re-draw last frame!
-  _allocFont (uint8: Uint8Array) {
-    const ptr = this._malloc(uint8.byteLength)
-    self.HEAPU8RAW.set(uint8, ptr)
-    this._wasm.addFont('font-' + (this._fontId++), ptr, uint8.byteLength)
+  queryFonts
+  async _queryLocalFont (fontName: string, weight: WeightValue) {
+    if (!this.queryFonts) return
+    return await this._getFont(fontName, weight)
+  }
+
+  async _queryRemoteFont (fontName: string, postscriptName: string) {
+    if (this.queryFonts !== 'localandremote') return
+
+    const fontData = await queryRemoteFonts({ postscriptNames: [postscriptName, fontName] })
+    if (!fontData.length) return
+    const blob = await fontData[0]!.blob()
+    return new Uint8Array(await blob.arrayBuffer())
+  }
+
+  async _asyncWrite (font: string) {
+    const res = await _fetch(font)
+    this._allocFonts([new Uint8Array(await res.arrayBuffer())])
+  }
+
+  _fontId = 0
+  _allocFonts (uint8s: Uint8Array[]) {
+    // TODO: this should re-draw last frame!
+    for (const uint8 of uint8s) {
+      const ptr = this._malloc(uint8.byteLength)
+      self.HEAPU8RAW.set(uint8, ptr)
+      this._wasm.addFont('font-' + (this._fontId++), ptr, uint8.byteLength)
+    }
     this._wasm.reloadFonts()
-  }
-
-  _processAvailableFonts (content: string) {
-    if (!this._availableFonts) return
-
-    for (const { FontName } of this.getStyles()) {
-      this._findAvailableFonts(FontName)
-    }
-
-    const regex = /\\fn([^\\}]*?)[\\}]/g
-    let matches
-    while ((matches = regex.exec(content)) !== null) {
-      this._findAvailableFonts(matches[1]!)
-    }
   }
 
   _resizeCanvas (width: number, height: number, videoWidth: number, videoHeight: number) {
@@ -260,7 +299,7 @@ export class ASSRenderer {
   _draw (time: number, repaint = false) {
     if (!this._offCanvas || !this._gpurender) return
 
-    const result: ASSImage = this._wasm.rawRender(time, Number(repaint))!
+    const result = this._wasm.rawRender(time, Number(repaint))!
     if (this._wasm.changed === 0 && !repaint) return
 
     const bitmaps: ASSImage[] = []

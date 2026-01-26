@@ -1,14 +1,18 @@
-/* eslint-disable camelcase */
 import 'rvfc-polyfill'
 
 import { proxy, releaseProxy } from 'abslink'
 import { wrap } from 'abslink/w3c'
 
-import { Debug } from './debug'
+import { Debug } from './debug.ts'
 
-import type { ASS_Event, ASS_Image, ASS_Style, ClassHandle } from './wasm/types'
+import type { WeightValue } from './worker/util.ts'
 import type { ASSRenderer } from './worker/worker'
 import type { Remote } from 'abslink'
+import type { queryRemoteFonts } from 'lfa-ponyfill'
+
+declare const self: typeof globalThis & {
+  queryLocalFonts: (opts?: { postscriptNames?: string[] }) => ReturnType<typeof queryRemoteFonts>
+}
 
 const webYCbCrMap = {
   rgb: 'RGB',
@@ -17,10 +21,6 @@ const webYCbCrMap = {
   bt470bg: 'BT601', // alias BT.601 PAL... whats the difference?
   smpte170m: 'BT601'// alias BT.601 NTSC... whats the difference?
 } as const
-
-export type ASSEvent = Omit<ASS_Event, keyof ClassHandle>
-export type ASSStyle = Omit<ASS_Style, keyof ClassHandle>
-export type ASSImage = Omit<ASS_Image, keyof ClassHandle>
 
 export type JASSUBOptions = {
   timeOffset?: number
@@ -31,12 +31,10 @@ export type JASSUBOptions = {
   workerUrl?: string
   wasmUrl?: string
   modernWasmUrl?: string
-  subUrl?: string
-  subContent?: string
-  fonts?: string[] | Uint8Array[]
+  fonts?: Array<string | Uint8Array>
   availableFonts?: Record<string, Uint8Array | string>
-  fallbackFont?: string
-  useLocalFonts?: boolean
+  defaultFont?: string
+  queryFonts?: 'local' | 'localandremote' | false
   libassMemoryLimit?: number
   libassGlyphLimit?: number
 } & ({
@@ -45,6 +43,12 @@ export type JASSUBOptions = {
 } | {
   video?: HTMLVideoElement
   canvas: HTMLCanvasElement
+}) & ({
+  subUrl: string
+  subContent?: string
+} | {
+  subUrl?: string
+  subContent: string
 })
 
 export default class JASSUB {
@@ -111,23 +115,27 @@ export default class JASSUB {
     const Renderer = wrap<typeof ASSRenderer>(this._worker)
 
     const modern = opts.modernWasmUrl ?? new URL('./wasm/jassub-worker-modern.wasm', import.meta.url).href
-    const fallback = opts.wasmUrl ?? new URL('./wasm/jassub-worker.wasm', import.meta.url).href
+    const normal = opts.wasmUrl ?? new URL('./wasm/jassub-worker.wasm', import.meta.url).href
+
+    const availableFonts = opts.availableFonts ?? {}
+    if (!availableFonts['liberation sans'] && !opts.defaultFont) {
+      availableFonts['liberation sans'] = new URL('./default.woff2', import.meta.url).href
+    }
 
     this.ready = (async () => {
       this.renderer = await new Renderer({
-        wasmUrl: JASSUB._supportsSIMD ? modern : fallback,
+        wasmUrl: JASSUB._supportsSIMD ? modern : normal,
         width: ctrl.width,
         height: ctrl.height,
         subUrl: opts.subUrl,
         subContent: opts.subContent ?? null,
         fonts: opts.fonts ?? [],
-        availableFonts: opts.availableFonts ?? { 'liberation sans': './default.woff2' },
-        fallbackFont: opts.fallbackFont ?? 'liberation sans',
+        availableFonts,
+        defaultFont: opts.defaultFont ?? 'liberation sans',
         debug: !!opts.debug,
         libassMemoryLimit: opts.libassMemoryLimit ?? 0,
         libassGlyphLimit: opts.libassGlyphLimit ?? 0,
-        // @ts-expect-error TS doesn't know about queryLocalFonts
-        useLocalFonts: typeof queryLocalFonts !== 'undefined' && (opts.useLocalFonts ?? true)
+        queryFonts: opts.queryFonts ?? 'local'
       }, proxy(font => this._getLocalFont(font))) as unknown as Remote<ASSRenderer>
 
       await this.renderer.ready()
@@ -174,8 +182,10 @@ export default class JASSUB {
       this._canvas.style.height = videoSize.height + 'px'
     }
 
-    this._canvas.style.top = top + 'px'
-    this._canvas.style.left = left + 'px'
+    if (this._canvasParent) {
+      this._canvas.style.top = top + 'px'
+      this._canvas.style.left = left + 'px'
+    }
 
     await this.renderer._resizeCanvas(
       width,
@@ -248,36 +258,21 @@ export default class JASSUB {
     }
   }
 
-  async _sendLocalFont (name: string) {
-    try {
-      // @ts-expect-error ts doesnt know
-      const fontData = await queryLocalFonts()
-      // @ts-expect-error ts doesnt know
-      const fonts = fontData?.filter(({ fullName, family }) => fullName.toLowerCase() === name || family.toLowerCase() === name)
-      for (const font of fonts) {
-        const blob: Blob = await font.blob()
-        this.renderer.addFont(new Uint8Array(await blob.arrayBuffer()))
-      }
-    } catch (e) {
-      console.warn('Local fonts API:', e)
+  async _getLocalFont (font: string, weight: WeightValue = 'regular') {
+    // electron by default has all permissions enabled, and it doesn't have perm query
+    // if this happens, just send it
+    if (navigator.permissions?.query) {
+      const { state } = await navigator.permissions.query({ name: 'local-fonts' as PermissionName })
+      if (state !== 'granted') return
     }
-  }
 
-  async _getLocalFont (font: string) {
-    try {
-      // electron by default has all permissions enabled, and it doesn't have perm query
-      // if this happens, just send it
-      if (navigator?.permissions?.query) {
-        // @ts-expect-error TS doesn't know about local-fonts
-        const permission = await navigator.permissions.query({ name: 'local-fonts' })
-        if (permission.state === 'granted') {
-          await this._sendLocalFont(font)
-        }
-      } else {
-        await this._sendLocalFont(font)
+    for (const data of await self.queryLocalFonts()) {
+      const family = data.family.toLowerCase()
+      const style = data.style.toLowerCase()
+      if (family === font && style === weight) {
+        const blob = await data.blob()
+        return new Uint8Array(await blob.arrayBuffer())
       }
-    } catch (e) {
-      console.warn('Local fonts API:', e)
     }
   }
 

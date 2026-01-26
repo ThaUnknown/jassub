@@ -17,6 +17,7 @@ JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>
 * Supports anamorphic videos [(on browsers which support it)](https://caniuse.com/mdn-api_htmlvideoelement_requestvideoframecallback)
 * Supports color space mangling [(on browsers which support it)](https://caniuse.com/mdn-api_videocolorspace)
 * Capable of using local fonts [(on browsers which support it)](https://caniuse.com/mdn-api_window_querylocalfonts)
+* Capable of finding fonts online (opt-in, done via Google Fonts API)
 * Works fast (all the heavy lifting is done by WebAssembly and WebGL, with absolutely minimal JS glue)
 * Is fully multi-threaded
 * Is asynchronous (renders when available, not in order of execution)
@@ -130,6 +131,57 @@ await instance.renderer.setDefaultFont('Gandhi Sans') // or you can await if if 
 Make sure to always `await instance.ready` before running any methods!!!
 
 Example usage can be found in the demo source [here](https://github.com/ThaUnknown/jassub/tree/gh-pages).
+
+## Understanding font management
+
+If you know for sure that your subtitles use specific fonts, you can pre-load them via the `fonts` option when creating the JASSUB instance:
+
+```js
+const instance = new JASSUB({
+  video: document.querySelector('video'),
+  subUrl: './tracks/sub.ass', 
+  fonts: [new URL('./fonts/GandhiSans-Regular.woff', import.meta.url).href, new Uint8Array(data)]
+})
+```
+
+This will load/fetch the fonts ASAP when the renderer and WASM is initiated, this process is non-blocking.
+
+If you however have a very big database of fonts and/or you're unsure if your subtitles use, or you want to conserve memory, bandwidth etc you can define fonts via `availableFonts`, which is a case-insensitive, postscript-insensitive map of fonts and their sources. This means the keys can, but don't need to include the weight of the font, but it is preferred. For example:
+
+```js
+const instance = new JASSUB({
+  video: document.querySelector('video'),
+  subUrl: './tracks/sub.ass',
+  availableFonts: {
+    'Gandhi Sans': new URL('./fonts/GandhiSans-Regular.ttf', import.meta.url).href,
+    'RoBoTO mEdiuM': new Uint8Array(data), // this is quite stupid if you want to conserve resources, since the data will be lingering in memory, but it is supported
+    'roboto': new URL('./fonts/Roboto-Medium.woff2', import.meta.url).href
+  }
+})
+```
+
+When JASSUB then needs one of these fonts for immediate rendering it will load the font from the given source, however this will cause a [flash of unstyled text](https://css-tricks.com/fout-foit-foft/) as the font is being loaded asynchronously, which looks something like this:
+
+<img src='./docs/fout.gif'>
+
+With complex typesetting this might not just be text, but glyphs, icons etc.
+
+The above also applies to the default font, you can pre-load it via fonts\[], or use availableFonts. If you use `await instance.renderer.setDefaultFont('Gandhi Sans')` and wish to preload it, you should do so manually via `await instance.renderer.addFonts(['Gandhi Sans'])`.
+
+## About finding fonts online
+
+By default, JASSUB will only use embedded, constructor defined and local fonts. However, if you want to enable online font finding, you can do so by setting the `queryFonts` option to `'localandremote'` when creating the JASSUB instance, note that this loads 50+ KB of code:
+
+```js
+const instance = new JASSUB({
+  video: document.querySelector('video'),
+  subUrl: './tracks/sub.ass',
+  queryFonts: 'localandremote'
+})
+```
+
+This finds fonts from the free and public Google Fonts API if they aren't available locally or embedded, which has some privacy implications \[in theory, not in practice]. Be mindful of the [licensing](https://fonts.google.com/knowledge/glossary/licensing).
+Note that Google Fonts doesn't include a lot of non-free fonts such as Arial, so this isn't a perfect solution.
 
 ## Looking for backwards compatibility with much older browser engines?
 

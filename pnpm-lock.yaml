@@ -11,6 +11,9 @@ importers:
       abslink:
         specifier: ^1.1.6
         version: 1.1.6
+      lfa-ponyfill:
+        specifier: ^1.1.0
+        version: 1.1.0
       rvfc-polyfill:
         specifier: ^1.0.8
         version: 1.0.8
@@ -1078,6 +1081,9 @@ packages:
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
     engines: {node: '>= 0.8.0'}
+
+  lfa-ponyfill@1.1.0:
+    resolution: {integrity: sha512-YS3/DmyDdywWwoEu1ZacAudqkJ4q7WtKE9+bWlaSuEoVrXva7ChIJHMJYs19zyVc1H198pzqAreQU0r/+YNeew==}
 
   lilconfig@2.1.0:
     resolution: {integrity: sha512-utWOt/GHzuUxnLKxB6dk81RoOeoNeHgbrXiuGk4yyF5qlRz+iIVWu56E2fqGHFrXz0QNUhLB/8nKqvRH66JKGQ==}
@@ -2637,6 +2643,8 @@ snapshots:
     dependencies:
       prelude-ls: 1.2.1
       type-check: 0.4.0
+
+  lfa-ponyfill@1.1.0: {}
 
   lilconfig@2.1.0: {}
 

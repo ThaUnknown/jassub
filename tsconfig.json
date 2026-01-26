@@ -13,7 +13,7 @@
     "rewriteRelativeImportExtensions": true,
     "allowImportingTsExtensions": true,
     "strict": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "noEmit": false,
     "types": [
       "@webgpu/types"

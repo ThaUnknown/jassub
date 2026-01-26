@@ -1,12 +1,10 @@
-import type { ASSImage } from '../jassub'
+import { IS_FIREFOX, type ASSImage } from './util.ts'
 
 declare const self: DedicatedWorkerGlobalScope &
   typeof globalThis & {
     HEAPU8RAW: Uint8Array<ArrayBuffer>
     WASMMEMORY: WebAssembly.Memory
   }
-
-const IS_FIREFOX = navigator.userAgent.toLowerCase().includes('firefox')
 
 const THREAD_COUNT = !IS_FIREFOX && self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1
 

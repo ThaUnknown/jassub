@@ -1,6 +1,6 @@
 {
   "name": "jassub",
-  "version": "2.2.7",
+  "version": "2.3.0",
   "description": "The Fastest JavaScript SSA/ASS Subtitle Renderer For Browsers",
   "main": "dist/jassub.js",
   "type": "module",
@@ -9,11 +9,13 @@
     "dist/worker/*",
     "dist/jassub.*",
     "dist/debug.*",
+    "dist/default.woff2",
     "!dist/wasm/jassub-worker-modern.js",
     "README.md",
     "LICENSE",
     "index.d.ts",
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "!src/default.woff2"
   ],
   "scripts": {
     "build": "tsc --noCheck",
@@ -45,6 +47,7 @@
   "homepage": "https://github.com/ThaUnknown/jassub",
   "dependencies": {
     "abslink": "^1.1.6",
+    "lfa-ponyfill": "^1.1.0",
     "rvfc-polyfill": "^1.0.8",
     "throughput": "^1.0.2"
   },

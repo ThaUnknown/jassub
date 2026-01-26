@@ -160,13 +160,26 @@ const instance = new JASSUB({
 })
 ```
 
-When JASSUB then needs one of these fonts for immediate rendering it will load the font from the given source, however this will cause a [flash of unstyled text](https://css-tricks.com/fout-foit-foft/) as the font is being loaded asynchronously, which looks something like this:
+When JASSUB then needs one of these fonts for immediate rendering it will load the font from the given source, however this can cause a [flash of unstyled text](https://css-tricks.com/fout-foit-foft/) if the default font was previously loaded, as the font is being loaded asynchronously, which looks something like this:
 
 <img src='./docs/fout.gif'>
 
-With complex typesetting this might not just be text, but glyphs, icons etc.
+With complex typesetting this might not just be text, but glyphs, icons etc. If the default font wasn't previously loaded and wasn't pre-loaded a FOUT won't happen!, and nothing will render for at most a few frames as the font is being downloaded from the given URL.
 
-The above also applies to the default font, you can pre-load it via fonts\[], or use availableFonts. If you use `await instance.renderer.setDefaultFont('Gandhi Sans')` and wish to preload it, you should do so manually via `await instance.renderer.addFonts(['Gandhi Sans'])`.
+The above also applies to the default font, you can pre-load it via fonts\[], or use availableFonts. If you use `await instance.renderer.setDefaultFont('Gandhi Sans')` and wish to preload it, you should do so manually via `await instance.renderer.addFonts(['Gandhi Sans'])`, however this is not recommended as it can cause FOUTs as explained above. JASSUB defines and provides a default font so configuring one is not strictly necessary.
+
+For the best user experience, which avoids FOUTs, while using as little memory/bandwidth as possible, you should use a config in the lines of:
+
+```js
+const instance = new JASSUB({
+  fonts: fileAttachments // extracted file attachments for the given video, for example MKV's attachments
+  availableFonts: {
+    'My Fallback Font Family Name': './fonts/MyFallbackFont.woff2' // or new URL(...).href, only necessary if you want a custom default font, don't include this in fonts[]!
+  },
+  defaultFont: 'My Fallback Font Family Name', // optional, only necessary if you want a custom default font
+  queryFonts: 'localandremote' // optional, local or remote fonts will be queried if a font isn't found in fonts[] or availableFonts and is required for immediate rendering
+})
+```
 
 ## About finding fonts online
 

@@ -182,7 +182,7 @@ export class ASSRenderer {
   async _log (log: string) {
     console.debug(log)
     const match = log.match(/JASSUB: fontselect:[^(]+: \(([^,]+), (\d{1,4}), \d\)/)
-    if (match && !await this._findAvailableFont(match[1]!.trim().toLowerCase(), WEIGHT_MAP[parseInt(match[2]!, 10) / 100 - 1])) {
+    if (match && !await this._findAvailableFont(match[1]!.trim().toLowerCase(), WEIGHT_MAP[Math.ceil(parseInt(match[2]!) / 100) - 1])) {
       await this._findAvailableFont(this._defaultFont)
     }
   }
@@ -240,7 +240,7 @@ export class ASSRenderer {
     this._checkedFonts.add(key)
 
     try {
-      const font = this._availableFonts[key] ?? this._availableFonts[fontName] ?? await this._queryLocalFont(fontName, weight) ?? await this._queryRemoteFont(fontName, key)
+      const font = this._availableFonts[key] ?? this._availableFonts[fontName] ?? await this._queryLocalFont(fontName, weight) ?? await this._queryRemoteFont([key, fontName])
       if (font) return await this.addFonts([font])
     } catch (e) {
       console.warn('Error querying font', fontName, weight, e)
@@ -253,10 +253,10 @@ export class ASSRenderer {
     return await this._getFont(fontName, weight)
   }
 
-  async _queryRemoteFont (fontName: string, postscriptName: string) {
+  async _queryRemoteFont (postscriptNames: string[]) {
     if (this.queryFonts !== 'localandremote') return
 
-    const fontData = await queryRemoteFonts({ postscriptNames: [postscriptName, fontName] })
+    const fontData = await queryRemoteFonts({ postscriptNames })
     if (!fontData.length) return
     const blob = await fontData[0]!.blob()
     return new Uint8Array(await blob.arrayBuffer())

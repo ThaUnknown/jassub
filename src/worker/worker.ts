@@ -179,13 +179,11 @@ export class ASSRenderer {
     this._wasm.setDefaultFont(this._defaultFont)
   }
 
-  _log (log: string) {
+  async _log (log: string) {
     console.debug(log)
-    const match = log.match(/JASSUB: fontselect: Using default font family: \(([^,]+), (\d{1,4}), \d\)/)
-    if (match) {
-      this._findAvailableFont(match[1]!.trim().toLowerCase(), WEIGHT_MAP[parseInt(match[2]!, 10) / 100 - 1])
-    } else if (log.startsWith('JASSUB: fontselect: failed to find any fallback with glyph 0x0 for font:')) {
-      this._findAvailableFont(this._defaultFont)
+    const match = log.match(/JASSUB: fontselect:[^(]+: \(([^,]+), (\d{1,4}), \d\)/)
+    if (match && !await this._findAvailableFont(match[1]!.trim().toLowerCase(), WEIGHT_MAP[parseInt(match[2]!, 10) / 100 - 1])) {
+      await this._findAvailableFont(this._defaultFont)
     }
   }
 
@@ -205,7 +203,7 @@ export class ASSRenderer {
 
     // this isn't batched like uint8s because software like jellyfin exists, which loads 50+ fonts over the network which takes time...
     // is connection exhaustion a concern here?
-    await Promise.allSettled(strings.map(url => this._asyncWrite(url)))
+    return await Promise.allSettled(strings.map(url => this._asyncWrite(url)))
   }
 
   // we don't want to run _findAvailableFont before initial fonts are loaded

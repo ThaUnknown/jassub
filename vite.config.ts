@@ -25,7 +25,10 @@ export default defineConfig({
   ssr: {
     target: 'webworker'
   },
-    optimizeDeps: {
+  worker: {
+    format: 'es'
+  },
+  optimizeDeps: {
     exclude: ['anitomyscript']
   }
 })

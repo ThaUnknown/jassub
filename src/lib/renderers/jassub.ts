@@ -10,15 +10,12 @@ export default async function (subUrl: string, video: HTMLVideoElement, timeOffs
     video,
     subUrl,
     fonts,
-    availableFonts: {
-      'liberation sans': '/fonts/default.woff2'
-    },
-    fallbackFont: 'liberation sans',
     workerUrl,
     modernWasmUrl,
     wasmUrl,
     debug: true,
-    timeOffset
+    timeOffset,
+    queryFonts: 'localandremote'
   })
 
   instance.debug!.onsubtitleFrameCallback = (_now, info) => cb(info)

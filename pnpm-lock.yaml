@@ -23,8 +23,8 @@ importers:
         specifier: ^1.0.8
         version: 1.0.8(patch_hash=sjlkda4uulzzsf4iwplt5cirf4)
       jassub:
-        specifier: ^2.2.7
-        version: 2.2.7
+        specifier: ^2.3.0
+        version: 2.3.0
       throughput:
         specifier: ^1.0.2
         version: 1.0.2
@@ -1154,8 +1154,8 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
-  jassub@2.2.7:
-    resolution: {integrity: sha512-biBnxRwnX4Fsyhms0GkN8kGumUDOkqlI9vYJHGuI4bGrGUfaxQs4I2rPyGoD7Z0qiJeK9PCW24rPpa+PtW+esA==}
+  jassub@2.3.0:
+    resolution: {integrity: sha512-qQKJFQMk1lUGDqGoWKmtmo16KSyqiE76GixyAvXCy6QNctyJ07jlTlFaYkyi5QSWcAr/1Lh9gbG0OC3Zg6F8Kg==}
 
   js-yaml@4.1.1:
     resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
@@ -1187,6 +1187,9 @@ packages:
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
     engines: {node: '>= 0.8.0'}
+
+  lfa-ponyfill@1.1.0:
+    resolution: {integrity: sha512-YS3/DmyDdywWwoEu1ZacAudqkJ4q7WtKE9+bWlaSuEoVrXva7ChIJHMJYs19zyVc1H198pzqAreQU0r/+YNeew==}
 
   lilconfig@2.1.0:
     resolution: {integrity: sha512-utWOt/GHzuUxnLKxB6dk81RoOeoNeHgbrXiuGk4yyF5qlRz+iIVWu56E2fqGHFrXz0QNUhLB/8nKqvRH66JKGQ==}
@@ -2866,9 +2869,10 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  jassub@2.2.7:
+  jassub@2.3.0:
     dependencies:
       abslink: 1.1.6
+      lfa-ponyfill: 1.1.0
       rvfc-polyfill: 1.0.8
       throughput: 1.0.2
 
@@ -2898,6 +2902,8 @@ snapshots:
     dependencies:
       prelude-ls: 1.2.1
       type-check: 0.4.0
+
+  lfa-ponyfill@1.1.0: {}
 
   lilconfig@2.1.0: {}
 

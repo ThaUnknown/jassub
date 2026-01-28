@@ -19,7 +19,7 @@
   }
 </script>
 
-<video src={data.videoUrl || page.state.video} controls use:renderer loop muted />
+<video src={data.videoUrl || page.state.video} controls use:renderer loop muted autoplay />
 
 <div style='position: absolute; top: 0; left: 0; color: white; background: rgba(0, 0, 0, 0.5); padding: 5px; font-family: monospace; font-size: 12px;'>
   {#if perf}

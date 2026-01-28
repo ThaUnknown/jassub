@@ -27,7 +27,7 @@
     "@jellyfin/libass-wasm": "^4.2.4",
     "@sabre-js/sabre": "0.5.1-pre.322713f",
     "assjs-v2": "^1.0.8",
-    "jassub": "^2.3.0",
+    "jassub": "^2.3.3",
     "throughput": "^1.0.2"
   },
   "pnpm": {

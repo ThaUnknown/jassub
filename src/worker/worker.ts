@@ -77,7 +77,7 @@ export class ASSRenderer {
       if (testCanvas.getContext('webgl2')) {
         this._gpurender = new WebGL2Renderer()
       } else {
-        this._gpurender = testCanvas.getContext('webgl') ? new WebGL1Renderer() : new Canvas2DRenderer()
+        this._gpurender = testCanvas.getContext('webgl')?.getExtension('ANGLE_instanced_arrays') ? new WebGL1Renderer() : new Canvas2DRenderer()
       }
     } catch {
       this._gpurender = new Canvas2DRenderer()

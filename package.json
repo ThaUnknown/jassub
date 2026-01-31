@@ -1,6 +1,6 @@
 {
   "name": "jassub",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "The Fastest JavaScript SSA/ASS Subtitle Renderer For Browsers",
   "main": "dist/jassub.js",
   "type": "module",
@@ -19,7 +19,7 @@
   ],
   "scripts": {
     "build": "tsc --noCheck",
-    "dev": "vite",
+    "dev": "vite --host",
     "docker:build": "docker build -t thaunknown/jassub-build .",
     "docker:run": "docker run -it --rm -v ${PWD}:/code --name thaunknown_jassub-build thaunknown/jassub-build:latest"
   },

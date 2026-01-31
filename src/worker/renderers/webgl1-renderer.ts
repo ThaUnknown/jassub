@@ -164,7 +164,7 @@ export class WebGL1Renderer {
     }
 
     // Create program
-    this.program = this.gl.createProgram()!
+    this.program = this.gl.createProgram()
     this.gl.attachShader(this.program, vertexShader)
     this.gl.attachShader(this.program, fragmentShader)
     this.gl.linkProgram(this.program)

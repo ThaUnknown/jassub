@@ -5,8 +5,10 @@ import { queryRemoteFonts } from 'lfa-ponyfill'
 
 import WASM from '../wasm/jassub-worker.js'
 
-import { _applyKeys, _fetch, fetchtext, IS_FIREFOX, LIBASS_YCBCR_MAP, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
-import { WebGL2Renderer } from './webgl-renderer.ts'
+import { Canvas2DRenderer } from './renderers/2d-renderer.ts'
+import { WebGL1Renderer } from './renderers/webgl1-renderer.ts'
+import { WebGL2Renderer } from './renderers/webgl2-renderer.ts'
+import { _applyKeys, _fetch, fetchtext, LIBASS_YCBCR_MAP, THREAD_COUNT, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
 
 import type { JASSUB, MainModule } from '../wasm/types.d.ts'
 // import { WebGPURenderer } from './webgpu-renderer'
@@ -38,7 +40,7 @@ export class ASSRenderer {
   _subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC' | null
   _videoColorSpace?: 'BT709' | 'BT601'
   _malloc!: (size: number) => number
-  _gpurender = new WebGL2Renderer()
+  _gpurender: WebGL2Renderer | WebGL1Renderer | Canvas2DRenderer
 
   debug = false
 
@@ -57,7 +59,7 @@ export class ASSRenderer {
     globalThis.fetch = _ => _fetch(data.wasmUrl)
 
     // TODO: abslink doesnt support transferables yet
-    const handleMessage = async ({ data }: MessageEvent) => {
+    const handleMessage = ({ data }: MessageEvent) => {
       if (data.name === 'offscreenCanvas') {
         // await this._ready // needed for webGPU
         this._offCanvas = data.ctrl
@@ -70,6 +72,16 @@ export class ASSRenderer {
     // const devicePromise = navigator.gpu?.requestAdapter({
     //   powerPreference: 'high-performance'
     // }).then(adapter => adapter?.requestDevice())
+    try {
+      const testCanvas = new OffscreenCanvas(1, 1)
+      if (testCanvas.getContext('webgl2')) {
+        this._gpurender = new WebGL2Renderer()
+      } else {
+        this._gpurender = testCanvas.getContext('webgl') ? new WebGL1Renderer() : new Canvas2DRenderer()
+      }
+    } catch {
+      this._gpurender = new Canvas2DRenderer()
+    }
 
     // eslint-disable-next-line @typescript-eslint/unbound-method
     this._ready = (WASM({ __url: data.wasmUrl, __out: (log: string) => this._log(log) }) as Promise<MainModule>).then(async ({ _malloc, JASSUB }) => {
@@ -78,7 +90,7 @@ export class ASSRenderer {
       this._wasm = new JASSUB(data.width, data.height, this._defaultFont)
       // Firefox seems to have issues with multithreading in workers
       // a worker inside a worker does not recieve messages properly
-      this._wasm.setThreads(!IS_FIREFOX && self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1)
+      this._wasm.setThreads(THREAD_COUNT)
 
       this._loadInitialFonts(data.fonts)
 

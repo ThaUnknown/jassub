@@ -38,11 +38,11 @@ The
 
 headers are recommended to use this library, as it uses SharedArrayBuffer for multi-threading, but if you can't set them, it will fallback automatically to work in single-threaded mode. Firefox doesn't support threading so they are not required there.
 
-At minimum WASM + WebGL2 + TextDecoder + OffscreenCanvas + Web Workers + Proxy + AbortController + Fetch + Promise + getVideoPlaybackQuality/requestVideoFrameCallback are required for JASSUB to work.
+At minimum WASM + TextDecoder + OffscreenCanvas + Web Workers + Proxy + AbortController + Fetch + Promise + getVideoPlaybackQuality/requestVideoFrameCallback are required for JASSUB to work.
 
 <!-- 
 WASM:              57 11 52    /  51 11 47
-WebGL2:            56 15 51    /  43 10.1 42
+WebGL2:            56 15 51    /  43 10.1 42 // not necessary anymore as it falls back to WebGL1/Canvas2D
 TextDecoder:       38 10.1 20  /  38 10.1 19
 OffscreenCanvas:   69 17 105   /  58 16.2 44
 BigInt:            67 15 68
@@ -204,7 +204,7 @@ If you want to support even older engines, then please check the [v1.8.8 tag](ht
 [p]npm i jassub@1.8.8
 ```
 
-Support for older browsers (without WebGL, WebAssembly threads, etc) has been dropped in v2.0.0 and later.
+Support for older browsers (without OffscreenCanvas, WebAssembly threads, etc) has been dropped in v2.0.0 and later.
 
 # How to build?
 

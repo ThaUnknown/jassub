@@ -69,4 +69,4 @@ export const subtitleList: Record<string, Subtitle> = {
   }
 } as const
 
-export const renderers = ['jassub', 'jsso', 'assjs', 'sabre'] as const
+export const renderers = ['jassub', 'jsso', 'assjs', 'sabre', 'subframe'] as const

@@ -45,5 +45,11 @@ export const results: Record<ResultKey, Result> = {
   'sabre-simple': { frametime: 'FAIL' },
   'sabre-fate': { frametime: 'FAIL' },
   'sabre-beastars': { frametime: 'FAIL' },
-  'sabre-kusriya': { frametime: 'FAIL' }
+  'sabre-kusriya': { frametime: 'FAIL' },
+  'subframe-variable': { frametime: 0.12 },
+  'subframe-high': { frametime: 0.17 },
+  'subframe-simple': { frametime: 4.30, notes: ['‡'] },
+  'subframe-fate': { frametime: 41.67, notes: ['‡', '+'] },
+  'subframe-beastars': { frametime: 335.66, notes: ['‡', '+'] },
+  'subframe-kusriya': { frametime: 115.1 }
 }

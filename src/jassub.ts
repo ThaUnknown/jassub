@@ -166,11 +166,11 @@ export default class JASSUB {
       let renderSize = null
       // support anamorphic video
       if (this._videoWidth) {
-        const widthRatio = this._video.videoWidth / this._videoWidth
-        const heightRatio = this._video.videoHeight / this._videoHeight
-        renderSize = this._computeCanvasSize((videoSize.width || 0) / widthRatio, (videoSize.height || 0) / heightRatio)
+        const widthRatio = (this._video.videoWidth / this._videoWidth) || 1
+        const heightRatio = (this._video.videoHeight / this._videoHeight) || 1
+        renderSize = this._computeCanvasSize(videoSize.width / widthRatio, videoSize.height / heightRatio)
       } else {
-        renderSize = this._computeCanvasSize(videoSize.width || 0, videoSize.height || 0)
+        renderSize = this._computeCanvasSize(videoSize.width, videoSize.height)
       }
       width = renderSize.width
       height = renderSize.height
@@ -198,7 +198,7 @@ export default class JASSUB {
   }
 
   _getVideoPosition (width = this._video!.videoWidth, height = this._video!.videoHeight) {
-    const videoRatio = width / height
+    const videoRatio = (width / height) || 1
     const { offsetWidth, offsetHeight } = this._video!
     const elementRatio = offsetWidth / offsetHeight
     width = offsetWidth

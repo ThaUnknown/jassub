@@ -1,0 +1,54 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@denosaurs/cache@0.2.15": "0.2.15",
+    "jsr:@gfx/build-glfw@0.1.0": "0.1.0",
+    "jsr:@gfx/dwm@*": "0.3.9",
+    "jsr:@std/fs@1.0.4": "1.0.4",
+    "jsr:@std/path@1.0.6": "1.0.6",
+    "jsr:@std/path@^1.0.6": "1.0.6"
+  },
+  "jsr": {
+    "@denosaurs/cache@0.2.15": {
+      "integrity": "c5abe7477ef5705ff7d3dbade3380a1b6cf82e3d4cb4755068a525a75cda987b",
+      "dependencies": [
+        "jsr:@std/fs",
+        "jsr:@std/path@1.0.6"
+      ]
+    },
+    "@gfx/build-glfw@0.1.0": {
+      "integrity": "dfe046f585cacbe0aa6d696e9f8fa33c0b5411121c6de58b14073c85252110fe"
+    },
+    "@gfx/dwm@0.3.9": {
+      "integrity": "867204194394a80679c6edd33916c8d3f4e08c33371bf07477d537cef17d4cb0",
+      "dependencies": [
+        "jsr:@denosaurs/cache",
+        "jsr:@gfx/build-glfw"
+      ]
+    },
+    "@std/fs@1.0.4": {
+      "integrity": "2907d32d8d1d9e540588fd5fe0ec21ee638134bd51df327ad4e443aaef07123c",
+      "dependencies": [
+        "jsr:@std/path@^1.0.6"
+      ]
+    },
+    "@std/path@1.0.6": {
+      "integrity": "ab2c55f902b380cf28e0eec501b4906e4c1960d13f00e11cfbcd21de15f18fed"
+    }
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@types/deno@^2.5.0",
+        "npm:@webgpu/types@~0.1.69",
+        "npm:abslink@^1.1.6",
+        "npm:eslint-config-standard-universal@^1.0.9",
+        "npm:lfa-ponyfill@^1.1.0",
+        "npm:rvfc-polyfill@^1.0.8",
+        "npm:throughput@^1.0.2",
+        "npm:typescript@^5.2.2",
+        "npm:vite@^7.3.1"
+      ]
+    }
+  }
+}

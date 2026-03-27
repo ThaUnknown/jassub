@@ -163,6 +163,7 @@ interface TextureInfo {
 export class WebGPURenderer {
   device: GPUDevice | null = null
   context: GPUCanvasContext | null = null
+  canvas: OffscreenCanvas | Deno.UnsafeWindowSurface | null = null
   pipeline: GPURenderPipeline | null = null
   bindGroupLayout: GPUBindGroupLayout | null = null
 
@@ -274,35 +275,30 @@ export class WebGPURenderer {
     })
   }
 
-  setCanvas (canvas: OffscreenCanvas, width: number, height: number) {
+  _scheduledResize?: { width: number, height: number }
+
+  resizeCanvas (width: number, height: number) {
+    // WebGL2 doesn't allow 0-sized canvases
+    if (!width || !height) return
+
+    this._scheduledResize = { width, height }
+  }
+
+  setCanvas (canvas: OffscreenCanvas) {
     if (!this.device) return
 
-    // WebGPU doesn't allow 0-sized textures/swapchains
-    if (width <= 0 || height <= 0) return
+    if (this.context) return
 
-    canvas.width = width
-    canvas.height = height
-
+    this.canvas = canvas
+    this.context = canvas.getContext('webgpu')
     if (!this.context) {
-    // Get canvas context
-      this.context = canvas.getContext('webgpu')
-      if (!this.context) {
-        throw new Error('Could not get WebGPU context')
-      }
-
-      this.context.configure({
-        device: this.device,
-        format: this.format,
-        alphaMode: 'premultiplied'
-      })
+      throw new Error('Could not get WebGPU context')
     }
 
-    // Update uniform buffer with resolution
-    this.device.queue.writeBuffer(
-      this.uniformBuffer!,
-      0,
-      new Float32Array([width, height])
-    )
+    this.context.configure({
+      device: this.device,
+      format: this.format
+    })
   }
 
   /**
@@ -332,7 +328,7 @@ export class WebGPURenderer {
   }
 
   render (images: ASSImage[], heap: Uint8Array): void {
-    if (!this.device || !this.context || !this.pipeline) return
+    if (!this.device || !this.context || !this.pipeline || !this.canvas) return
 
     // getCurrentTexture fails if canvas has 0 dimensions
     const currentTexture = this.context.getCurrentTexture()
@@ -353,6 +349,26 @@ export class WebGPURenderer {
         }
       ]
     })
+
+    // we scheduled a resize because changing the canvas size clears it, and we don't want it to flicker
+    // so we do it here, right before rendering
+    if (this._scheduledResize) {
+      const { width, height } = this._scheduledResize
+      this._scheduledResize = undefined
+      if ('resize' in this.canvas) {
+        this.canvas.resize(width, height)
+      } else {
+        this.canvas.width = width
+        this.canvas.height = height
+      }
+
+      // Update uniform buffer with resolution
+      this.device.queue.writeBuffer(
+        this.uniformBuffer!,
+        0,
+        new Float32Array([width, height])
+      )
+    }
 
     renderPass.setPipeline(this.pipeline)
 
@@ -399,7 +415,7 @@ export class WebGPURenderer {
 
       this.device.queue.writeTexture(
         { texture: texInfo.texture },
-        heap.buffer,
+        heap,
         { bytesPerRow: img.stride, offset: img.bitmap }, // Source rows are stride bytes apart
         { width: img.w, height: img.h } // But we only copy w pixels per row
       )

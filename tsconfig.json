@@ -16,7 +16,8 @@
     "skipLibCheck": false,
     "noEmit": false,
     "types": [
-      "@webgpu/types"
+      "@webgpu/types",
+      "deno"
     ],
     "outDir": "./dist"
   },

@@ -26,8 +26,8 @@ importers:
         specifier: ^1.0.8
         version: 1.0.8(patch_hash=sjlkda4uulzzsf4iwplt5cirf4)
       jassub:
-        specifier: ^2.4.3
-        version: 2.4.3
+        specifier: ^2.5.2
+        version: 2.5.2
       lfa-ponyfill:
         specifier: ^1.1.0
         version: 1.1.0
@@ -573,6 +573,9 @@ packages:
 
   abslink@1.1.6:
     resolution: {integrity: sha512-8fQgnUoVSgc1IhOrYzdDY+wTDPktbuYjds2LKf9kWYWKwDnHgXU168gdV3sPei7vevFf5m2fPZ6IQSKZkSjHVg==}
+
+  abslink@1.2.2:
+    resolution: {integrity: sha512-HCOItvzORPjMzddCmEpbH8+W1VM3yjH+CR7DLtxlxFKX/jz5twJbm7KLfblO7eKLnXINLah8Hk2ZAJqxXeSkOg==}
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -1175,8 +1178,8 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
-  jassub@2.4.3:
-    resolution: {integrity: sha512-G29tqwIBO2gQUrOj3pJMRGktfUOWeOyPWfm1Sl49Q6whcmkFufmQWpZjRGtSANEfJ4BIwYLE+xHudVHH8n1Yiw==}
+  jassub@2.5.2:
+    resolution: {integrity: sha512-328UAqAusmI3o2oGaII96k4wy1G+/O9Whetn5rVcAKYuCKur2O9s+NBLyuHeQHVPHc+pK95dn3mDos5flx7gYg==}
 
   js-yaml@4.1.1:
     resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
@@ -2136,6 +2139,8 @@ snapshots:
 
   abslink@1.1.6: {}
 
+  abslink@1.2.2: {}
+
   acorn-jsx@5.3.2(acorn@8.15.0):
     dependencies:
       acorn: 8.15.0
@@ -2905,9 +2910,9 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  jassub@2.4.3:
+  jassub@2.5.2:
     dependencies:
-      abslink: 1.1.6
+      abslink: 1.2.2
       lfa-ponyfill: 1.1.0
       rvfc-polyfill: 1.0.8
       throughput: 1.0.2

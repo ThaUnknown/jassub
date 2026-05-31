@@ -29,7 +29,7 @@
     "@sabre-js/sabre": "0.5.1-pre.322713f",
     "abslink": "^1.1.6",
     "assjs-v2": "^1.0.8",
-    "jassub": "^2.5.2",
+    "jassub": "^2.5.3",
     "lfa-ponyfill": "^1.1.0",
     "rvfc-polyfill": "^1.0.8",
     "subforge": "^0.1.3",

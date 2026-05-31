@@ -27,17 +27,12 @@ updateMemoryViews = () => {
   self.WASMMEMORY = wasmMemory
 }
 
+if (moduleArg.__out) out = moduleArg.__out
+if (moduleArg.__err) err = moduleArg.__err
 // emscripten doesnt support conditional loading of wasm modules out of the box
 // so we hack around it by passing the url and simd support via the worker name
 // hopefully not bad?
-if (self.name.startsWith('em-pthread')) {
-  const url = self.name.split('-').slice(2).join('-')
-
-  const _fetch = globalThis.fetch
-  globalThis.fetch = _ => _fetch(url)
-} else {
-  if (moduleArg.__out) out = moduleArg.__out
-  if (moduleArg.__err) err = moduleArg.__err
+if (!self.name.startsWith('em-pthread')) {
   const OriginalWorker = globalThis.Worker
   globalThis.Worker = class extends OriginalWorker {
     constructor(scriptURL, options = {}) {

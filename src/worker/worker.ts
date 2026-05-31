@@ -8,7 +8,7 @@ import WASM from '../wasm/jassub-worker.js'
 import { Canvas2DRenderer } from './renderers/2d-renderer.ts'
 import { WebGL1Renderer } from './renderers/webgl1-renderer.ts'
 import { WebGL2Renderer } from './renderers/webgl2-renderer.ts'
-import { _applyKeys, _fetch, fetchtext, LIBASS_YCBCR_MAP, THREAD_COUNT, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
+import { _fetch, fetchtext, LIBASS_YCBCR_MAP, THREAD_COUNT, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
 
 import type { JASSUB, MainModule } from '../wasm/types.d.ts'
 // import { WebGPURenderer } from './webgpu-renderer'
@@ -108,20 +108,15 @@ export class ASSRenderer {
   }
 
   createEvent (event: ASSEvent) {
-    _applyKeys(event, this._wasm.getEvent(this._wasm.allocEvent())!)
+    this._wasm.createEvent(event)
   }
 
-  getEvents () {
-    const events: Array<Partial<ASSEvent>> = []
-    for (let i = 0; i < this._wasm.getEventCount(); i++) {
-      const { Start, Duration, ReadOrder, Layer, Style, MarginL, MarginR, MarginV, Name, Text, Effect } = this._wasm.getEvent(i)!
-      events.push({ Start, Duration, ReadOrder, Layer, Style, MarginL, MarginR, MarginV, Name, Text, Effect })
-    }
-    return events
+  getEvents (): Array<Partial<ASSEvent>> {
+    return this._wasm.getEvents()
   }
 
   setEvent (event: ASSEvent, index: number) {
-    _applyKeys(event, this._wasm.getEvent(index)!)
+    this._wasm.setEvent(index, event)
   }
 
   removeEvent (index: number) {
@@ -129,24 +124,15 @@ export class ASSRenderer {
   }
 
   createStyle (style: ASSStyle) {
-    const alloc = this._wasm.getStyle(this._wasm.allocStyle())!
-    _applyKeys(style, alloc)
-    return alloc
+    this._wasm.createStyle(style)
   }
 
-  getStyles () {
-    const styles: ASSStyle[] = []
-    for (let i = 0; i < this._wasm.getStyleCount(); i++) {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-      const { Name, FontName, FontSize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding, treat_fontname_as_pattern, Blur, Justify } = this._wasm.getStyle(i)!
-
-      styles.push({ Name, FontName, FontSize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding, treat_fontname_as_pattern, Blur, Justify })
-    }
-    return styles
+  getStyles (): ASSStyle[] {
+    return this._wasm.getStyles()
   }
 
   setStyle (style: ASSStyle, index: number) {
-    _applyKeys(style, this._wasm.getStyle(index)!)
+    this._wasm.setStyle(index, style)
   }
 
   removeStyle (index: number) {
@@ -154,7 +140,7 @@ export class ASSRenderer {
   }
 
   styleOverride (style: ASSStyle) {
-    this._wasm.styleOverride(this.createStyle(style))
+    this._wasm.styleOverride(style)
   }
 
   disableStyleOverride () {
@@ -302,24 +288,10 @@ export class ASSRenderer {
   }
 
   _draw (time: number, repaint = false) {
-    const result = this._wasm.rawRender(time, Number(repaint))!
-    if (this._wasm.changed === 0 && !repaint) return
+    const images = this._wasm.rawRender(time, Number(repaint)) as ASSImage[] | null
+    if (!images) return
 
-    const bitmaps: ASSImage[] = []
-
-    for (let image = result, i = 0; i < this._wasm.count; image = image.next!, ++i) {
-      // @ts-expect-error internal emsc types
-      bitmaps.push({
-        bitmap: image.bitmap,
-        color: image.color,
-        dst_x: image.dst_x,
-        dst_y: image.dst_y,
-        h: image.h,
-        stride: image.stride,
-        w: image.w
-      })
-    }
-    this._gpurender.render(bitmaps, self.HEAPU8RAW)
+    this._gpurender.render(images, self.HEAPU8RAW)
   }
 
   _setColorSpace (videoColorSpace: 'RGB' | 'BT709' | 'BT601') {

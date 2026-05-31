@@ -51,6 +51,8 @@ Promise:           33 7.1 29   /  4 3.1 2
 Proxy:             49 10 18
 Fetch:             42 10.1 39  /  41 10.1 34
 getVPQ/rVFC:       80 8 42     /  28 8 42
+-mnontrapping-fptoint 75 15 64
+-msign-ext         69 14 62
 -->
 
 JASSUB supports Chrome/Safari/Firefox 80/17/105, you bring the support down to 67/16.2/68 if you enable some flags/settings in your browser for these features. For other engines polyfills might be needed. Babel is also recommended if you need to support older JS engines as JASSUB ships as ES modules with modern syntax.

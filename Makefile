@@ -14,7 +14,7 @@ endif
 BUILD_LIB_DIR := $(BASE_DIR)build/lib/$(BUILD_VARIANT)
 DIST_DIR := $(BASE_DIR)dist/libraries/$(BUILD_VARIANT)
 
-export CFLAGS = -O3 -flto -fno-rtti -fno-exceptions -s USE_PTHREADS=1
+export CFLAGS = -O3 -flto -fno-rtti -fno-exceptions -fno-math-errno -s USE_PTHREADS=1 -mnontrapping-fptoint -msign-ext -mbulk-memory -mreference-types
 export CXXFLAGS = $(CFLAGS)
 export PKG_CONFIG_PATH = $(DIST_DIR)/lib/pkgconfig
 export EM_PKG_CONFIG_PATH = $(PKG_CONFIG_PATH)
@@ -30,8 +30,7 @@ SIMD_ARGS = \
 	-msse4.2 \
 	-mavx \
 	-mavx2 \
-	-matomics \
-	-mnontrapping-fptoint 
+	-matomics
 
 ifeq (${MODERN},1)
 	WORKER_NAME = jassub-worker-modern
@@ -63,7 +62,7 @@ $(BUILD_LIB_DIR)/fribidi/configure: lib/fribidi $(wildcard $(BASE_DIR)build/patc
 
 $(DIST_DIR)/lib/libfribidi.a: $(BUILD_LIB_DIR)/fribidi/configure
 	cd $(BUILD_LIB_DIR)/fribidi && \
-	$(call CONFIGURE_AUTO) --disable-debug && \
+	$(call CONFIGURE_AUTO) --disable-debug --disable-deprecated && \
 	$(JASSUB_MAKE) -C lib/ fribidi-unicode-version.h && \
 	$(JASSUB_MAKE) -C lib/ install && \
 	$(JASSUB_MAKE) install-pkgconfigDATA
@@ -76,7 +75,7 @@ $(BUILD_LIB_DIR)/brotli/configured: lib/brotli $(wildcard $(BASE_DIR)build/patch
 $(DIST_DIR)/lib/libbrotlidec.a: $(DIST_DIR)/lib/libbrotlicommon.a
 $(DIST_DIR)/lib/libbrotlicommon.a: $(BUILD_LIB_DIR)/brotli/configured
 	cd $(BUILD_LIB_DIR)/brotli && \
-	$(call CONFIGURE_CMAKE) && \
+	$(call CONFIGURE_CMAKE) -DBROTLI_DISABLE_TESTS=ON && \
 	$(JASSUB_MAKE) install
 	# Normalise static lib names
 	cd $(DIST_DIR)/lib/ && \
@@ -96,6 +95,9 @@ $(BUILD_LIB_DIR)/freetype/build_hb/dist_hb/lib/libfreetype.a: $(DIST_DIR)/lib/li
 			--prefix="$$(pwd)/dist_hb" \
 			--with-brotli=yes \
 			--without-harfbuzz \
+			--with-zlib=no \
+			--with-png=no \
+			--with-bzip2=no \
 		&& \
 		$(JASSUB_MAKE) install
 
@@ -111,6 +113,11 @@ $(DIST_DIR)/lib/libharfbuzz.a: $(BUILD_LIB_DIR)/freetype/build_hb/dist_hb/lib/li
 	CXXFLAGS="-DHB_NO_MT $(CFLAGS)" \
 	$(call CONFIGURE_AUTO) \
 		--with-freetype \
+		--with-glib=no \
+		--with-cairo=no \
+		--with-gobject=no \
+		--with-icu=no \
+		--with-graphite2=no \
 	&& \
 	cd src && \
 	$(JASSUB_MAKE) install-libLTLIBRARIES install-pkgincludeHEADERS install-pkgconfigDATA
@@ -122,6 +129,9 @@ $(DIST_DIR)/lib/libfreetype.a: $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/lib
 	$(call CONFIGURE_AUTO) \
 		--with-brotli=yes \
 		--with-harfbuzz \
+		--with-zlib=no \
+		--with-png=no \
+		--with-bzip2=no \
 	&& \
 	$(JASSUB_MAKE) install
 
@@ -138,6 +148,7 @@ $(DIST_DIR)/lib/libass.a: $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/libfribi
 		--disable-fontconfig \
 		--disable-require-system-font-provider \
 		--enable-pthreads \
+		--disable-asm \
 	&& \
 	$(JASSUB_MAKE) install
 
@@ -161,12 +172,19 @@ PERFORMANCE_ARGS = \
 		-s INVOKE_RUN=0 \
 		-s DISABLE_EXCEPTION_CATCHING=1 \
 		-s TEXTDECODER=2 \
-		-s INITIAL_MEMORY=60MB \
+		-s INITIAL_MEMORY=32MB \
 		-s MALLOC=mimalloc \
 		-s WASM_BIGINT=1 \
+		-s DYNAMIC_EXECUTION=0 \
+		-s EMBIND_AOT=1 \
 		-s MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION=1 \
 		-flto \
 		-fno-exceptions \
+		-fno-math-errno \
+		-mnontrapping-fptoint \
+		-msign-ext \
+		-mreference-types \
+		-s STACK_SIZE=256KB \
 		-O3
 
 # args for reducing size
@@ -179,22 +197,24 @@ SIZE_ARGS = \
 		-s INCOMING_MODULE_JS_API="[]" \
 		-s USE_SDL=0 \
 		-s EXPORTED_RUNTIME_METHODS="[]" \
-		-s IMPORTED_MEMORY=0 \
 		-s MINIMAL_RUNTIME=1 
 
 # args that are required for this to even work at all
 COMPAT_ARGS = \
 		-s EXPORTED_FUNCTIONS="['_malloc']" \
 		-s EXPORT_KEEPALIVE=1 \
+		-s DISABLE_EXCEPTION_THROWING=1 \
+		-s DEFAULT_LIBRARY_FUNCS_TO_INCLUDE='["$$stringToNewUTF8"]' \
 		-mbulk-memory
 
-src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js
+src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js src/worker/extern-pre-worker.js
 	mkdir -p src/wasm
 	emcc src/JASSUB.cpp $(LIBASS_DEPS) \
 		$(WORKER_ARGS) \
 		$(PERFORMANCE_ARGS) \
 		$(SIZE_ARGS) \
 		$(COMPAT_ARGS) \
+		--extern-pre-js src/worker/extern-pre-worker.js \
 		--pre-js src/worker/pre-worker.js \
 		--emit-tsd='types.d.ts' \
 		-s ENVIRONMENT=worker \

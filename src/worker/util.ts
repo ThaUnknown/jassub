@@ -1,9 +1,56 @@
 /* eslint-disable camelcase */
-import type { ASS_Event, ASS_Image, ASS_Style, ClassHandle } from '../wasm/types.d.ts'
+export interface ASSEvent {
+  Start: number
+  Duration: number
+  Name: string
+  Effect: string
+  Text: string
+  ReadOrder: number
+  Layer: number
+  Style: number
+  MarginL: number
+  MarginR: number
+  MarginV: number
+}
 
-export type ASSEvent = Omit<ASS_Event, keyof ClassHandle>
-export type ASSStyle = Omit<ASS_Style, keyof ClassHandle>
-export type ASSImage = Omit<ASS_Image, keyof ClassHandle>
+export interface ASSStyle {
+  Name: string
+  FontName: string
+  FontSize: number
+  PrimaryColour: number
+  SecondaryColour: number
+  OutlineColour: number
+  BackColour: number
+  Bold: number
+  Italic: number
+  Underline: number
+  StrikeOut: number
+  ScaleX: number
+  ScaleY: number
+  Spacing: number
+  Angle: number
+  BorderStyle: number
+  Outline: number
+  Shadow: number
+  Alignment: number
+  MarginL: number
+  MarginR: number
+  MarginV: number
+  Encoding: number
+  treat_fontname_as_pattern: number
+  Blur: number
+  Justify: number
+}
+
+export interface ASSImage {
+  w: number
+  h: number
+  dst_x: number
+  dst_y: number
+  stride: number
+  color: number
+  bitmap: number
+}
 
 // offset by 1, 0 = 1, to match CSS font-weight values, but dividing by 100 gives the correct index
 export const WEIGHT_MAP = [
@@ -31,12 +78,6 @@ const c = 'SMPTE240M'
 const d = 'FCC'
 
 export const LIBASS_YCBCR_MAP = [null, a, null, a, a, b, b, c, c, d, d] as const
-
-export function _applyKeys<T extends (ASSEvent | ASSStyle)> (input: T, output: T) {
-  for (const v of Object.keys(input) as Array<keyof T>) {
-    output[v] = input[v]
-  }
-}
 
 export const _fetch = globalThis.fetch
 export async function fetchtext (url: string) {

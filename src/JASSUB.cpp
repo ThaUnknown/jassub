@@ -22,10 +22,46 @@ void msg_callback(int level, const char *fmt, va_list va, void *data) {
   fprintf(stream, "\n");
 }
 
-static char *copyString(const std::string &str) {
-  char *result = new char[str.length() + 1];
-  strcpy(result, str.data());
-  return result;
+static char *copyString(emscripten::val v) {
+  return (char*)EM_ASM_PTR({
+    return stringToNewUTF8(Emval.toValue($0));
+  }, v.as_handle());
+}
+
+static void applyStyleStringFields(ASS_Style &style, emscripten::val obj) {
+  auto read = [&](const char *key) { return obj[key]; };
+  auto v = read("Name");
+  if (!v.isUndefined()) style.Name = copyString(v);
+  v = read("FontName");
+  if (!v.isUndefined()) style.FontName = copyString(v);
+}
+
+static void applyStyleCommonFields(ASS_Style &style, emscripten::val obj) {
+  auto read = [&](const char *key) { return obj[key]; };
+  auto v = read("FontSize");                   if (!v.isUndefined()) style.FontSize = v.as<double>();
+  v = read("PrimaryColour");                    if (!v.isUndefined()) style.PrimaryColour = v.as<uint32_t>();
+  v = read("SecondaryColour");                  if (!v.isUndefined()) style.SecondaryColour = v.as<uint32_t>();
+  v = read("OutlineColour");                    if (!v.isUndefined()) style.OutlineColour = v.as<uint32_t>();
+  v = read("BackColour");                       if (!v.isUndefined()) style.BackColour = v.as<uint32_t>();
+  v = read("Bold");                             if (!v.isUndefined()) style.Bold = v.as<int>();
+  v = read("Italic");                           if (!v.isUndefined()) style.Italic = v.as<int>();
+  v = read("Underline");                        if (!v.isUndefined()) style.Underline = v.as<int>();
+  v = read("StrikeOut");                        if (!v.isUndefined()) style.StrikeOut = v.as<int>();
+  v = read("ScaleX");                           if (!v.isUndefined()) style.ScaleX = v.as<double>();
+  v = read("ScaleY");                           if (!v.isUndefined()) style.ScaleY = v.as<double>();
+  v = read("Spacing");                          if (!v.isUndefined()) style.Spacing = v.as<double>();
+  v = read("Angle");                            if (!v.isUndefined()) style.Angle = v.as<double>();
+  v = read("BorderStyle");                      if (!v.isUndefined()) style.BorderStyle = v.as<int>();
+  v = read("Outline");                          if (!v.isUndefined()) style.Outline = v.as<double>();
+  v = read("Shadow");                           if (!v.isUndefined()) style.Shadow = v.as<double>();
+  v = read("Alignment");                        if (!v.isUndefined()) style.Alignment = v.as<int>();
+  v = read("MarginL");                          if (!v.isUndefined()) style.MarginL = v.as<int>();
+  v = read("MarginR");                          if (!v.isUndefined()) style.MarginR = v.as<int>();
+  v = read("MarginV");                          if (!v.isUndefined()) style.MarginV = v.as<int>();
+  v = read("Encoding");                         if (!v.isUndefined()) style.Encoding = v.as<int>();
+  v = read("treat_fontname_as_pattern");        if (!v.isUndefined()) style.treat_fontname_as_pattern = v.as<int>();
+  v = read("Blur");                             if (!v.isUndefined()) style.Blur = v.as<double>();
+  v = read("Justify");                          if (!v.isUndefined()) style.Justify = v.as<int>();
 }
 
 class JASSUB {
@@ -36,18 +72,13 @@ private:
   int canvas_w;
   int canvas_h;
 
-  int status;
-
   const char *defaultFont;
 
 public:
   ASS_Track *track;
 
   int trackColorSpace;
-  int changed = 0;
-  int count = 0;
-  JASSUB(int canvas_w, int canvas_h, const std::string &df) {
-    status = 0;
+  JASSUB(int canvas_w, int canvas_h, emscripten::val df) {
     ass_library = NULL;
     ass_renderer = NULL;
     track = NULL;
@@ -104,18 +135,82 @@ public:
     this->canvas_w = canvas_w;
   }
 
-  ASS_Image *rawRender(double tm, int force) {
-    count = 0;
+  emscripten::val rawRender(double tm, int force) {
+    int changed = 0;
     ASS_Image *imgs = ass_render_frame(ass_renderer, track, (long long)(tm * 1e+3 + 0.5), &changed);
     if (imgs == NULL || (changed == 0 && !force))
-      return NULL;
+      return emscripten::val::null();
 
-    // count, because embind is not good with null pointers
+    emscripten::val arr = emscripten::val::array();
     for (ASS_Image *img = imgs; img; img = img->next) {
-      ++count;
+      emscripten::val obj = emscripten::val::object();
+      obj.set("w", img->w);
+      obj.set("h", img->h);
+      obj.set("dst_x", img->dst_x);
+      obj.set("dst_y", img->dst_y);
+      obj.set("bitmap", (uintptr_t)img->bitmap);
+      obj.set("color", img->color);
+      obj.set("stride", img->stride);
+      arr.call<emscripten::val>("push", obj);
     }
+    return arr;
+  }
 
-    return imgs;
+  emscripten::val getEvents() {
+    emscripten::val arr = emscripten::val::array();
+    for (int i = 0; i < track->n_events; i++) {
+      ASS_Event &evt = track->events[i];
+      emscripten::val obj = emscripten::val::object();
+      obj.set("Start", (uint32_t)evt.Start);
+      obj.set("Duration", (uint32_t)evt.Duration);
+      obj.set("ReadOrder", evt.ReadOrder);
+      obj.set("Layer", evt.Layer);
+      obj.set("Style", evt.Style);
+      obj.set("MarginL", evt.MarginL);
+      obj.set("MarginR", evt.MarginR);
+      obj.set("MarginV", evt.MarginV);
+      obj.set("Name", evt.Name ? std::string(evt.Name) : "");
+      obj.set("Text", evt.Text ? std::string(evt.Text) : "");
+      obj.set("Effect", evt.Effect ? std::string(evt.Effect) : "");
+      arr.call<emscripten::val>("push", obj);
+    }
+    return arr;
+  }
+
+  emscripten::val getStyles() {
+    emscripten::val arr = emscripten::val::array();
+    for (int i = 0; i < track->n_styles; i++) {
+      ASS_Style &style = track->styles[i];
+      emscripten::val obj = emscripten::val::object();
+      obj.set("Name", style.Name ? std::string(style.Name) : "");
+      obj.set("FontName", style.FontName ? std::string(style.FontName) : "");
+      obj.set("FontSize", style.FontSize);
+      obj.set("PrimaryColour", style.PrimaryColour);
+      obj.set("SecondaryColour", style.SecondaryColour);
+      obj.set("OutlineColour", style.OutlineColour);
+      obj.set("BackColour", style.BackColour);
+      obj.set("Bold", style.Bold);
+      obj.set("Italic", style.Italic);
+      obj.set("Underline", style.Underline);
+      obj.set("StrikeOut", style.StrikeOut);
+      obj.set("ScaleX", style.ScaleX);
+      obj.set("ScaleY", style.ScaleY);
+      obj.set("Spacing", style.Spacing);
+      obj.set("Angle", style.Angle);
+      obj.set("BorderStyle", style.BorderStyle);
+      obj.set("Outline", style.Outline);
+      obj.set("Shadow", style.Shadow);
+      obj.set("Alignment", style.Alignment);
+      obj.set("MarginL", style.MarginL);
+      obj.set("MarginR", style.MarginR);
+      obj.set("MarginV", style.MarginV);
+      obj.set("Encoding", style.Encoding);
+      obj.set("treat_fontname_as_pattern", style.treat_fontname_as_pattern);
+      obj.set("Blur", style.Blur);
+      obj.set("Justify", style.Justify);
+      arr.call<emscripten::val>("push", obj);
+    }
+    return arr;
   }
 
   void quitLibrary() {
@@ -124,7 +219,7 @@ public:
     ass_library_done(ass_library);
   }
 
-  void setDefaultFont(const std::string &name) {
+  void setDefaultFont(emscripten::val name) {
     defaultFont = copyString(name);
     reloadFonts();
   }
@@ -133,8 +228,10 @@ public:
     ass_set_fonts(ass_renderer, NULL, defaultFont, ASS_FONTPROVIDER_NONE, NULL, 1);
   }
 
-  void addFont(const std::string &name, int data, unsigned long data_size) {
-    ass_add_font(ass_library, name.c_str(), (char *)data, (size_t)data_size);
+  void addFont(emscripten::val name, int data, unsigned long data_size) {
+    char *ptr = copyString(name);
+    ass_add_font(ass_library, ptr, (char *)data, (size_t)data_size);
+    free(ptr);
     free((char *)data);
   }
 
@@ -146,28 +243,12 @@ public:
     return ass_set_threads(ass_renderer, threads);
   }
 
-  int getEventCount() const {
-    return track->n_events;
-  }
-
-  int allocEvent() {
-    return ass_alloc_event(track);
-  }
-
   void removeEvent(int eid) {
     ass_free_event(track, eid);
   }
 
-  int getStyleCount() const {
-    return track->n_styles;
-  }
-
-  int allocStyle() {
-    return ass_alloc_style(track);
-  }
-
   void removeStyle(int sid) {
-    ass_free_event(track, sid);
+    ass_free_style(track, sid);
   }
 
   void removeAllEvents() {
@@ -183,21 +264,50 @@ public:
   }
 
 
-  // BINDING
-  ASS_Event *getEvent(int i) {
-    return &track->events[i];
+  void createEvent(emscripten::val obj) {
+    setEvent(ass_alloc_event(track), obj);
   }
 
-  ASS_Style *getStyle(int i) {
-    return &track->styles[i];
+  void setEvent(int index, emscripten::val obj) {
+    ASS_Event &evt = track->events[index];
+    auto read = [&](const char *key) { return obj[key]; };
+
+    auto v = read("Start");    if (!v.isUndefined()) evt.Start = v.as<uint32_t>();
+    v = read("Duration");      if (!v.isUndefined()) evt.Duration = v.as<uint32_t>();
+    v = read("ReadOrder");     if (!v.isUndefined()) evt.ReadOrder = v.as<int>();
+    v = read("Layer");         if (!v.isUndefined()) evt.Layer = v.as<int>();
+    v = read("Style");         if (!v.isUndefined()) evt.Style = v.as<int>();
+    v = read("MarginL");       if (!v.isUndefined()) evt.MarginL = v.as<int>();
+    v = read("MarginR");       if (!v.isUndefined()) evt.MarginR = v.as<int>();
+    v = read("MarginV");       if (!v.isUndefined()) evt.MarginV = v.as<int>();
+    v = read("Name");          if (!v.isUndefined()) evt.Name = copyString(v);
+    v = read("Text");          if (!v.isUndefined()) evt.Text = copyString(v);
+    v = read("Effect");        if (!v.isUndefined()) evt.Effect = copyString(v);
   }
 
-  void styleOverride(ASS_Style style) {
+  void createStyle(emscripten::val obj) {
+    setStyle(ass_alloc_style(track), obj);
+  }
+
+  void setStyle(int index, emscripten::val obj) {
+    ASS_Style &style = track->styles[index];
+    applyStyleStringFields(style, obj);
+    applyStyleCommonFields(style, obj);
+  }
+
+  void styleOverride(emscripten::val obj) {
+    ASS_Style style = {};
+    applyStyleStringFields(style, obj);
+    applyStyleCommonFields(style, obj);
+
     int set_force_flags = ASS_OVERRIDE_BIT_STYLE | ASS_OVERRIDE_BIT_SELECTIVE_FONT_SCALE;
 
     ass_set_selective_style_override_enabled(ass_renderer, set_force_flags);
     ass_set_selective_style_override(ass_renderer, &style);
     ass_set_font_scale(ass_renderer, 0.3);
+
+    free(style.Name);
+    free(style.FontName);
   }
 
   void disableStyleOverride() {
@@ -206,123 +316,8 @@ public:
   }
 };
 
-static uint32_t getDuration(const ASS_Event &evt) {
-  return (uint32_t)evt.Duration;
-}
-
-static void setDuration(ASS_Event &evt, uint32_t ms) {
-  evt.Duration = ms;
-}
-
-static uint32_t getStart(const ASS_Event &evt) {
-  return (uint32_t)evt.Start;
-}
-
-static void setStart(ASS_Event &evt, uint32_t ms) {
-  evt.Start = ms;
-}
-
-static std::string getEventName(const ASS_Event &evt) {
-  return evt.Name;
-}
-
-static void setEventName(ASS_Event &evt, const std::string &str) {
-  evt.Name = copyString(str);
-}
-
-static std::string getText(const ASS_Event &evt) {
-  return evt.Text;
-}
-
-static void setText(ASS_Event &evt, const std::string &str) {
-  evt.Text = copyString(str);
-}
-
-static std::string getEffect(const ASS_Event &evt) {
-  return evt.Effect;
-}
-
-static void setEffect(ASS_Event &evt, const std::string &str) {
-  evt.Effect = copyString(str);
-}
-
-static std::string getStyleName(const ASS_Style &style) {
-  return style.Name;
-}
-
-static void setStyleName(ASS_Style &style, const std::string &str) {
-  style.Name = copyString(str);
-}
-
-static std::string getFontName(const ASS_Style &style) {
-  return style.FontName;
-}
-
-static void setFontName(ASS_Style &style, const std::string &str) {
-  style.FontName = copyString(str);
-}
-
-static ASS_Image getNext(const ASS_Image &res) {
-  return *res.next;
-}
-
-static uintptr_t getBitmapPtr(const ASS_Image &img) {
-  return (uintptr_t)img.bitmap;
-}
-
 EMSCRIPTEN_BINDINGS(JASSUB) {
-  emscripten::class_<ASS_Image>("ASS_Image")
-    .property("w", &ASS_Image::w)
-    .property("h", &ASS_Image::h)
-    .property("dst_x", &ASS_Image::dst_x)
-    .property("dst_y", &ASS_Image::dst_y)
-    .property("next", &getNext)
-    .property("bitmap", &getBitmapPtr)
-    .property("color", &ASS_Image::color)
-    .property("stride", &ASS_Image::stride);
-
-  emscripten::class_<ASS_Style>("ASS_Style")
-    .property("Name", &getStyleName, &setStyleName)
-    .property("FontName", &getFontName, &setFontName)
-    .property("FontSize", &ASS_Style::FontSize)
-    .property("PrimaryColour", &ASS_Style::PrimaryColour)
-    .property("SecondaryColour", &ASS_Style::SecondaryColour)
-    .property("OutlineColour", &ASS_Style::OutlineColour)
-    .property("BackColour", &ASS_Style::BackColour)
-    .property("Bold", &ASS_Style::Bold)
-    .property("Italic", &ASS_Style::Italic)
-    .property("Underline", &ASS_Style::Underline)
-    .property("StrikeOut", &ASS_Style::StrikeOut)
-    .property("ScaleX", &ASS_Style::ScaleX)
-    .property("ScaleY", &ASS_Style::ScaleY)
-    .property("Spacing", &ASS_Style::Spacing)
-    .property("Angle", &ASS_Style::Angle)
-    .property("BorderStyle", &ASS_Style::BorderStyle)
-    .property("Outline", &ASS_Style::Outline)
-    .property("Shadow", &ASS_Style::Shadow)
-    .property("Alignment", &ASS_Style::Alignment)
-    .property("MarginL", &ASS_Style::MarginL)
-    .property("MarginR", &ASS_Style::MarginR)
-    .property("MarginV", &ASS_Style::MarginV)
-    .property("Encoding", &ASS_Style::Encoding)
-    .property("treat_fontname_as_pattern", &ASS_Style::treat_fontname_as_pattern)
-    .property("Blur", &ASS_Style::Blur)
-    .property("Justify", &ASS_Style::Justify);
-
-  emscripten::class_<ASS_Event>("ASS_Event")
-    .property("Start", &getStart, &setStart)
-    .property("Duration", &getDuration, &setDuration)
-    .property("Name", &getEventName, &setEventName)
-    .property("Effect", &getEffect, &setEffect)
-    .property("Text", &getText, &setText)
-    .property("ReadOrder", &ASS_Event::ReadOrder)
-    .property("Layer", &ASS_Event::Layer)
-    .property("Style", &ASS_Event::Style)
-    .property("MarginL", &ASS_Event::MarginL)
-    .property("MarginR", &ASS_Event::MarginR)
-    .property("MarginV", &ASS_Event::MarginV);
-
-  emscripten::class_<JASSUB>("JASSUB").constructor<int, int, std::string>()
+  emscripten::class_<JASSUB>("JASSUB").constructor<int, int, emscripten::val>()
     .function("setLogLevel", &JASSUB::setLogLevel)
     .function("createTrackMem", &JASSUB::createTrackMem)
     .function("removeTrack", &JASSUB::removeTrack)
@@ -331,23 +326,21 @@ EMSCRIPTEN_BINDINGS(JASSUB) {
     .function("addFont", &JASSUB::addFont)
     .function("reloadFonts", &JASSUB::reloadFonts)
     .function("setMargin", &JASSUB::setMargin)
-    .function("getEventCount", &JASSUB::getEventCount)
-    .function("allocEvent", &JASSUB::allocEvent)
-    .function("allocStyle", &JASSUB::allocStyle)
+    .function("getEvents", &JASSUB::getEvents)
+    .function("getStyles", &JASSUB::getStyles)
+    .function("createEvent", &JASSUB::createEvent)
+    .function("setEvent", &JASSUB::setEvent)
+    .function("createStyle", &JASSUB::createStyle)
+    .function("setStyle", &JASSUB::setStyle)
     .function("removeEvent", &JASSUB::removeEvent)
     .function("setThreads", &JASSUB::setThreads)
-    .function("getStyleCount", &JASSUB::getStyleCount)
     .function("removeStyle", &JASSUB::removeStyle)
     .function("removeAllEvents", &JASSUB::removeAllEvents)
     .function("setMemoryLimits", &JASSUB::setMemoryLimits)
     .function("processData", &JASSUB::processData)
-    .function("rawRender", &JASSUB::rawRender, emscripten::allow_raw_pointers())
-    .function("getEvent", &JASSUB::getEvent, emscripten::allow_raw_pointers())
-    .function("getStyle", &JASSUB::getStyle, emscripten::allow_raw_pointers())
-    .function("styleOverride", &JASSUB::styleOverride, emscripten::allow_raw_pointers())
+    .function("rawRender", &JASSUB::rawRender)
+    .function("styleOverride", &JASSUB::styleOverride)
     .function("disableStyleOverride", &JASSUB::disableStyleOverride)
     .function("setDefaultFont", &JASSUB::setDefaultFont)
-    .property("trackColorSpace", &JASSUB::trackColorSpace)
-    .property("changed", &JASSUB::changed)
-    .property("count", &JASSUB::count);
+    .property("trackColorSpace", &JASSUB::trackColorSpace);
 }

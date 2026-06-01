@@ -138,8 +138,12 @@ public:
   emscripten::val rawRender(double tm, int force) {
     int changed = 0;
     ASS_Image *imgs = ass_render_frame(ass_renderer, track, (long long)(tm * 1e+3 + 0.5), &changed);
-    if (imgs == NULL || (changed == 0 && !force))
-      return emscripten::val::null();
+    if (imgs == NULL)
+      if ((changed == 0 && !force)) {
+        return emscripten::val::null();
+      } else {
+        return emscripten::val::array();
+      }
 
     emscripten::val arr = emscripten::val::array();
     for (ASS_Image *img = imgs; img; img = img->next) {

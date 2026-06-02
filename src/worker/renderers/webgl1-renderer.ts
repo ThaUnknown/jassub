@@ -19,6 +19,9 @@ varying vec4 v_color;
 varying vec2 v_texSize;
 varying float v_texLayer;
 varying vec2 v_texCoord;
+varying vec2 v_normalizedImageSize;
+
+uniform vec2 u_texDimensions;
 
 void main() {
   vec2 pixelPos = a_destRect.xy + a_quadPos * a_destRect.zw;
@@ -31,6 +34,7 @@ void main() {
   v_texSize = a_destRect.zw;
   v_texLayer = a_texLayer;
   v_texCoord = a_quadPos;
+  v_normalizedImageSize = a_destRect.zw / u_texDimensions;
 }
 `
 
@@ -42,23 +46,17 @@ precision mediump float;
 uniform sampler2D u_tex;
 uniform mat3 u_colorMatrix;
 uniform vec2 u_resolution;
-uniform vec2 u_texDimensions; // Actual texture dimensions
 
 varying vec2 v_destXY;
 varying vec4 v_color;
 varying vec2 v_texSize;
 varying float v_texLayer;
 varying vec2 v_texCoord;
+varying vec2 v_normalizedImageSize;
 
 void main() {
-  // v_texCoord is in 0-1 range for the quad
-  // We need to map it to the actual image size within the texture
-  // The image occupies only (v_texSize.x / u_texDimensions.x, v_texSize.y / u_texDimensions.y) of the texture
-  vec2 normalizedImageSize = v_texSize / u_texDimensions;
-  vec2 texCoord = v_texCoord * normalizedImageSize;
-
   // Sample texture (r channel contains mask)
-  float mask = texture2D(u_tex, texCoord).r;
+  float mask = texture2D(u_tex, v_texCoord * v_normalizedImageSize).r;
 
   // Apply color matrix conversion (identity if no conversion needed)
   vec3 correctedColor = u_colorMatrix * v_color.rgb;

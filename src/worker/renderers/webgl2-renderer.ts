@@ -9,7 +9,7 @@ declare const self: DedicatedWorkerGlobalScope &
 
 // GLSL ES 3.0 Vertex Shader with Instancing
 const VERTEX_SHADER = /* glsl */`#version 300 es
-precision mediump float;
+precision highp float;
 
 const vec2 QUAD_POSITIONS[6] = vec2[6](
   vec2(0.0, 0.0),
@@ -48,8 +48,8 @@ void main() {
 
 // GLSL ES 3.0 Fragment Shader - use texelFetch for pixel-perfect sampling
 const FRAGMENT_SHADER = /* glsl */`#version 300 es
-precision mediump float;
-precision mediump sampler2DArray;
+precision highp float;
+precision highp sampler2DArray;
 
 uniform sampler2DArray u_texArray;
 uniform mat3 u_colorMatrix;

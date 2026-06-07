@@ -268,9 +268,9 @@ export default class JASSUB {
     this._video!.requestVideoFrameCallback((now, data) => this._handleRVFC(data))
   }
 
-  manualRender (data: Pick<VideoFrameCallbackMetadata, 'expectedDisplayTime' | 'width' | 'height' | 'mediaTime'>) {
+  manualRender (data: Pick<VideoFrameCallbackMetadata, 'expectedDisplayTime' | 'width' | 'height' | 'mediaTime'>, repaint = false) {
     this._lastDemandTime = data
-    return this._demandRender()
+    return this._demandRender(repaint)
   }
 
   async _demandRender (repaint = false) {

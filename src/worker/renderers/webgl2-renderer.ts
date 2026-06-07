@@ -138,6 +138,7 @@ export class WebGL2Renderer {
   resizeCanvas (width: number, height: number) {
     // WebGL2 doesn't allow 0-sized canvases
     if (!width || !height) return
+    if (this.canvas?.width === width && this.canvas?.height === height) return
 
     this._scheduledResize = { width, height }
   }

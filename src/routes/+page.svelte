@@ -18,7 +18,7 @@
   <table>
     <thead>
       <tr>
-        <th>Renderer \ Subtitle</th>
+        <th>Renderer\Subs</th>
         {#each Object.keys(subtitleList) as subtitle (subtitle)}
           <th>{subtitle}</th>
         {/each}
@@ -59,7 +59,7 @@
       </dl>
       <div>JSSO underreports actual timings as it doesn't report the times of unchanged events and rounds times to nearest digit. This causes problems when trying to profile subtitles with gaps.</div>
       <div>ASS.js doesn't provide any way to measure render timings, so it is done on a "best effort", by measuring only if a frame is delayed more than the video frame duration and assuming 1000/videoFPS for everything else [usually 33-42ms], and might not be entirely accurate. For example this means that "42ms is real-time and fine". Also could not get custom fonts working.</div>
-
+      <div>Akarisub has many bugs in it's built in statistic reporting so it's difficult to trust the data it provides. Subtitles also frequently stop rendering.</div>
     </footer>
   {/if}
 </main>

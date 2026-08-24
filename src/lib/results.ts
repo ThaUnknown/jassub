@@ -6,7 +6,7 @@ type ResultKey = `${Renderer}-${Subtitle}`
 
 // Common annotation symbols: * † ‡ + ◊ § ¶ # ※
 export const annotations = {
-  '*': 'Known timing issues',
+  '*': 'Timing issues',
   '†': 'Subtitles desync from video position progressively',
   '‡': 'Partial implementation, missing/incorrectly implemented ASS features',
   '+': 'Major rendering issues',
@@ -51,5 +51,11 @@ export const results: Record<ResultKey, Result> = {
   'subframe-simple': { frametime: 4.30, notes: ['‡'] },
   'subframe-fate': { frametime: 41.67, notes: ['‡', '+'] },
   'subframe-beastars': { frametime: 335.66, notes: ['‡', '+'] },
-  'subframe-kusriya': { frametime: 115.1 }
+  'subframe-kusriya': { frametime: 115.1 },
+  'akarisub-variable': { frametime: 0.07 },
+  'akarisub-high': { frametime: 0.04, notes: ['*'] },
+  'akarisub-simple': { frametime: 3.56 },
+  'akarisub-fate': { frametime: 10.67 },
+  'akarisub-beastars': { frametime: 45.61 },
+  'akarisub-kusriya': { frametime: 33.04, notes: ['+'] }
 }

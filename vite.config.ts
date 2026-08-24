@@ -1,6 +1,9 @@
 import devtoolsJson from 'vite-plugin-devtools-json';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import { resolve } from 'node:path';
+
+const akarisubDir = resolve('node_modules/akarisub');
 
 const viteServerConfig = () => ({
   name: 'add-headers',
@@ -20,7 +23,9 @@ export default defineConfig({
     sourcemap: true
   },
   resolve: {
-    alias: {}
+    alias: [
+      { find: /^\$akarisub\/(.*)$/, replacement: (_, path) => resolve(akarisubDir, path) }
+    ]
   },
   ssr: {
     target: 'webworker'

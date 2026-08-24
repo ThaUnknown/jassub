@@ -22,9 +22,12 @@ importers:
       abslink:
         specifier: ^1.2.2
         version: 1.2.2
+      akarisub:
+        specifier: ^1.1.2
+        version: 1.1.2
       assjs:
-        specifier: ^0.1.9
-        version: 0.1.9(patch_hash=qpr5ht4rah23r3hpararocrwkq)
+        specifier: ^0.1.10
+        version: 0.1.10(patch_hash=qpr5ht4rah23r3hpararocrwkq)
       jassub:
         specifier: ^2.5.14
         version: 2.5.14
@@ -601,6 +604,10 @@ packages:
   ajv@6.15.0:
     resolution: {integrity: sha512-fgFx7Hfoq60ytK2c7DhnF8jIvzYgOMxfugjLOSMHjLIPgenqa7S7oaagATUq99mV6IYvN2tRmC0wnTYX6iPbMw==}
 
+  akarisub@1.1.2:
+    resolution: {integrity: sha512-FKPPaq+xFvJrMNUq/aapdHq3w18ayME1OcgQWqLq4nXqmeyYvNLUCruQO7JrhBIbC+vKIyY+Ra+EIX+cxeQ6Hw==}
+    engines: {node: '>=18'}
+
   ansi-styles@4.3.0:
     resolution: {integrity: sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg==}
     engines: {node: '>=8'}
@@ -640,8 +647,8 @@ packages:
     resolution: {integrity: sha512-BNoCY6SXXPQ7gF2opIP4GBE+Xw7U+pHMYKuzjgCN3GwiaIR09UUeKfheyIry77QtrCBlC0KK0q5/TER/tYh3PQ==}
     engines: {node: '>= 0.4'}
 
-  assjs@0.1.9:
-    resolution: {integrity: sha512-G1KmdmcxIz+UJcEKJurxueApVGg4KuJUhXn+gnGVsWlJnxKtLd7BJP+JcZTInr0aYEy4CZeSKMR9YX0uIaWIRg==}
+  assjs@0.1.10:
+    resolution: {integrity: sha512-pzJ+LVqAypIb+JjfvYn/LID7xrMOydTpjZ2U53m6nWa5VqPMkKtGBB7xHF6p0Y9UBtsiW3ehY9JQsgCDLXg/ow==}
 
   async-function@1.0.0:
     resolution: {integrity: sha512-hsU18Ae8CDTR6Kgu9DYf0EbCr/a5iGL0rytQDobUcdpYOKokk8LEjVphnXkDkgpi0wYVsqrXuP0bZxJaTqdgoA==}
@@ -2233,6 +2240,8 @@ snapshots:
       json-schema-traverse: 0.4.1
       uri-js: 4.4.1
 
+  akarisub@1.1.2: {}
+
   ansi-styles@4.3.0:
     dependencies:
       color-convert: 2.0.1
@@ -2293,7 +2302,7 @@ snapshots:
       get-intrinsic: 1.3.0
       is-array-buffer: 3.0.5
 
-  assjs@0.1.9(patch_hash=qpr5ht4rah23r3hpararocrwkq): {}
+  assjs@0.1.10(patch_hash=qpr5ht4rah23r3hpararocrwkq): {}
 
   async-function@1.0.0: {}
 

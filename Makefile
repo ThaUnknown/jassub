@@ -81,7 +81,7 @@ $(DIST_DIR)/lib/libbrotlicommon.a: $(BUILD_LIB_DIR)/brotli/configured
 	$(JASSUB_MAKE) install
 	# Normalise static lib names
 	cd $(DIST_DIR)/lib/ && \
-	for lib in *-static.a ; do mv "$$lib" "$${lib%-static.a}.a" ; done
+	for lib in *-static.a ; do [ -e "$$lib" ] || continue ; mv "$$lib" "$${lib%-static.a}.a" ; done
 
 
 # Freetype without Harfbuzz
@@ -104,6 +104,11 @@ $(BUILD_LIB_DIR)/freetype/build_hb/dist_hb/lib/libfreetype.a: $(DIST_DIR)/lib/li
 		$(JASSUB_MAKE) install
 
 # Harfbuzz
+$(DIST_DIR)/lib/libharfbuzz.a: CFLAGS += -DHB_NO_PRAGMA_GCC_DIAGNOSTIC_ERROR
+$(DIST_DIR)/lib/libharfbuzz.a: CXXFLAGS += -DHB_NO_PRAGMA_GCC_DIAGNOSTIC_ERROR
+$(BUILD_LIB_DIR)/harfbuzz/configure: CFLAGS += -DHB_NO_PRAGMA_GCC_DIAGNOSTIC_ERROR
+$(BUILD_LIB_DIR)/harfbuzz/configure: CXXFLAGS += -DHB_NO_PRAGMA_GCC_DIAGNOSTIC_ERROR
+
 $(BUILD_LIB_DIR)/harfbuzz/configure: lib/harfbuzz $(wildcard $(BASE_DIR)build/patches/harfbuzz/*.patch)
 	$(call PREPARE_SRC_PATCHED,harfbuzz)
 	cd $(BUILD_LIB_DIR)/harfbuzz && $(RECONF_AUTO)
@@ -211,7 +216,7 @@ COMPAT_ARGS = \
 		-s DEFAULT_LIBRARY_FUNCS_TO_INCLUDE='["$$stringToNewUTF8"]' \
 		-mbulk-memory
 
-src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js src/worker/extern-pre-worker.js
+src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js src/worker/extern-pre-worker.js $(LIBASS_DEPS)
 	mkdir -p src/wasm
 	emcc src/JASSUB.cpp $(LIBASS_DEPS) \
 		$(WORKER_ARGS) \

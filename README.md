@@ -4,7 +4,7 @@
 <p align="center">
   The Fastest JavaScript SSA/ASS Subtitle Renderer For Browsers.
 </p>
-JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>, which renders <a href="https://en.wikipedia.org/wiki/SubStation_Alpha">SSA/ASS subtitles</a> directly in your browser. It uses Emscripten to compile libass' C++ code to WASM, and WebGL for hardware acceleration.
+JASSUB is a JS wrapper for <a href="https://github.com/libass/libass">libass</a>, which renders <a href="https://en.wikipedia.org/wiki/SubStation_Alpha">SSA/ASS subtitles</a> directly in your browser. It uses Emscripten to compile libass' C++ code to WASM, and WebGL for hardware acceleration, and outperforms even native implementations.
 
 <p align="center">
   <a href="https://jassub.pages.dev" target="_blank">Demo</a>

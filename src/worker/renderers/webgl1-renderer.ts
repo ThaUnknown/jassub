@@ -132,6 +132,16 @@ export class WebGL1Renderer {
   }
 
   setCanvas (canvas: OffscreenCanvas) {
+    this._initGL(canvas)
+
+    canvas.addEventListener('webglcontextlost', e => {
+      e.preventDefault()
+      this.gl = null
+    })
+    canvas.addEventListener('webglcontextrestored', () => this._initGL(canvas))
+  }
+
+  _initGL (canvas: OffscreenCanvas) {
     this.canvas = canvas
     this.gl = canvas.getContext('webgl', {
       alpha: true,
@@ -240,6 +250,9 @@ export class WebGL1Renderer {
     this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1)
     this.gl.clearColor(0, 0, 0, 0)
     this.gl.activeTexture(this.gl.TEXTURE0)
+
+    this.gl.viewport(0, 0, canvas.width, canvas.height)
+    this.gl.uniform2f(this.u_resolution, canvas.width, canvas.height)
   }
 
   createShader (type: number, source: string): WebGLShader | null {

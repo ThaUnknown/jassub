@@ -346,8 +346,11 @@ export default class JASSUB {
     this._destroyed = true
     this._canvas.remove()
     this._removeListeners()
-    await this.ready
-    await this.renderer?.[releaseProxy]()
-    this._worker.terminate()
+    try {
+      await this.ready
+      await this.renderer?.[releaseProxy]()
+    } finally {
+      this._worker.terminate()
+    }
   }
 }

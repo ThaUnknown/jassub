@@ -26,7 +26,7 @@ importers:
         specifier: ^1.1.2
         version: 1.1.2
       assjs:
-        specifier: ^0.1.10
+        specifier: ^0.1.9
         version: 0.1.10(patch_hash=qpr5ht4rah23r3hpararocrwkq)
       jassub:
         specifier: ^2.5.14

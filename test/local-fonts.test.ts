@@ -26,8 +26,8 @@ function makeCanvas () {
   return canvas
 }
 
-function create () {
-  return new JASSUB({ canvas: makeCanvas(), subContent: ASS, fonts: [LATO], queryFonts: 'local', debug: false })
+function create (subContent = ASS) {
+  return new JASSUB({ canvas: makeCanvas(), subContent, fonts: [LATO], queryFonts: 'local', debug: false })
 }
 
 type LocalFontAccess = { _getLocalFont: (font: string) => Promise<Uint8Array | undefined> }
@@ -80,6 +80,37 @@ describe('local fonts', () => {
     try {
       await jassub.ready
       expect(jassub.renderer).toBeDefined()
+    } finally {
+      await jassub.destroy()
+    }
+  })
+
+  // libass reports the italic field as 100, not 1. A one-digit matcher in the
+  // worker log handler dropped the message, so the fallback was never queried.
+  test('loads a fallback for a missing italic font', async () => {
+    const bytes = new Uint8Array(await (await fetch(LATO)).arrayBuffer())
+    vi.spyOn(navigator.permissions, 'query').mockResolvedValue({ state: 'granted' } as PermissionStatus)
+    const queryLocalFonts = vi.fn(async () => [{
+      family: 'Missing Font',
+      style: 'regular',
+      blob: async () => new Blob([bytes])
+    }])
+    ;(globalThis as Record<string, unknown>).queryLocalFonts = queryLocalFonts
+
+    const ass = ASS
+      .replace('Style: Default,Lato,20,', 'Style: Default,Missing Font,20,')
+      .replace(',0,0,0,0,100,100,0,0,1,1,0,2,5,5,5,1', ',700,100,0,0,100,100,0,0,1,1,0,2,5,5,5,1')
+      + 'Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,Hello\n'
+
+    const jassub = create(ass)
+    try {
+      await jassub.ready
+      await jassub.manualRender({ mediaTime: 1, width: 64, height: 64, expectedDisplayTime: performance.now() })
+      const deadline = performance.now() + 10_000
+      while (!queryLocalFonts.mock.calls.length && performance.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+      expect(queryLocalFonts).toHaveBeenCalled()
     } finally {
       await jassub.destroy()
     }

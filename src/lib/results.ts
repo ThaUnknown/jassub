@@ -57,5 +57,5 @@ export const results: Record<ResultKey, Result> = {
   'akarisub-simple': { frametime: 3.56 },
   'akarisub-fate': { frametime: 10.67 },
   'akarisub-beastars': { frametime: 45.61 },
-  'akarisub-kusriya': { frametime: 33.04, notes: ['+'] }
+  'akarisub-kusriya': { frametime: 33.04 }
 }

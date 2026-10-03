@@ -1,8 +1,10 @@
 node_modules/
 build/lib
 /lib/
-/test/
+/debug/
 /dist/
+.vitest/
+jassub-worker-modern.js
 
 node_modules
 

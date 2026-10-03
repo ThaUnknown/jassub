@@ -1,0 +1,15 @@
+[Script Info]
+ScriptType: v4.00+
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+PlayResX: 1920
+PlayResY: 1080
+YCbCr Matrix: TV.709
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Slate Pro Medium,67,&H00FFFFFF,&H000000FF,&H00472A27,&HCC000000,0,0,0,0,100,100,0,0,1,4.2,2.5,2,200,200,57,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:04:06.35,0:04:11.35,Default,,0,0,0,,{\\move(200,540,1700,540)}日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC日本語ABC

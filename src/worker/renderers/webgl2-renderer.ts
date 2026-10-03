@@ -165,7 +165,7 @@ export class WebGL2Renderer {
       preserveDrawingBuffer: false,
       stencil: false,
       desynchronized: true,
-      powerPreference: 'high-performance'
+      powerPreference: 'default'
     })
 
     if (!this.gl) {
@@ -317,8 +317,9 @@ export class WebGL2Renderer {
       heap = self.HEAPU8RAW = new Uint8Array(self.WASMMEMORY.buffer)
     }
 
-    // we scheduled a resize because changing the canvas size clears it, and we don't want it to flicker
-    // so we do it here, right before rendering
+    // Apply a scheduled resize right before rendering, so the resize and the
+    // first draw happen in one call and the resized buffer is never presented
+    // on its own.
     if (this._scheduledResize) {
       const { width, height } = this._scheduledResize
       this._scheduledResize = undefined
@@ -328,10 +329,10 @@ export class WebGL2Renderer {
       // Update viewport and resolution uniform
       this.gl.viewport(0, 0, width, height)
       this.gl.uniform2f(this.u_resolution, width, height)
-    } else {
-      // Clear canvas
-      this.gl.clear(this.gl.COLOR_BUFFER_BIT)
     }
+
+    // Clear canvas
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT)
 
     // Find max dimensions needed and filter valid images
     let maxW = this.texArrayWidth
@@ -345,7 +346,10 @@ export class WebGL2Renderer {
       if (img.h > maxH) maxH = img.h
     }
 
-    if (validImages.length === 0) return
+    if (validImages.length === 0) {
+      this.gl.flush()
+      return
+    }
 
     // Resize texture array if needed
     if (maxW > this.texArrayWidth || maxH > this.texArrayHeight) {
@@ -430,6 +434,10 @@ export class WebGL2Renderer {
       // Single instanced draw call
       this.gl.drawArraysInstanced(this.gl.TRIANGLES, 0, 6, instanceCount)
     }
+
+    // Submit the queued commands before the task ends, so the compositor picks
+    // up this frame.
+    this.gl.flush()
   }
 
   destroy () {

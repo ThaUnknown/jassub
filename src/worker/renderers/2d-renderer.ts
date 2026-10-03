@@ -51,9 +51,9 @@ export class Canvas2DRenderer {
       this._scheduledResize = undefined
       this.canvas.width = width
       this.canvas.height = height
-    } else {
-      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
     }
+
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
 
     for (const img of images) {
       if (img.w <= 0 || img.h <= 0) continue

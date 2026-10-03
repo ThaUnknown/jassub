@@ -6,7 +6,8 @@
 *.tgz
 node_modules/
 build/lib/*
-test
+/debug/
+.vitest/
 .pnpm-store
 dist/*
 src/wasm/jassub-worker-modern.js

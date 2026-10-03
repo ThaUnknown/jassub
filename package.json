@@ -1,6 +1,6 @@
 {
   "name": "jassub",
-  "version": "2.5.16",
+  "version": "2.5.17",
   "description": "The Fastest JavaScript SSA/ASS Subtitle Renderer For Browsers",
   "main": "dist/jassub.js",
   "type": "module",
@@ -20,6 +20,8 @@
   "scripts": {
     "build": "tsc --noCheck",
     "dev": "vite --host",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "docker:build": "docker build -t thaunknown/jassub-build .",
     "docker:run": "docker run -it --rm -v ${PWD}:/code --name thaunknown_jassub-build thaunknown/jassub-build:latest"
   },
@@ -52,9 +54,15 @@
     "throughput": "^1.0.2"
   },
   "devDependencies": {
+    "@vitest/browser": "^5.0.3",
+    "@vitest/browser-playwright": "^5.0.3",
     "@webgpu/types": "^0.1.69",
     "eslint-config-standard-universal": "^1.0.9",
+    "jassub-2.5.16": "npm:jassub@2.5.16",
+    "jassub-ref": "npm:jassub@1.8.8",
+    "playwright": "^1.63.0",
     "typescript": "^5.2.2",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^5.0.3"
   }
 }

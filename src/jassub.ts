@@ -201,11 +201,15 @@ export default class JASSUB {
       this._canvas.style.left = videoSize.x + 'px'
     }
 
+    // The storage size is the video resolution. Do not set it for canvas-only
+    // rendering. If it is set to the render size, libass scales blur, borders
+    // and shadows by the render size instead of the script resolution
+    // (libass issue #591).
     await this.renderer._resizeCanvas(
       renderWidth,
       renderHeight,
-      this._videoWidth || renderWidth,
-      this._videoHeight || renderHeight
+      this._video ? (this._videoWidth || renderWidth) : 0,
+      this._video ? (this._videoHeight || renderHeight) : 0
     )
 
     if (this._lastDemandTime) await this._demandRender(forceRepaint)

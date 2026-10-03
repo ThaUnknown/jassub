@@ -299,6 +299,21 @@ export class ASSRenderer {
     this._gpurender.render(images, self.HEAPU8RAW)
   }
 
+  // single-frame readback for tests
+  _drawCapture (time: number) {
+    const images = (this._wasm.rawRender(time, 1) ?? []) as ASSImage[]
+    this._gpurender.render(images, self.HEAPU8RAW)
+
+    const canvas = this._gpurender.canvas
+    if (!canvas) return
+    const { width, height } = canvas
+    const surface = new OffscreenCanvas(width, height)
+    const ctx = surface.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(canvas, 0, 0)
+    return { data: ctx.getImageData(0, 0, width, height).data, width, height }
+  }
+
   _setColorSpace (videoColorSpace: 'RGB' | 'BT709' | 'BT601') {
     if (videoColorSpace === 'RGB') return
     this._videoColorSpace = videoColorSpace

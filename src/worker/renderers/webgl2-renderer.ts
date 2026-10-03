@@ -25,7 +25,6 @@ uniform vec2 u_resolution;
 // Instance attributes
 in vec4 a_destRect;  // x, y, w, h
 in vec4 a_color;     // r, g, b, a
-in float a_texLayer;
 
 flat out vec2 v_destXY;
 flat out vec4 v_color;
@@ -42,7 +41,8 @@ void main() {
   v_destXY = a_destRect.xy;
   v_color = a_color;
   v_texSize = a_destRect.zw;
-  v_texLayer = a_texLayer;
+  // The instance index in a batch equals its texture layer index.
+  v_texLayer = float(gl_InstanceID);
 }
 `
 
@@ -99,6 +99,8 @@ void main() {
 const TEX_ARRAY_SIZE = 64 // Fixed layer count
 const TEX_INITIAL_SIZE = 256 // Initial width/height
 const MAX_INSTANCES = 256 // Maximum instances per draw call
+// One instance is 4 floats (dest rect) and 4 normalized bytes (color)
+const INSTANCE_STRIDE = 20
 
 export class WebGL2Renderer {
   canvas: OffscreenCanvas | null = null
@@ -111,15 +113,11 @@ export class WebGL2Renderer {
   u_texArray: WebGLUniformLocation | null = null
   u_colorMatrix: WebGLUniformLocation | null = null
 
-  // Instance attribute buffers
-  instanceDestRectBuffer: WebGLBuffer | null = null
-  instanceColorBuffer: WebGLBuffer | null = null
-  instanceTexLayerBuffer: WebGLBuffer | null = null
-
-  // Instance data arrays
-  instanceDestRectData: Float32Array
-  instanceColorData: Float32Array
-  instanceTexLayerData: Float32Array
+  // Interleaved instance buffer: dest rect (4 floats) then color (4 normalized bytes)
+  instanceBuffer: WebGLBuffer | null = null
+  instanceData: ArrayBuffer
+  instanceFloats: Float32Array
+  instanceBytes: Uint8Array
 
   texArray: WebGLTexture | null = null
   texArrayWidth = 0
@@ -128,9 +126,9 @@ export class WebGL2Renderer {
   colorMatrix: Float32Array = IDENTITY_MATRIX
 
   constructor () {
-    this.instanceDestRectData = new Float32Array(MAX_INSTANCES * 4)
-    this.instanceColorData = new Float32Array(MAX_INSTANCES * 4)
-    this.instanceTexLayerData = new Float32Array(MAX_INSTANCES)
+    this.instanceData = new ArrayBuffer(MAX_INSTANCES * INSTANCE_STRIDE)
+    this.instanceFloats = new Float32Array(this.instanceData)
+    this.instanceBytes = new Uint8Array(this.instanceData)
   }
 
   _scheduledResize?: { width: number, height: number }
@@ -199,33 +197,27 @@ export class WebGL2Renderer {
     this.u_texArray = this.gl.getUniformLocation(this.program, 'u_texArray')
     this.u_colorMatrix = this.gl.getUniformLocation(this.program, 'u_colorMatrix')
 
-    // Create instance attribute buffers
-    this.instanceDestRectBuffer = this.gl.createBuffer()
-    this.instanceColorBuffer = this.gl.createBuffer()
-    this.instanceTexLayerBuffer = this.gl.createBuffer()
+    // Create the interleaved instance buffer
+    this.instanceBuffer = this.gl.createBuffer()
 
     // Create a VAO (required for WebGL2)
     this.vao = this.gl.createVertexArray()
     this.gl.bindVertexArray(this.vao)
 
+    // Preallocate the buffer storage
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceBuffer)
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, MAX_INSTANCES * INSTANCE_STRIDE, this.gl.DYNAMIC_DRAW)
+
     // Setup instance attributes
     const destRectLoc = this.gl.getAttribLocation(this.program, 'a_destRect')
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceDestRectBuffer)
     this.gl.enableVertexAttribArray(destRectLoc)
-    this.gl.vertexAttribPointer(destRectLoc, 4, this.gl.FLOAT, false, 0, 0)
+    this.gl.vertexAttribPointer(destRectLoc, 4, this.gl.FLOAT, false, INSTANCE_STRIDE, 0)
     this.gl.vertexAttribDivisor(destRectLoc, 1)
 
     const colorLoc = this.gl.getAttribLocation(this.program, 'a_color')
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceColorBuffer)
     this.gl.enableVertexAttribArray(colorLoc)
-    this.gl.vertexAttribPointer(colorLoc, 4, this.gl.FLOAT, false, 0, 0)
+    this.gl.vertexAttribPointer(colorLoc, 4, this.gl.UNSIGNED_BYTE, true, INSTANCE_STRIDE, 16)
     this.gl.vertexAttribDivisor(colorLoc, 1)
-
-    const texLayerLoc = this.gl.getAttribLocation(this.program, 'a_texLayer')
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceTexLayerBuffer)
-    this.gl.enableVertexAttribArray(texLayerLoc)
-    this.gl.vertexAttribPointer(texLayerLoc, 1, this.gl.FLOAT, false, 0, 0)
-    this.gl.vertexAttribDivisor(texLayerLoc, 1)
 
     // Set up blending for premultiplied alpha
     this.gl.enable(this.gl.BLEND)
@@ -401,19 +393,18 @@ export class WebGL2Renderer {
             img.bitmap
           )
         }
-        // Fill instance data
-        const idx = instanceCount * 4
-        this.instanceDestRectData[idx] = img.dst_x
-        this.instanceDestRectData[idx + 1] = img.dst_y
-        this.instanceDestRectData[idx + 2] = img.w
-        this.instanceDestRectData[idx + 3] = img.h
+        // Fill the interleaved instance data
+        const f = instanceCount * 5
+        this.instanceFloats[f] = img.dst_x
+        this.instanceFloats[f + 1] = img.dst_y
+        this.instanceFloats[f + 2] = img.w
+        this.instanceFloats[f + 3] = img.h
 
-        this.instanceColorData[idx] = ((img.color >>> 24) & 0xFF) / 255
-        this.instanceColorData[idx + 1] = ((img.color >>> 16) & 0xFF) / 255
-        this.instanceColorData[idx + 2] = ((img.color >>> 8) & 0xFF) / 255
-        this.instanceColorData[idx + 3] = (img.color & 0xFF) / 255
-
-        this.instanceTexLayerData[instanceCount] = layer
+        const b = instanceCount * INSTANCE_STRIDE + 16
+        this.instanceBytes[b] = (img.color >>> 24) & 0xFF
+        this.instanceBytes[b + 1] = (img.color >>> 16) & 0xFF
+        this.instanceBytes[b + 2] = (img.color >>> 8) & 0xFF
+        this.instanceBytes[b + 3] = img.color & 0xFF
 
         instanceCount++
       }
@@ -421,15 +412,10 @@ export class WebGL2Renderer {
       this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, 0)
 
       if (instanceCount === 0) continue
-      // Upload instance data to buffers
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceDestRectBuffer)
-      this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceDestRectData.subarray(0, instanceCount * 4), this.gl.DYNAMIC_DRAW)
 
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceColorBuffer)
-      this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceColorData.subarray(0, instanceCount * 4), this.gl.DYNAMIC_DRAW)
-
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceTexLayerBuffer)
-      this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceTexLayerData.subarray(0, instanceCount), this.gl.DYNAMIC_DRAW)
+      // Upload the instance data in one call
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceBuffer)
+      this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.instanceBytes, 0, instanceCount * INSTANCE_STRIDE)
 
       // Single instanced draw call
       this.gl.drawArraysInstanced(this.gl.TRIANGLES, 0, 6, instanceCount)
@@ -447,19 +433,9 @@ export class WebGL2Renderer {
         this.texArray = null
       }
 
-      if (this.instanceDestRectBuffer) {
-        this.gl.deleteBuffer(this.instanceDestRectBuffer)
-        this.instanceDestRectBuffer = null
-      }
-
-      if (this.instanceColorBuffer) {
-        this.gl.deleteBuffer(this.instanceColorBuffer)
-        this.instanceColorBuffer = null
-      }
-
-      if (this.instanceTexLayerBuffer) {
-        this.gl.deleteBuffer(this.instanceTexLayerBuffer)
-        this.instanceTexLayerBuffer = null
+      if (this.instanceBuffer) {
+        this.gl.deleteBuffer(this.instanceBuffer)
+        this.instanceBuffer = null
       }
 
       if (this.vao) {

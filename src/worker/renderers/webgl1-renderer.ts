@@ -109,9 +109,9 @@ export class WebGL1Renderer {
   instanceTexLayerData: Float32Array
 
   // Texture cache (since WebGL1 doesn't support texture arrays)
-  textureCache = new Map<number, WebGLTexture>()
-  textureWidth = 0
-  textureHeight = 0
+  textureCache = new Map<number, { texture: WebGLTexture, width: number, height: number }>()
+  // A reusable buffer for strided bitmap data
+  tightData: Uint8Array | null = null
 
   colorMatrix: Float32Array = IDENTITY_MATRIX
 
@@ -326,70 +326,58 @@ export class WebGL1Renderer {
     // Clear canvas
     this.gl.clear(this.gl.COLOR_BUFFER_BIT)
 
-    // Find max dimensions needed and filter valid images
-    let maxW = this.textureWidth
-    let maxH = this.textureHeight
-    const validImages: ASSImage[] = []
-
-    for (const img of images) {
-      if (img.w <= 0 || img.h <= 0) continue
-      validImages.push(img)
-      if (img.w > maxW) maxW = img.w
-      if (img.h > maxH) maxH = img.h
-    }
-
-    if (validImages.length === 0) {
-      this.gl.flush()
-      return
-    }
-
-    // Update texture dimensions if needed
-    if (maxW > this.textureWidth || maxH > this.textureHeight) {
-      this.textureWidth = maxW
-      this.textureHeight = maxH
-      // Clear texture cache as we need to recreate textures
-      for (const texture of this.textureCache.values()) {
-        this.gl.deleteTexture(texture)
-      }
-      this.textureCache.clear()
-    }
-
     // Process images individually (WebGL1 limitation: no texture arrays)
-    // We'll render them one by one instead of in batches
-    for (let i = 0; i < validImages.length; i++) {
-      const img = validImages[i]!
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i]!
+      if (img.w <= 0 || img.h <= 0) continue
 
-      // Get or create texture for this image
-      let texture = this.textureCache.get(i)
-      if (!texture) {
-        texture = this.createTexture(this.textureWidth, this.textureHeight)
-        this.textureCache.set(i, texture)
+      // Get or recreate the texture for this image
+      let entry = this.textureCache.get(i)
+      if (!entry || entry.width !== img.w || entry.height !== img.h) {
+        if (entry) this.gl.deleteTexture(entry.texture)
+        entry = { texture: this.createTexture(img.w, img.h), width: img.w, height: img.h }
+        this.textureCache.set(i, entry)
       }
 
-      this.gl.bindTexture(this.gl.TEXTURE_2D, texture)
+      this.gl.bindTexture(this.gl.TEXTURE_2D, entry.texture)
 
-      // Upload bitmap data to texture
-      // WebGL1 doesn't support UNPACK_ROW_LENGTH, so we need to handle strided data manually
-      // Strided data - need to copy row by row to remove padding
-      const sourceView = new Uint8Array(heap.buffer, img.bitmap, img.stride * img.h)
-      const tightData = new Uint8Array(img.w * img.h)
+      // A tight bitmap uploads directly.
+      if (img.stride === img.w) {
+        this.gl.texSubImage2D(
+          this.gl.TEXTURE_2D,
+          0,
+          0, 0, // x, y offset
+          img.w,
+          img.h,
+          this.gl.LUMINANCE,
+          this.gl.UNSIGNED_BYTE,
+          heap.subarray(img.bitmap, img.bitmap + img.w * img.h)
+        )
+      } else {
+        // Upload bitmap data to texture
+        // WebGL1 doesn't support UNPACK_ROW_LENGTH, so we need to handle strided data manually
+        // Strided data - need to copy row by row to remove padding
+        const length = img.w * img.h
+        let tightData = this.tightData
+        if (!tightData || tightData.length < length) tightData = this.tightData = new Uint8Array(length)
 
-      for (let y = 0; y < img.h; y++) {
-        const srcOffset = y * img.stride
-        const dstOffset = y * img.w
-        tightData.set(sourceView.subarray(srcOffset, srcOffset + img.w), dstOffset)
+        const sourceView = new Uint8Array(heap.buffer, img.bitmap, img.stride * img.h)
+        for (let y = 0; y < img.h; y++) {
+          const srcOffset = y * img.stride
+          tightData.set(sourceView.subarray(srcOffset, srcOffset + img.w), y * img.w)
+        }
+
+        this.gl.texSubImage2D(
+          this.gl.TEXTURE_2D,
+          0,
+          0, 0, // x, y offset
+          img.w,
+          img.h,
+          this.gl.LUMINANCE,
+          this.gl.UNSIGNED_BYTE,
+          tightData.subarray(0, length)
+        )
       }
-
-      this.gl.texSubImage2D(
-        this.gl.TEXTURE_2D,
-        0,
-        0, 0, // x, y offset
-        img.w,
-        img.h,
-        this.gl.LUMINANCE,
-        this.gl.UNSIGNED_BYTE,
-        tightData
-      )
 
       // Fill instance data (single instance)
       this.instanceDestRectData[0] = img.dst_x
@@ -415,7 +403,7 @@ export class WebGL1Renderer {
       this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceTexLayerData.subarray(0, 1), this.gl.DYNAMIC_DRAW)
 
       // Set texture dimensions uniform
-      this.gl.uniform2f(this.u_texDimensions, this.textureWidth, this.textureHeight)
+      this.gl.uniform2f(this.u_texDimensions, img.w, img.h)
 
       // Single instanced draw call
       this.instancedArraysExt.drawArraysInstancedANGLE(this.gl.TRIANGLES, 0, 6, 1)
@@ -429,10 +417,11 @@ export class WebGL1Renderer {
   destroy () {
     if (this.gl) {
       // Delete all cached textures
-      for (const texture of this.textureCache.values()) {
-        this.gl.deleteTexture(texture)
+      for (const entry of this.textureCache.values()) {
+        this.gl.deleteTexture(entry.texture)
       }
       this.textureCache.clear()
+      this.tightData = null
 
       if (this.quadPosBuffer) {
         this.gl.deleteBuffer(this.quadPosBuffer)

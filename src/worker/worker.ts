@@ -275,7 +275,6 @@ export class ASSRenderer {
       self.HEAPU8RAW.set(uint8, ptr)
       this._wasm.addFont('font-' + (this._fontId++), ptr, uint8.byteLength)
     }
-    this._wasm.reloadFonts()
   }
 
   _resizeCanvas (width: number, height: number, videoWidth: number, videoHeight: number) {

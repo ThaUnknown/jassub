@@ -1,2 +1,5 @@
 allowBuilds:
   esbuild: false
+  lfa-ponyfill: true
+minimumReleaseAgeExclude:
+  - abslink@1.3.1

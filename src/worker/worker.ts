@@ -46,7 +46,7 @@ export class ASSRenderer {
   debug = false
 
   constructor (...args: [data: opts, getFont: (font: string, weight: WeightValue) => Promise<Uint8Array<ArrayBuffer> | undefined>, ctrl: OffscreenCanvas]) {
-    return this[constructor](...args).catch(console.error) as unknown as this
+    return this[constructor](...args) as unknown as this
   }
 
   async [constructor] (data: opts, getFont: (font: string, weight: WeightValue) => Promise<Uint8Array<ArrayBuffer> | undefined>, ctrl: OffscreenCanvas) {

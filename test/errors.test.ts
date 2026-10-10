@@ -54,7 +54,14 @@ describe('error handling', () => {
 
   for (const [name, content] of TERMINATING) {
     test(`rejects: ${name}`, async () => {
-      await expect(createModern(content, { fonts: [LATO] })).rejects.toThrow()
+      const reason = await createModern(content, { fonts: [LATO] }).then(
+        () => null,
+        (reason: unknown) => reason
+      )
+      // The real failure must reach the caller, not an abslink serialization
+      // failure.
+      expect(reason, 'init rejects').toBeTruthy()
+      expect(String(reason)).not.toContain('Unserializable')
     })
   }
 

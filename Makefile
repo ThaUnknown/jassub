@@ -14,7 +14,7 @@ endif
 BUILD_LIB_DIR := $(BASE_DIR)build/lib/$(BUILD_VARIANT)
 DIST_DIR := $(BASE_DIR)dist/libraries/$(BUILD_VARIANT)
 
-export CFLAGS = -O3 -flto -fno-rtti -fno-exceptions -fno-math-errno -s USE_PTHREADS=1 -mnontrapping-fptoint -msign-ext -mbulk-memory -mreference-types -ffast-math -matomics
+export CFLAGS = -O3 -flto -fno-rtti -fno-exceptions -fno-math-errno -pthread -mnontrapping-fptoint -msign-ext -mbulk-memory -mreference-types -ffast-math -matomics
 export CXXFLAGS = $(CFLAGS)
 export PKG_CONFIG_PATH = $(DIST_DIR)/lib/pkgconfig
 export EM_PKG_CONFIG_PATH = $(PKG_CONFIG_PATH)
@@ -181,7 +181,6 @@ PERFORMANCE_ARGS = \
 		-s TEXTDECODER=2 \
 		-s INITIAL_MEMORY=32MB \
 		-s MALLOC=mimalloc \
-		-s WASM_BIGINT=1 \
 		-s DYNAMIC_EXECUTION=0 \
 		-s EMBIND_AOT=1 \
 		-s MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION=1 \
@@ -218,7 +217,7 @@ COMPAT_ARGS = \
 
 src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js src/worker/extern-pre-worker.js $(LIBASS_DEPS)
 	mkdir -p src/wasm
-	emcc src/JASSUB.cpp $(LIBASS_DEPS) \
+	em++ src/JASSUB.cpp $(LIBASS_DEPS) \
 		$(WORKER_ARGS) \
 		$(PERFORMANCE_ARGS) \
 		$(SIZE_ARGS) \
@@ -229,7 +228,7 @@ src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js src/worker/e
 		-s ENVIRONMENT=worker \
 		-s EXIT_RUNTIME=0 \
 		-s ALLOW_MEMORY_GROWTH=1 \
-		-s GROWABLE_ARRAYBUFFERS=0 \
+		-s GROWABLE_ARRAYBUFFERS=1 \
 		-s MODULARIZE=1 \
 		-s EXPORT_ES6=1 \
 		-lembind \

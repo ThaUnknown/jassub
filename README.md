@@ -36,7 +36,7 @@ The
 }
 ```
 
-headers are recommended to use this library, as it uses SharedArrayBuffer for multi-threading, but if you can't set them, it will fallback automatically to work in single-threaded mode. Firefox doesn't support threading so they are not required there.
+headers are recommended to use this library, as it uses SharedArrayBuffer for multi-threading, but if you can't set them, it will fallback automatically to work in single-threaded mode.
 
 At minimum WASM + TextDecoder + OffscreenCanvas + Web Workers + Proxy + Fetch + Promise + getVideoPlaybackQuality/requestVideoFrameCallback are required for JASSUB to work.
 

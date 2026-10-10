@@ -85,7 +85,7 @@ export async function fetchtext (url: string) {
   return await res.text()
 }
 
-export const THREAD_COUNT = !IS_FIREFOX && self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1
+export const THREAD_COUNT = self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1
 
 export const SUPPORTS_GROWTH = !!WebAssembly.Memory.prototype.toResizableBuffer
 

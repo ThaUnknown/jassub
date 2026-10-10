@@ -78,13 +78,15 @@ export class ASSRenderer {
     this._gpurender.setCanvas(ctrl)
 
     this._loadedInitialFonts = !data.fonts.length
+    // Emscripten pre-spawns pthread workers from this pool size.
+    // A pool size of 0 pre-spawns no workers.
+    // libass reads 0 as auto, but emscripten does not.
+    // THREAD_COUNT is 1 when rendering is serial. Pass 0 in that case.
     // eslint-disable-next-line @typescript-eslint/unbound-method
-    const { _malloc, JASSUB } = await (WASM({ __url: data.wasmUrl, __out: (log: string) => this._log(log) }) as Promise<MainModule>)
+    const { _malloc, JASSUB } = await (WASM({ __url: data.wasmUrl, __poolSize: THREAD_COUNT > 1 ? THREAD_COUNT : 0, __out: (log: string) => this._log(log) }) as Promise<MainModule>)
     this._malloc = _malloc
 
     this._wasm = new JASSUB(data.width, data.height, this._defaultFont)
-    // Firefox seems to have issues with multithreading in workers
-    // a worker inside a worker does not recieve messages properly
     this._wasm.setThreads(THREAD_COUNT)
 
     if (!this._loadedInitialFonts) await this._loadInitialFonts(data.fonts)

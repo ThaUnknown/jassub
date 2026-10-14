@@ -182,7 +182,7 @@ export class ASSRenderer {
 
   async _log (log: string) {
     console.debug(log)
-    const match = log.match(/JASSUB: fontselect:[^(]+: \(([^,]+), (\d{1,4}), \d+\)/)
+    const match = log.match(/JASSUB: fontselect:[^(]+: \(([^,]*), (\d{1,4}), \d+\)/)
     if (match && !await this._findAvailableFont(match[1]!.trim().toLowerCase(), WEIGHT_MAP[Math.ceil(parseInt(match[2]!) / 100) - 1])) {
       await this._findAvailableFont(this._defaultFont)
     }

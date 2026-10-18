@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import { finalizer } from 'abslink'
 import { expose } from 'abslink/w3c'
 import { queryRemoteFonts } from 'lfa-ponyfill'

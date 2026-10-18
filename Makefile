@@ -143,12 +143,23 @@ $(DIST_DIR)/lib/libfreetype.a: $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/lib
 	$(JASSUB_MAKE) install
 
 # libass
-$(BUILD_LIB_DIR)/libass/configured: lib/libass
+# Depend on the source files, not the directory. Directory mtimes are not
+# reliable on Windows, so source edits would not trigger a rebuild.
+LIBASS_BUILD_FILES = \
+	lib/libass/configure.ac \
+	lib/libass/Makefile.am \
+	lib/libass/libass/Makefile_library.am \
+	lib/libass/libass/meson.build
+
+LIBASS_SRC = $(wildcard \
+	lib/libass/libass/*.c lib/libass/libass/*.h \
+	lib/libass/libass/c/*.c lib/libass/libass/c/*.h \
+	lib/libass/libass/x86/*.asm lib/libass/libass/x86/*.h \
+	lib/libass/libass/aarch64/*.S lib/libass/libass/aarch64/*.h)
+
+$(BUILD_LIB_DIR)/libass/configured: $(LIBASS_BUILD_FILES)
 	cd lib/libass && $(RECONF_AUTO)
 	$(call PREPARE_SRC_VPATH,libass)
-	touch $(BUILD_LIB_DIR)/libass/configured
-
-$(DIST_DIR)/lib/libass.a: $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/libfribidi.a $(DIST_DIR)/lib/libfreetype.a $(DIST_DIR)/lib/libbrotlidec.a $(BUILD_LIB_DIR)/libass/configured
 	cd $(BUILD_LIB_DIR)/libass && \
 	$(call CONFIGURE_AUTO,$(BASE_DIR)lib/libass) \
 		--enable-large-tiles \
@@ -156,8 +167,10 @@ $(DIST_DIR)/lib/libass.a: $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/libfribi
 		--disable-require-system-font-provider \
 		--enable-pthreads \
 		--disable-asm \
-	&& \
-	$(JASSUB_MAKE) install
+	&& touch $(BUILD_LIB_DIR)/libass/configured
+
+$(DIST_DIR)/lib/libass.a: $(LIBASS_SRC) $(BUILD_LIB_DIR)/libass/configured $(DIST_DIR)/lib/libharfbuzz.a $(DIST_DIR)/lib/libfribidi.a $(DIST_DIR)/lib/libfreetype.a $(DIST_DIR)/lib/libbrotlidec.a
+	cd $(BUILD_LIB_DIR)/libass && $(JASSUB_MAKE) install
 
 LIBASS_DEPS = \
 	$(DIST_DIR)/lib/libfribidi.a \

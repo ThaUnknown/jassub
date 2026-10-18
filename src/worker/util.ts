@@ -50,6 +50,7 @@ export interface ASSImage {
   stride: number
   color: number
   bitmap: number
+  cache_id: number
 }
 
 // offset by 1, 0 = 1, to match CSS font-weight values, but dividing by 100 gives the correct index

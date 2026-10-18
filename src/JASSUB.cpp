@@ -156,6 +156,7 @@ public:
       obj.set("bitmap", (uintptr_t)img->bitmap);
       obj.set("color", img->color);
       obj.set("stride", img->stride);
+      obj.set("cache_id", img->cache_id);
       arr.call<emscripten::val>("push", obj);
     }
     return arr;

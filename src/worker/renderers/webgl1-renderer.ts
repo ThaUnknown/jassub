@@ -12,12 +12,10 @@ uniform vec2 u_resolution;
 // Instance attributes
 attribute vec4 a_destRect;  // x, y, w, h
 attribute vec4 a_color;     // r, g, b, a
-attribute float a_texLayer;
 
 varying vec2 v_destXY;
 varying vec4 v_color;
 varying vec2 v_texSize;
-varying float v_texLayer;
 varying vec2 v_texCoord;
 varying vec2 v_normalizedImageSize;
 
@@ -32,7 +30,6 @@ void main() {
   v_destXY = a_destRect.xy;
   v_color = a_color;
   v_texSize = a_destRect.zw;
-  v_texLayer = a_texLayer;
   v_texCoord = a_quadPos;
   v_normalizedImageSize = a_destRect.zw / u_texDimensions;
 }
@@ -50,13 +47,12 @@ uniform vec2 u_resolution;
 varying vec2 v_destXY;
 varying vec4 v_color;
 varying vec2 v_texSize;
-varying float v_texLayer;
 varying vec2 v_texCoord;
 varying vec2 v_normalizedImageSize;
 
 void main() {
-  // Sample texture (r channel contains mask)
-  float mask = texture2D(u_tex, v_texCoord * v_normalizedImageSize).r;
+  // The alpha channel contains the mask.
+  float mask = texture2D(u_tex, v_texCoord * v_normalizedImageSize).a;
 
   // Apply color matrix conversion (identity if no conversion needed)
   vec3 correctedColor = u_colorMatrix * v_color.rgb;
@@ -93,7 +89,6 @@ export class WebGL1Renderer {
   a_quadPos = -1
   a_destRect = -1
   a_color = -1
-  a_texLayer = -1
 
   // Quad vertex buffer (shared for all instances)
   quadPosBuffer: WebGLBuffer | null = null
@@ -101,15 +96,22 @@ export class WebGL1Renderer {
   // Instance attribute buffers
   instanceDestRectBuffer: WebGLBuffer | null = null
   instanceColorBuffer: WebGLBuffer | null = null
-  instanceTexLayerBuffer: WebGLBuffer | null = null
 
   // Instance data arrays
   instanceDestRectData: Float32Array
   instanceColorData: Float32Array
-  instanceTexLayerData: Float32Array
 
   // Texture cache (since WebGL1 doesn't support texture arrays)
-  textureCache = new Map<number, { texture: WebGLTexture, width: number, height: number }>()
+  textureCache = new Map<number, {
+    texture: WebGLTexture
+    texWidth: number
+    texHeight: number
+    cacheId: number
+    bitmap: number
+    width: number
+    stride: number
+  }>()
+
   // A reusable buffer for strided bitmap data
   tightData: Uint8Array | null = null
 
@@ -118,7 +120,6 @@ export class WebGL1Renderer {
   constructor () {
     this.instanceDestRectData = new Float32Array(MAX_INSTANCES * 4)
     this.instanceColorData = new Float32Array(MAX_INSTANCES * 4)
-    this.instanceTexLayerData = new Float32Array(MAX_INSTANCES)
   }
 
   _scheduledResize?: { width: number, height: number }
@@ -158,6 +159,8 @@ export class WebGL1Renderer {
       throw new Error('Could not get WebGL context')
     }
 
+    this.textureCache.clear()
+
     // Get instanced arrays extension (required for instancing in WebGL1)
     this.instancedArraysExt = this.gl.getExtension('ANGLE_instanced_arrays')
     if (!this.instancedArraysExt) {
@@ -193,7 +196,6 @@ export class WebGL1Renderer {
     this.a_quadPos = this.gl.getAttribLocation(this.program, 'a_quadPos')
     this.a_destRect = this.gl.getAttribLocation(this.program, 'a_destRect')
     this.a_color = this.gl.getAttribLocation(this.program, 'a_color')
-    this.a_texLayer = this.gl.getAttribLocation(this.program, 'a_texLayer')
 
     // Create quad position buffer (6 vertices for 2 triangles)
     this.quadPosBuffer = this.gl.createBuffer()
@@ -211,7 +213,6 @@ export class WebGL1Renderer {
     // Create instance attribute buffers
     this.instanceDestRectBuffer = this.gl.createBuffer()
     this.instanceColorBuffer = this.gl.createBuffer()
-    this.instanceTexLayerBuffer = this.gl.createBuffer()
 
     // Set up vertex attributes
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.quadPosBuffer)
@@ -227,11 +228,6 @@ export class WebGL1Renderer {
     this.gl.enableVertexAttribArray(this.a_color)
     this.gl.vertexAttribPointer(this.a_color, 4, this.gl.FLOAT, false, 0, 0)
     this.instancedArraysExt.vertexAttribDivisorANGLE(this.a_color, 1)
-
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceTexLayerBuffer)
-    this.gl.enableVertexAttribArray(this.a_texLayer)
-    this.gl.vertexAttribPointer(this.a_texLayer, 1, this.gl.FLOAT, false, 0, 0)
-    this.instancedArraysExt.vertexAttribDivisorANGLE(this.a_texLayer, 1)
 
     // Set up blending for premultiplied alpha
     this.gl.enable(this.gl.BLEND)
@@ -280,19 +276,19 @@ export class WebGL1Renderer {
     }
   }
 
-  createTexture (width: number, height: number): WebGLTexture {
+  createTexture (width: number, height: number) {
     const texture = this.gl!.createTexture()
     this.gl!.bindTexture(this.gl!.TEXTURE_2D, texture)
 
-    // Allocate storage for texture (WebGL1 uses LUMINANCE instead of R8)
+    // Allocate storage for the mask texture.
     this.gl!.texImage2D(
       this.gl!.TEXTURE_2D,
       0,
-      this.gl!.LUMINANCE,
+      this.gl!.ALPHA,
       width,
       height,
       0,
-      this.gl!.LUMINANCE,
+      this.gl!.ALPHA,
       this.gl!.UNSIGNED_BYTE,
       null
     )
@@ -331,32 +327,53 @@ export class WebGL1Renderer {
       const img = images[i]!
       if (img.w <= 0 || img.h <= 0) continue
 
-      // Get or recreate the texture for this image
+      // WebGL1 has no UNPACK_ROW_LENGTH. Upload the stride as the texture
+      // width instead of copying rows. The shader samples only the image width.
+      const stridedLength = img.stride * img.h
+      const canUploadStrided = img.stride >= img.w && img.bitmap + stridedLength <= heap.length
+      const texWidth = canUploadStrided ? img.stride : img.w
+      const texHeight = img.h
+
       let entry = this.textureCache.get(i)
-      if (!entry || entry.width !== img.w || entry.height !== img.h) {
+      let resized = false
+      if (entry?.texWidth !== texWidth || entry.texHeight !== texHeight) {
         if (entry) this.gl.deleteTexture(entry.texture)
-        entry = { texture: this.createTexture(img.w, img.h), width: img.w, height: img.h }
+        entry = {
+          texture: this.createTexture(texWidth, texHeight),
+          texWidth,
+          texHeight,
+          cacheId: 0,
+          bitmap: 0,
+          width: 0,
+          stride: 0
+        }
         this.textureCache.set(i, entry)
+        resized = true
       }
+
+      const cached = !resized && img.cache_id !== 0 &&
+        entry.cacheId === img.cache_id &&
+        entry.bitmap === img.bitmap &&
+        entry.width === img.w &&
+        entry.stride === img.stride
 
       this.gl.bindTexture(this.gl.TEXTURE_2D, entry.texture)
 
-      // A tight bitmap uploads directly.
-      if (img.stride === img.w) {
+      if (cached) {
+        // The composite cache did not change, so the texture is current.
+      } else if (canUploadStrided) {
         this.gl.texSubImage2D(
           this.gl.TEXTURE_2D,
           0,
           0, 0, // x, y offset
-          img.w,
-          img.h,
-          this.gl.LUMINANCE,
+          texWidth,
+          texHeight,
+          this.gl.ALPHA,
           this.gl.UNSIGNED_BYTE,
-          heap.subarray(img.bitmap, img.bitmap + img.w * img.h)
+          heap.subarray(img.bitmap, img.bitmap + stridedLength)
         )
       } else {
-        // Upload bitmap data to texture
-        // WebGL1 doesn't support UNPACK_ROW_LENGTH, so we need to handle strided data manually
-        // Strided data - need to copy row by row to remove padding
+        // The padding is outside the heap. Copy the rows to a tight buffer.
         const length = img.w * img.h
         let tightData = this.tightData
         if (!tightData || tightData.length < length) tightData = this.tightData = new Uint8Array(length)
@@ -373,11 +390,16 @@ export class WebGL1Renderer {
           0, 0, // x, y offset
           img.w,
           img.h,
-          this.gl.LUMINANCE,
+          this.gl.ALPHA,
           this.gl.UNSIGNED_BYTE,
           tightData.subarray(0, length)
         )
       }
+
+      entry.cacheId = img.cache_id
+      entry.bitmap = img.bitmap
+      entry.width = img.w
+      entry.stride = img.stride
 
       // Fill instance data (single instance)
       this.instanceDestRectData[0] = img.dst_x
@@ -390,8 +412,6 @@ export class WebGL1Renderer {
       this.instanceColorData[2] = ((img.color >>> 8) & 0xFF) / 255
       this.instanceColorData[3] = (img.color & 0xFF) / 255
 
-      this.instanceTexLayerData[0] = 0 // Not used in WebGL1 version
-
       // Upload instance data to buffers
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceDestRectBuffer)
       this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceDestRectData.subarray(0, 4), this.gl.DYNAMIC_DRAW)
@@ -399,11 +419,8 @@ export class WebGL1Renderer {
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceColorBuffer)
       this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceColorData.subarray(0, 4), this.gl.DYNAMIC_DRAW)
 
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceTexLayerBuffer)
-      this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceTexLayerData.subarray(0, 1), this.gl.DYNAMIC_DRAW)
-
       // Set texture dimensions uniform
-      this.gl.uniform2f(this.u_texDimensions, img.w, img.h)
+      this.gl.uniform2f(this.u_texDimensions, texWidth, texHeight)
 
       // Single instanced draw call
       this.instancedArraysExt.drawArraysInstancedANGLE(this.gl.TRIANGLES, 0, 6, 1)
@@ -436,11 +453,6 @@ export class WebGL1Renderer {
       if (this.instanceColorBuffer) {
         this.gl.deleteBuffer(this.instanceColorBuffer)
         this.instanceColorBuffer = null
-      }
-
-      if (this.instanceTexLayerBuffer) {
-        this.gl.deleteBuffer(this.instanceTexLayerBuffer)
-        this.instanceTexLayerBuffer = null
       }
 
       if (this.program) {

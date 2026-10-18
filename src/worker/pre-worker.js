@@ -5,6 +5,10 @@
 var asm = null
 var _scriptName
 
+// Emscripten MINIMAL_RUNTIME marks workers as web, which disables blocking
+// waits. A worker can block, so clear the web flag before the runtime starts.
+ENVIRONMENT_IS_WEB = false
+
 // GROWABLE_ARRAYBUFFERS=1 makes emscripten handle resizable heap views itself,
 // including the Firefox and maximum-memory cases. Publish the heap for the
 // renderers, which run outside the module scope.

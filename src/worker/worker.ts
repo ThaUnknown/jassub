@@ -63,6 +63,9 @@ export class ASSRenderer {
     // const devicePromise = navigator.gpu?.requestAdapter({
     //   powerPreference: 'high-performance'
     // }).then(adapter => adapter?.requestDevice())
+    // WebGL2 is barely faster than WebGL1 in most cases,
+    // in rare cases the better texture-dedupe, drawing everything in one call, no fake stride and no page ordering
+    // can help it's performance, but those cases are rare
     try {
       const testCanvas = new OffscreenCanvas(1, 1)
       if (testCanvas.getContext('webgl2')) {

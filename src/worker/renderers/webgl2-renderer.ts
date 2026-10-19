@@ -1,5 +1,7 @@
 // fallback for browsers that don't support WebGL2
-import { colorMatrixConversionMap, IDENTITY_MATRIX, IS_FIREFOX, IS_SAFARI, SHOULD_REFERENCE_MEMORY, type ASSImage } from '../util.ts'
+import { IS_FIREFOX, IS_SAFARI, SHOULD_REFERENCE_MEMORY, type ASSImage } from '../util.ts'
+
+import { WebGLRendererBase, type AtlasItem } from './webgl-base.ts'
 
 declare const self: DedicatedWorkerGlobalScope &
   typeof globalThis & {
@@ -104,70 +106,16 @@ const INITIAL_INSTANCES = 256
 // One instance is 4 floats (dest rect), 2 floats (atlas position), 4 normalized bytes (color) and 1 float (atlas layer)
 const INSTANCE_STRIDE = 32
 
-interface AtlasItem {
-  img: ASSImage
-  x: number
-  y: number
-  layer: number
-  sourceKey: string | 0
-}
-
 interface AtlasTexture {
   texture: WebGLTexture
   size: number
   depth: number
 }
 
-// Dedupe identical sources, place tallest-first, keep original draw order.
-function packAtlas (items: AtlasItem[], size: number) {
-  const placed = new Map<string, AtlasItem>()
-  let layer = 0
-  let x = 0
-  let y = 0
-  let shelfHeight = 0
-
-  for (const item of [...items].sort((a, b) => b.img.h - a.img.h)) {
-    const { img, sourceKey } = item
-
-    const cached = sourceKey && placed.get(sourceKey)
-    if (cached) {
-      item.x = cached.x
-      item.y = cached.y
-      item.layer = cached.layer
-      continue
-    }
-
-    if (x + img.w > size) {
-      x = 0
-      y += shelfHeight + ATLAS_PADDING
-    }
-    if (y + img.h > size) {
-      layer++
-      x = 0
-      y = 0
-    }
-    if (x === 0) shelfHeight = img.h
-
-    item.x = x
-    item.y = y
-    item.layer = layer
-    if (sourceKey) placed.set(sourceKey, item)
-    x += img.w + ATLAS_PADDING
-  }
-
-  return layer + 1
-}
-
-export class WebGL2Renderer {
-  canvas
-  gl!: WebGL2RenderingContext
-  program!: WebGLProgram
+export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
   vao!: WebGLVertexArrayObject
 
-  // Uniform locations
-  u_resolution: WebGLUniformLocation | null = null
   u_atlas: WebGLUniformLocation | null = null
-  u_colorMatrix: WebGLUniformLocation | null = null
 
   // Interleaved instance buffer: dest rect, atlas position, then color
   instanceBuffer!: WebGLBuffer
@@ -180,8 +128,6 @@ export class WebGL2Renderer {
   maxTextureSize = 0
   maxArrayTextureLayers = 0
   uploadCache = new Set<string>()
-
-  colorMatrix: Float32Array = IDENTITY_MATRIX
 
   _createInstanceData () {
     this.instanceData = new ArrayBuffer(this.instanceCapacity * INSTANCE_STRIDE)
@@ -198,25 +144,9 @@ export class WebGL2Renderer {
     this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceCapacity * INSTANCE_STRIDE, this.gl.DYNAMIC_DRAW)
   }
 
-  _scheduledResize?: { width: number, height: number }
-
-  resizeCanvas (width: number, height: number) {
-    // WebGL2 doesn't allow 0-sized canvases
-    if (!width || !height) return
-    if (this.canvas.width === width && this.canvas.height === height) return
-
-    this._scheduledResize = { width, height }
-  }
-
   constructor (canvas: OffscreenCanvas) {
-    this.canvas = canvas
+    super(canvas)
     this._initGL()
-
-    canvas.addEventListener('webglcontextlost', e => {
-      e.preventDefault()
-      this.gl = null!
-    })
-    canvas.addEventListener('webglcontextrestored', () => this._initGL())
   }
 
   _initGL () {
@@ -241,27 +171,7 @@ export class WebGL2Renderer {
     this.atlas = null
     this.uploadCache.clear()
 
-    // Create shaders
-    const vertexShader = this.createShader(this.gl.VERTEX_SHADER, VERTEX_SHADER)
-    const fragmentShader = this.createShader(this.gl.FRAGMENT_SHADER, FRAGMENT_SHADER)
-
-    if (!vertexShader || !fragmentShader) {
-      throw new Error('Failed to create shaders')
-    }
-
-    // Create program
-    this.program = this.gl.createProgram()
-    this.gl.attachShader(this.program, vertexShader)
-    this.gl.attachShader(this.program, fragmentShader)
-    this.gl.linkProgram(this.program)
-
-    if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) {
-      const info = this.gl.getProgramInfoLog(this.program)
-      throw new Error('Failed to link program: ' + info)
-    }
-
-    this.gl.deleteShader(vertexShader)
-    this.gl.deleteShader(fragmentShader)
+    this.createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
 
     // Get uniform locations
     this.u_resolution = this.gl.getUniformLocation(this.program, 'u_resolution')
@@ -298,51 +208,7 @@ export class WebGL2Renderer {
     this.gl.vertexAttribPointer(layerLoc, 1, this.gl.FLOAT, false, INSTANCE_STRIDE, 28)
     this.gl.vertexAttribDivisor(layerLoc, 1)
 
-    // Set up blending for premultiplied alpha
-    this.gl.enable(this.gl.BLEND)
-    this.gl.blendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA)
-
-    // Use the program
-    this.gl.useProgram(this.program)
-
-    // Set texture unit
-    this.gl.uniform1i(this.u_atlas, 0)
-
-    // Set initial color matrix
-    this.gl.uniformMatrix3fv(this.u_colorMatrix, false, this.colorMatrix)
-
-    // Set one-time GL state
-    this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1)
-    this.gl.clearColor(0, 0, 0, 0)
-    this.gl.activeTexture(this.gl.TEXTURE0)
-
-    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height)
-    this.gl.uniform2f(this.u_resolution, this.canvas.width, this.canvas.height)
-  }
-
-  createShader (type: number, source: string): WebGLShader | null {
-    const shader = this.gl.createShader(type)!
-    this.gl.shaderSource(shader, source)
-    this.gl.compileShader(shader)
-
-    if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
-      const info = this.gl.getShaderInfoLog(shader)
-      console.log(info)
-      this.gl.deleteShader(shader)
-      return null
-    }
-
-    return shader
-  }
-
-  // Set the color matrix for color space conversion.
-  // Pass null or undefined to use identity (no conversion).
-  setColorMatrix (subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC', videoColorSpace?: 'BT601' | 'BT709') {
-    this.colorMatrix = (subtitleColorSpace && videoColorSpace && colorMatrixConversionMap[subtitleColorSpace]?.[videoColorSpace]) ?? IDENTITY_MATRIX
-    if (this.gl && this.u_colorMatrix) {
-      this.gl.useProgram(this.program)
-      this.gl.uniformMatrix3fv(this.u_colorMatrix, false, this.colorMatrix)
-    }
+    this.applyCommonState(this.u_atlas)
   }
 
   createAtlasTexture (size: number, depth: number) {
@@ -378,29 +244,7 @@ export class WebGL2Renderer {
   }
 
   render (images: ASSImage[], heap: Uint8Array): void {
-    if (!this.gl) return
-
-    // Apply a scheduled resize right before rendering, so the resize and the
-    // first draw happen in one call and the resized buffer is never presented
-    // on its own.
-    if (this._scheduledResize) {
-      const { width, height } = this._scheduledResize
-      this._scheduledResize = undefined
-      this.canvas.width = width
-      this.canvas.height = height
-
-      // Update viewport and resolution uniform
-      this.gl.viewport(0, 0, width, height)
-      this.gl.uniform2f(this.u_resolution, width, height)
-    }
-
-    // Clear canvas
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT)
-
-    if (images.length === 0) {
-      this.gl.flush()
-      return
-    }
+    if (!this.gl || !this.beginFrame(images)) return
 
     // Filter valid images and build atlas items in one pass
     let maxDimension = 0
@@ -427,11 +271,13 @@ export class WebGL2Renderer {
     let size = Math.max(this.atlas?.size ?? 0, initialSize)
     const maxLayers = this.maxArrayTextureLayers || 256
 
-    let pageCount = packAtlas(items, size)
+    // Place tallest-first, keep original draw order.
+    const ordered = [...items].sort((a, b) => b.img.h - a.img.h)
+    let pageCount = this.packAtlas(ordered, size, ATLAS_PADDING, true)
     // triggered when a LOT of small textures are created, so small atlas, a lot of images, somewhat cheap-ish to recalculate
     while (pageCount > maxLayers && size < this.maxTextureSize) {
       size = Math.min(this.maxTextureSize, size * 2)
-      pageCount = packAtlas(items, size)
+      pageCount = this.packAtlas(ordered, size, ATLAS_PADDING, true)
     }
 
     if (pageCount > maxLayers) {

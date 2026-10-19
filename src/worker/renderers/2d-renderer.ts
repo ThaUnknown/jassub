@@ -1,11 +1,12 @@
 // fallback for browsers that don't support GPU acceleration
-import { colorMatrixConversionMap, IDENTITY_MATRIX, type ASSImage } from '../util.ts'
+import { IDENTITY_MATRIX, resolveColorMatrix, type ASSImage } from '../util.ts'
+
+import { CanvasRendererBase } from './canvas-base.ts'
 
 // clamp to 0-255 with rounding, matching rgba8unorm GPU behaviour
 const clamp = (v: number) => (v < 0 ? 0 : v > 1 ? 255 : Math.round(v * 255))
 
-export class Canvas2DRenderer {
-  canvas
+export class Canvas2DRenderer extends CanvasRendererBase {
   ctx
   bufferCanvas = new OffscreenCanvas(1, 1)
   bufferCtx = this.bufferCanvas.getContext('2d', {
@@ -16,17 +17,8 @@ export class Canvas2DRenderer {
 
   colorMatrix: Float32Array = IDENTITY_MATRIX
 
-  _scheduledResize?: { width: number, height: number }
-
-  resizeCanvas (width: number, height: number) {
-    if (!width || !height) return
-    if (this.canvas.width === width && this.canvas.height === height) return
-
-    this._scheduledResize = { width, height }
-  }
-
   constructor (canvas: OffscreenCanvas) {
-    this.canvas = canvas
+    super(canvas)
     this.ctx = canvas.getContext('2d', {
       alpha: true,
       desynchronized: true,
@@ -39,17 +31,12 @@ export class Canvas2DRenderer {
   // this should be an svg filter which is cheaper, but not supported
   // https://issues.chromium.org/u/1/issues/40910142
   setColorMatrix (subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC', videoColorSpace?: 'BT601' | 'BT709') {
-    this.colorMatrix = (subtitleColorSpace && videoColorSpace && colorMatrixConversionMap[subtitleColorSpace]?.[videoColorSpace]) ?? IDENTITY_MATRIX
+    this.colorMatrix = resolveColorMatrix(subtitleColorSpace, videoColorSpace)
   }
 
   // this is horribly inefficient, but it's a fallback for systems without a GPU, this is the least of their problems
   render (images: ASSImage[], heap: Uint8Array): void {
-    if (this._scheduledResize) {
-      const { width, height } = this._scheduledResize
-      this._scheduledResize = undefined
-      this.canvas.width = width
-      this.canvas.height = height
-    }
+    this.applyScheduledResize()
 
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
 

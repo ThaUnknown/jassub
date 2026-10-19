@@ -1,0 +1,5 @@
+allowBuilds:
+  esbuild: false
+  lfa-ponyfill: true
+minimumReleaseAgeExclude:
+  - jassub@2.5.22

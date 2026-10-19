@@ -23,11 +23,11 @@ export interface Result {
 
 export const results: Record<ResultKey, Result> = {
   'jassub-variable': { frametime: 0.25 },
-  'jassub-high': { frametime: 0.16 },
-  'jassub-simple': { frametime: 3.51 },
-  'jassub-fate': { frametime: 4.61 },
-  'jassub-beastars': { frametime: 8.55 },
-  'jassub-kusriya': { frametime: 7.31 },
+  'jassub-high': { frametime: 0.21 },
+  'jassub-simple': { frametime: 1.42 },
+  'jassub-fate': { frametime: 3.59 },
+  'jassub-beastars': { frametime: 5.73 },
+  'jassub-kusriya': { frametime: 6.21 },
   'jsso-variable': { frametime: 1, notes: ['*'] },
   'jsso-high': { frametime: 1, notes: ['*'] },
   'jsso-simple': { frametime: 24.95, notes: ['*'] },

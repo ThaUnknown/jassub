@@ -159,10 +159,10 @@ function packAtlas (items: AtlasItem[], size: number) {
 }
 
 export class WebGL2Renderer {
-  canvas: OffscreenCanvas | null = null
-  gl: WebGL2RenderingContext | null = null
-  program: WebGLProgram | null = null
-  vao: WebGLVertexArrayObject | null = null
+  canvas
+  gl!: WebGL2RenderingContext
+  program!: WebGLProgram
+  vao!: WebGLVertexArrayObject
 
   // Uniform locations
   u_resolution: WebGLUniformLocation | null = null
@@ -170,7 +170,7 @@ export class WebGL2Renderer {
   u_colorMatrix: WebGLUniformLocation | null = null
 
   // Interleaved instance buffer: dest rect, atlas position, then color
-  instanceBuffer: WebGLBuffer | null = null
+  instanceBuffer!: WebGLBuffer
   instanceData!: ArrayBuffer
   instanceFloats!: Float32Array
   instanceBytes!: Uint8Array
@@ -194,8 +194,8 @@ export class WebGL2Renderer {
 
     this.instanceCapacity = Math.max(count, this.instanceCapacity * 2, INITIAL_INSTANCES)
     this._createInstanceData()
-    this.gl!.bindBuffer(this.gl!.ARRAY_BUFFER, this.instanceBuffer)
-    this.gl!.bufferData(this.gl!.ARRAY_BUFFER, this.instanceCapacity * INSTANCE_STRIDE, this.gl!.DYNAMIC_DRAW)
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceBuffer)
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceCapacity * INSTANCE_STRIDE, this.gl.DYNAMIC_DRAW)
   }
 
   _scheduledResize?: { width: number, height: number }
@@ -203,25 +203,24 @@ export class WebGL2Renderer {
   resizeCanvas (width: number, height: number) {
     // WebGL2 doesn't allow 0-sized canvases
     if (!width || !height) return
-    if (this.canvas?.width === width && this.canvas?.height === height) return
+    if (this.canvas.width === width && this.canvas.height === height) return
 
     this._scheduledResize = { width, height }
   }
 
-  setCanvas (canvas: OffscreenCanvas) {
+  constructor (canvas: OffscreenCanvas) {
     this.canvas = canvas
-    this._initGL(canvas)
+    this._initGL()
 
     canvas.addEventListener('webglcontextlost', e => {
       e.preventDefault()
-      this.gl = null
+      this.gl = null!
     })
-    canvas.addEventListener('webglcontextrestored', () => this._initGL(canvas))
+    canvas.addEventListener('webglcontextrestored', () => this._initGL())
   }
 
-  _initGL (canvas: OffscreenCanvas) {
-    this.canvas = canvas
-    this.gl = canvas.getContext('webgl2', {
+  _initGL () {
+    const gl = this.canvas.getContext('webgl2', {
       alpha: true,
       premultipliedAlpha: true,
       antialias: false,
@@ -232,9 +231,10 @@ export class WebGL2Renderer {
       powerPreference: 'default'
     })
 
-    if (!this.gl) {
+    if (!gl) {
       throw new Error('Could not get WebGL2 context')
     }
+    this.gl = gl
 
     this.maxTextureSize = this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE)
     this.maxArrayTextureLayers = this.gl.getParameter(this.gl.MAX_ARRAY_TEXTURE_LAYERS)
@@ -316,19 +316,19 @@ export class WebGL2Renderer {
     this.gl.clearColor(0, 0, 0, 0)
     this.gl.activeTexture(this.gl.TEXTURE0)
 
-    this.gl.viewport(0, 0, canvas.width, canvas.height)
-    this.gl.uniform2f(this.u_resolution, canvas.width, canvas.height)
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height)
+    this.gl.uniform2f(this.u_resolution, this.canvas.width, this.canvas.height)
   }
 
   createShader (type: number, source: string): WebGLShader | null {
-    const shader = this.gl!.createShader(type)!
-    this.gl!.shaderSource(shader, source)
-    this.gl!.compileShader(shader)
+    const shader = this.gl.createShader(type)!
+    this.gl.shaderSource(shader, source)
+    this.gl.compileShader(shader)
 
-    if (!this.gl!.getShaderParameter(shader, this.gl!.COMPILE_STATUS)) {
-      const info = this.gl!.getShaderInfoLog(shader)
+    if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+      const info = this.gl.getShaderInfoLog(shader)
       console.log(info)
-      this.gl!.deleteShader(shader)
+      this.gl.deleteShader(shader)
       return null
     }
 
@@ -339,7 +339,7 @@ export class WebGL2Renderer {
   // Pass null or undefined to use identity (no conversion).
   setColorMatrix (subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC', videoColorSpace?: 'BT601' | 'BT709') {
     this.colorMatrix = (subtitleColorSpace && videoColorSpace && colorMatrixConversionMap[subtitleColorSpace]?.[videoColorSpace]) ?? IDENTITY_MATRIX
-    if (this.gl && this.u_colorMatrix && this.program) {
+    if (this.gl && this.u_colorMatrix) {
       this.gl.useProgram(this.program)
       this.gl.uniformMatrix3fv(this.u_colorMatrix, false, this.colorMatrix)
     }
@@ -347,38 +347,38 @@ export class WebGL2Renderer {
 
   createAtlasTexture (size: number, depth: number) {
     if (this.atlas) {
-      this.gl!.deleteTexture(this.atlas.texture)
+      this.gl.deleteTexture(this.atlas.texture)
     }
 
-    const texture = this.gl!.createTexture()
-    this.gl!.bindTexture(this.gl!.TEXTURE_2D_ARRAY, texture)
+    const texture = this.gl.createTexture()
+    this.gl.bindTexture(this.gl.TEXTURE_2D_ARRAY, texture)
 
     // Allocate storage for texture
-    this.gl!.texImage3D(
-      this.gl!.TEXTURE_2D_ARRAY,
+    this.gl.texImage3D(
+      this.gl.TEXTURE_2D_ARRAY,
       0,
-      this.gl!.R8,
+      this.gl.R8,
       size,
       size,
       depth,
       0,
-      this.gl!.RED,
-      this.gl!.UNSIGNED_BYTE,
+      this.gl.RED,
+      this.gl.UNSIGNED_BYTE,
       null // Firefox cries about uninitialized data, but is slower with zero initialized data...
     )
 
     // Set texture parameters (no filtering needed for texelFetch, but set anyway)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D_ARRAY, this.gl!.TEXTURE_MIN_FILTER, this.gl!.NEAREST)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D_ARRAY, this.gl!.TEXTURE_MAG_FILTER, this.gl!.NEAREST)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D_ARRAY, this.gl!.TEXTURE_WRAP_S, this.gl!.CLAMP_TO_EDGE)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D_ARRAY, this.gl!.TEXTURE_WRAP_T, this.gl!.CLAMP_TO_EDGE)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D_ARRAY, this.gl!.TEXTURE_MAX_LEVEL, 0)
+    this.gl.texParameteri(this.gl.TEXTURE_2D_ARRAY, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST)
+    this.gl.texParameteri(this.gl.TEXTURE_2D_ARRAY, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST)
+    this.gl.texParameteri(this.gl.TEXTURE_2D_ARRAY, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE)
+    this.gl.texParameteri(this.gl.TEXTURE_2D_ARRAY, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE)
+    this.gl.texParameteri(this.gl.TEXTURE_2D_ARRAY, this.gl.TEXTURE_MAX_LEVEL, 0)
 
     this.atlas = { texture, size, depth }
   }
 
   render (images: ASSImage[], heap: Uint8Array): void {
-    if (!this.gl || !this.program || !this.vao) return
+    if (!this.gl) return
 
     // Apply a scheduled resize right before rendering, so the resize and the
     // first draw happen in one call and the resized buffer is never presented
@@ -386,8 +386,8 @@ export class WebGL2Renderer {
     if (this._scheduledResize) {
       const { width, height } = this._scheduledResize
       this._scheduledResize = undefined
-      this.canvas!.width = width
-      this.canvas!.height = height
+      this.canvas.width = width
+      this.canvas.height = height
 
       // Update viewport and resolution uniform
       this.gl.viewport(0, 0, width, height)
@@ -539,29 +539,16 @@ export class WebGL2Renderer {
   }
 
   destroy () {
-    if (this.gl) {
-      if (this.atlas) {
-        this.gl.deleteTexture(this.atlas.texture)
-        this.atlas = null
-      }
-      this.uploadCache.clear()
+    this.uploadCache.clear()
 
-      if (this.instanceBuffer) {
-        this.gl.deleteBuffer(this.instanceBuffer)
-        this.instanceBuffer = null
-      }
+    if (!this.gl) return
 
-      if (this.vao) {
-        this.gl.deleteVertexArray(this.vao)
-        this.vao = null
-      }
+    if (this.atlas) this.gl.deleteTexture(this.atlas.texture)
 
-      if (this.program) {
-        this.gl.deleteProgram(this.program)
-        this.program = null
-      }
+    this.gl.deleteBuffer(this.instanceBuffer)
+    this.gl.deleteVertexArray(this.vao)
+    this.gl.deleteProgram(this.program)
 
-      this.gl = null
-    }
+    this.instanceBuffer = this.vao = this.program = this.gl = this.atlas = null!
   }
 }

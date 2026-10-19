@@ -5,14 +5,14 @@ import { colorMatrixConversionMap, IDENTITY_MATRIX, type ASSImage } from '../uti
 const clamp = (v: number) => (v < 0 ? 0 : v > 1 ? 255 : Math.round(v * 255))
 
 export class Canvas2DRenderer {
-  canvas: OffscreenCanvas | null = null
-  ctx: OffscreenCanvasRenderingContext2D | null = null
+  canvas
+  ctx
   bufferCanvas = new OffscreenCanvas(1, 1)
   bufferCtx = this.bufferCanvas.getContext('2d', {
     alpha: true,
     desynchronized: true,
     willReadFrequently: false
-  })
+  })!
 
   colorMatrix: Float32Array = IDENTITY_MATRIX
 
@@ -20,20 +20,20 @@ export class Canvas2DRenderer {
 
   resizeCanvas (width: number, height: number) {
     if (!width || !height) return
-    if (this.canvas?.width === width && this.canvas?.height === height) return
+    if (this.canvas.width === width && this.canvas.height === height) return
 
     this._scheduledResize = { width, height }
   }
 
-  setCanvas (canvas: OffscreenCanvas) {
+  constructor (canvas: OffscreenCanvas) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d', {
       alpha: true,
       desynchronized: true,
       willReadFrequently: false
-    })
+    })!
 
-    if (!this.ctx) throw new Error('Could not get 2D context')
+    if (!this.ctx || !this.bufferCtx) throw new Error('Could not get 2D context')
   }
 
   // this should be an svg filter which is cheaper, but not supported
@@ -44,8 +44,6 @@ export class Canvas2DRenderer {
 
   // this is horribly inefficient, but it's a fallback for systems without a GPU, this is the least of their problems
   render (images: ASSImage[], heap: Uint8Array): void {
-    if (!this.ctx || !this.canvas) return
-
     if (this._scheduledResize) {
       const { width, height } = this._scheduledResize
       this._scheduledResize = undefined
@@ -84,15 +82,12 @@ export class Canvas2DRenderer {
 
       this.bufferCanvas.width = w
       this.bufferCanvas.height = h
-      this.bufferCtx!.putImageData(imageData, 0, 0)
+      this.bufferCtx.putImageData(imageData, 0, 0)
       this.ctx.drawImage(this.bufferCanvas, img.dst_x, img.dst_y)
     }
   }
 
   destroy () {
-    this.ctx = null
-    this.canvas = null
-    this.bufferCtx = null!
-    this.bufferCanvas = null!
+    this.ctx = this.bufferCtx = this.bufferCanvas = null!
   }
 }

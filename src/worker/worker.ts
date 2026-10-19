@@ -66,15 +66,13 @@ export class ASSRenderer {
     try {
       const testCanvas = new OffscreenCanvas(1, 1)
       if (testCanvas.getContext('webgl2')) {
-        this._gpurender = new WebGL2Renderer()
+        this._gpurender = new WebGL2Renderer(ctrl)
       } else {
-        this._gpurender = testCanvas.getContext('webgl')?.getExtension('ANGLE_instanced_arrays') ? new WebGL1Renderer() : new Canvas2DRenderer()
+        this._gpurender = testCanvas.getContext('webgl')?.getExtension('ANGLE_instanced_arrays') ? new WebGL1Renderer(ctrl) : new Canvas2DRenderer(ctrl)
       }
     } catch {
-      this._gpurender = new Canvas2DRenderer()
+      this._gpurender = new Canvas2DRenderer(ctrl)
     }
-
-    this._gpurender.setCanvas(ctrl)
 
     this._loadedInitialFonts = !data.fonts.length
     // Emscripten pre-spawns pthread workers from this pool size.

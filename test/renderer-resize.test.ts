@@ -13,8 +13,7 @@ const RENDERERS = { WebGL2Renderer, WebGL1Renderer, Canvas2DRenderer }
 test('resizeCanvas ignores a same-size resize and schedules a real one', () => {
   for (const [name, Renderer] of Object.entries(RENDERERS)) {
     const canvas = new OffscreenCanvas(300, 150)
-    const renderer: any = new Renderer()
-    renderer.setCanvas(canvas)
+    const renderer = new Renderer(canvas)
 
     renderer.resizeCanvas(300, 150)
     expect(renderer._scheduledResize, `${name} same size`).toBeUndefined()
@@ -36,8 +35,7 @@ test('render clears the buffer on every draw, including after a resize', () => {
 
     for (const [name, Renderer] of Object.entries(RENDERERS)) {
       const canvas = new OffscreenCanvas(300, 150)
-      const renderer: any = new Renderer()
-      renderer.setCanvas(canvas)
+      const renderer: any = new Renderer(canvas)
 
       let clears = 0
       if (Renderer === Canvas2DRenderer) {

@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 export interface ASSEvent {
   Start: number
   Duration: number

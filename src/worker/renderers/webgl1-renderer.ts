@@ -72,12 +72,12 @@ void main() {
 const MAX_INSTANCES = 256 // Maximum instances per draw call
 
 export class WebGL1Renderer {
-  canvas: OffscreenCanvas | null = null
-  gl: WebGLRenderingContext | null = null
-  program: WebGLProgram | null = null
+  canvas
+  gl!: WebGLRenderingContext
+  program!: WebGLProgram
 
   // Extensions
-  instancedArraysExt: ANGLE_instanced_arrays | null = null
+  instancedArraysExt!: ANGLE_instanced_arrays
 
   // Uniform locations
   u_resolution: WebGLUniformLocation | null = null
@@ -91,15 +91,15 @@ export class WebGL1Renderer {
   a_color = -1
 
   // Quad vertex buffer (shared for all instances)
-  quadPosBuffer: WebGLBuffer | null = null
+  quadPosBuffer!: WebGLBuffer
 
   // Instance attribute buffers
-  instanceDestRectBuffer: WebGLBuffer | null = null
-  instanceColorBuffer: WebGLBuffer | null = null
+  instanceDestRectBuffer!: WebGLBuffer
+  instanceColorBuffer!: WebGLBuffer
 
   // Instance data arrays
-  instanceDestRectData: Float32Array
-  instanceColorData: Float32Array
+  instanceDestRectData = new Float32Array(MAX_INSTANCES * 4)
+  instanceColorData = new Float32Array(MAX_INSTANCES * 4)
 
   // Texture cache (since WebGL1 doesn't support texture arrays)
   textureCache = new Map<number, {
@@ -117,34 +117,29 @@ export class WebGL1Renderer {
 
   colorMatrix: Float32Array = IDENTITY_MATRIX
 
-  constructor () {
-    this.instanceDestRectData = new Float32Array(MAX_INSTANCES * 4)
-    this.instanceColorData = new Float32Array(MAX_INSTANCES * 4)
-  }
-
   _scheduledResize?: { width: number, height: number }
 
   resizeCanvas (width: number, height: number) {
     // WebGL doesn't allow 0-sized canvases
     if (!width || !height) return
-    if (this.canvas?.width === width && this.canvas?.height === height) return
+    if (this.canvas.width === width && this.canvas.height === height) return
 
     this._scheduledResize = { width, height }
   }
 
-  setCanvas (canvas: OffscreenCanvas) {
-    this._initGL(canvas)
+  constructor (canvas: OffscreenCanvas) {
+    this.canvas = canvas
+    this._initGL()
 
     canvas.addEventListener('webglcontextlost', e => {
       e.preventDefault()
-      this.gl = null
+      this.gl = null!
     })
-    canvas.addEventListener('webglcontextrestored', () => this._initGL(canvas))
+    canvas.addEventListener('webglcontextrestored', () => this._initGL())
   }
 
-  _initGL (canvas: OffscreenCanvas) {
-    this.canvas = canvas
-    this.gl = canvas.getContext('webgl', {
+  _initGL () {
+    const gl = this.canvas.getContext('webgl', {
       alpha: true,
       premultipliedAlpha: true,
       antialias: false,
@@ -155,17 +150,19 @@ export class WebGL1Renderer {
       powerPreference: 'default'
     })
 
-    if (!this.gl) {
+    if (!gl) {
       throw new Error('Could not get WebGL context')
     }
+    this.gl = gl
 
     this.textureCache.clear()
 
     // Get instanced arrays extension (required for instancing in WebGL1)
-    this.instancedArraysExt = this.gl.getExtension('ANGLE_instanced_arrays')
-    if (!this.instancedArraysExt) {
+    const instancedArraysExt = this.gl.getExtension('ANGLE_instanced_arrays')
+    if (!instancedArraysExt) {
       throw new Error('ANGLE_instanced_arrays extension not supported')
     }
+    this.instancedArraysExt = instancedArraysExt
 
     // Create shaders
     const vertexShader = this.createShader(this.gl.VERTEX_SHADER, VERTEX_SHADER)
@@ -247,19 +244,19 @@ export class WebGL1Renderer {
     this.gl.clearColor(0, 0, 0, 0)
     this.gl.activeTexture(this.gl.TEXTURE0)
 
-    this.gl.viewport(0, 0, canvas.width, canvas.height)
-    this.gl.uniform2f(this.u_resolution, canvas.width, canvas.height)
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height)
+    this.gl.uniform2f(this.u_resolution, this.canvas.width, this.canvas.height)
   }
 
   createShader (type: number, source: string): WebGLShader | null {
-    const shader = this.gl!.createShader(type)!
-    this.gl!.shaderSource(shader, source)
-    this.gl!.compileShader(shader)
+    const shader = this.gl.createShader(type)!
+    this.gl.shaderSource(shader, source)
+    this.gl.compileShader(shader)
 
-    if (!this.gl!.getShaderParameter(shader, this.gl!.COMPILE_STATUS)) {
-      const info = this.gl!.getShaderInfoLog(shader)
+    if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+      const info = this.gl.getShaderInfoLog(shader)
       console.log(info)
-      this.gl!.deleteShader(shader)
+      this.gl.deleteShader(shader)
       return null
     }
 
@@ -270,40 +267,40 @@ export class WebGL1Renderer {
   // Pass null or undefined to use identity (no conversion).
   setColorMatrix (subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC', videoColorSpace?: 'BT601' | 'BT709') {
     this.colorMatrix = (subtitleColorSpace && videoColorSpace && colorMatrixConversionMap[subtitleColorSpace]?.[videoColorSpace]) ?? IDENTITY_MATRIX
-    if (this.gl && this.u_colorMatrix && this.program) {
+    if (this.gl && this.u_colorMatrix) {
       this.gl.useProgram(this.program)
       this.gl.uniformMatrix3fv(this.u_colorMatrix, false, this.colorMatrix)
     }
   }
 
   createTexture (width: number, height: number) {
-    const texture = this.gl!.createTexture()
-    this.gl!.bindTexture(this.gl!.TEXTURE_2D, texture)
+    const texture = this.gl.createTexture()
+    this.gl.bindTexture(this.gl.TEXTURE_2D, texture)
 
     // Allocate storage for the mask texture.
-    this.gl!.texImage2D(
-      this.gl!.TEXTURE_2D,
+    this.gl.texImage2D(
+      this.gl.TEXTURE_2D,
       0,
-      this.gl!.ALPHA,
+      this.gl.ALPHA,
       width,
       height,
       0,
-      this.gl!.ALPHA,
-      this.gl!.UNSIGNED_BYTE,
+      this.gl.ALPHA,
+      this.gl.UNSIGNED_BYTE,
       null
     )
 
     // Set texture parameters
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D, this.gl!.TEXTURE_MIN_FILTER, this.gl!.NEAREST)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D, this.gl!.TEXTURE_MAG_FILTER, this.gl!.NEAREST)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D, this.gl!.TEXTURE_WRAP_S, this.gl!.CLAMP_TO_EDGE)
-    this.gl!.texParameteri(this.gl!.TEXTURE_2D, this.gl!.TEXTURE_WRAP_T, this.gl!.CLAMP_TO_EDGE)
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST)
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST)
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE)
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE)
 
     return texture
   }
 
   render (images: ASSImage[], heap: Uint8Array): void {
-    if (!this.gl || !this.program || !this.instancedArraysExt) return
+    if (!this.gl) return
 
     // Apply a scheduled resize right before rendering, so the resize and the
     // first draw happen in one call and the resized buffer is never presented
@@ -311,8 +308,8 @@ export class WebGL1Renderer {
     if (this._scheduledResize) {
       const { width, height } = this._scheduledResize
       this._scheduledResize = undefined
-      this.canvas!.width = width
-      this.canvas!.height = height
+      this.canvas.width = width
+      this.canvas.height = height
 
       // Update viewport and resolution uniform
       this.gl.viewport(0, 0, width, height)
@@ -432,35 +429,18 @@ export class WebGL1Renderer {
   }
 
   destroy () {
-    if (this.gl) {
-      // Delete all cached textures
-      for (const entry of this.textureCache.values()) {
-        this.gl.deleteTexture(entry.texture)
-      }
-      this.textureCache.clear()
-      this.tightData = null
-
-      if (this.quadPosBuffer) {
-        this.gl.deleteBuffer(this.quadPosBuffer)
-        this.quadPosBuffer = null
-      }
-
-      if (this.instanceDestRectBuffer) {
-        this.gl.deleteBuffer(this.instanceDestRectBuffer)
-        this.instanceDestRectBuffer = null
-      }
-
-      if (this.instanceColorBuffer) {
-        this.gl.deleteBuffer(this.instanceColorBuffer)
-        this.instanceColorBuffer = null
-      }
-
-      if (this.program) {
-        this.gl.deleteProgram(this.program)
-        this.program = null
-      }
-
-      this.gl = null
+    if (!this.gl) return
+    // Delete all cached textures
+    for (const entry of this.textureCache.values()) {
+      this.gl.deleteTexture(entry.texture)
     }
+    this.textureCache.clear()
+
+    this.gl.deleteBuffer(this.quadPosBuffer)
+    this.gl.deleteBuffer(this.instanceDestRectBuffer)
+    this.gl.deleteBuffer(this.instanceColorBuffer)
+    this.gl.deleteProgram(this.program)
+
+    this.quadPosBuffer = this.instanceDestRectBuffer = this.instanceColorBuffer = this.program = this.gl = this.tightData = null!
   }
 }

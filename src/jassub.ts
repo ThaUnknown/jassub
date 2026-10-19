@@ -330,9 +330,10 @@ export default class JASSUB {
       if (this._destroyed || this._video !== target) return
       try {
         const frame = new VideoFrame(this._video)
+        const colorSpace = webYCbCrMap[frame.colorSpace.matrix!]
         frame.close()
         await this.ready
-        await this.renderer._setColorSpace(webYCbCrMap[frame.colorSpace.matrix!])
+        await this.renderer._setColorSpace(colorSpace)
       } catch (e) {
         // sources can be tainted
         console.warn(e)

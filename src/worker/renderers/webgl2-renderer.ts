@@ -149,7 +149,12 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
 
   constructor (canvas: OffscreenCanvas) {
     super(canvas)
-    this._initGL()
+    try {
+      this._initGL()
+    } catch (e) {
+      this.destroy()
+      throw e
+    }
   }
 
   _initGL () {

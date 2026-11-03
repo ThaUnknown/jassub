@@ -66,13 +66,7 @@ export class ASSRenderer {
     // WebGL2 is barely faster than WebGL1 in most cases,
     // in rare cases the better texture-dedupe, drawing everything in one call, no fake stride and no page ordering
     // can help its performance, but those cases are rare
-    if (WebGL2Renderer.isSupported()) {
-      this._gpurender = new WebGL2Renderer(ctrl)
-    } else if (WebGL1Renderer.isSupported()) {
-      this._gpurender = new WebGL1Renderer(ctrl)
-    } else {
-      this._gpurender = new Canvas2DRenderer(ctrl)
-    }
+    this._gpurender = WebGL2Renderer.isSupported(ctrl) ?? WebGL1Renderer.isSupported(ctrl) ?? new Canvas2DRenderer(ctrl)
 
     this._loadedInitialFonts = !data.fonts.length
     // Emscripten pre-spawns pthread workers from this pool size.

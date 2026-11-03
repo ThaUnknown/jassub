@@ -6,11 +6,10 @@ export class CanvasRendererBase {
     this.canvas = canvas
   }
 
-  static isSupported () {
+  static isSupported<T extends CanvasRendererBase> (this: new (canvas: OffscreenCanvas) => T, canvas: OffscreenCanvas) {
     try {
-      new this(new OffscreenCanvas(1, 1)).destroy()
-      return true
-    } catch {}
+      return new this(canvas)
+    } catch (e) {}
   }
 
   resizeCanvas (width: number, height: number) {

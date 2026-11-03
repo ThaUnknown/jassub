@@ -23,6 +23,28 @@ test('resizeCanvas ignores a same-size resize and schedules a real one', () => {
   }
 })
 
+test('resizeCanvas cancels a pending resize when it returns to the current size', () => {
+  for (const [name, Renderer] of Object.entries(RENDERERS)) {
+    const canvas = new OffscreenCanvas(300, 150)
+    const renderer = new Renderer(canvas)
+
+    renderer.resizeCanvas(301, 150)
+    expect(renderer._scheduledResize, `${name} pending`).toEqual({ width: 301, height: 150 })
+
+    // Going back to the current size must not leave the older pending resize.
+    renderer.resizeCanvas(300, 150)
+    expect(renderer._scheduledResize, `${name} cancelled`).toBeUndefined()
+    expect(renderer.applyScheduledResize(), `${name} applies nothing`).toBeUndefined()
+    expect(canvas.width, `${name} width`).toBe(300)
+    expect(canvas.height, `${name} height`).toBe(150)
+
+    // An invalid size must also drop the pending resize.
+    renderer.resizeCanvas(301, 150)
+    renderer.resizeCanvas(0, 150)
+    expect(renderer._scheduledResize, `${name} zero size`).toBeUndefined()
+  }
+})
+
 test('render clears the buffer on every draw, including after a resize', () => {
   // The WebGL renderers read these worker globals while rendering.
   const glob = self as any

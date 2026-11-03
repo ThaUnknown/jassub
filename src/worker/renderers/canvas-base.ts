@@ -14,11 +14,12 @@ export class CanvasRendererBase {
   }
 
   resizeCanvas (width: number, height: number) {
-    // WebGL doesn't allow 0-sized canvases
-    if (!width || !height) return
-    if (this.canvas.width === width && this.canvas.height === height) return
-
-    this._scheduledResize = { width, height }
+    // WebGL doesn't allow 0-sized canvases. A matching size cancels any pending
+    // resize, otherwise a later draw would apply an older size to a newer frame.
+    this._scheduledResize = !width || !height ||
+      (this.canvas.width === width && this.canvas.height === height)
+      ? undefined
+      : { width, height }
   }
 
   applyScheduledResize () {

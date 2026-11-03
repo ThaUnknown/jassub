@@ -207,6 +207,10 @@ If you want to support even older engines, then please check the [v1.8.8 tag](ht
 
 Support for older browsers (without OffscreenCanvas, WebAssembly threads, etc) has been dropped in v2.0.0 and later.
 
+# On tests
+
+Most tests are vibe-coded and not great, but they still catch regressions. I don't have the time to polish test code for a FOSS library.
+
 # How to build?
 
 ## Get the Source

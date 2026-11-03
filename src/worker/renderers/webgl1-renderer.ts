@@ -1,8 +1,8 @@
+import { NEEDS_WASM_BUFFER_COPY, type ASSImage } from '../util.ts'
+
 import { WebGLRendererBase, type AtlasItem } from './webgl-base.ts'
 
-import type { ASSImage } from '../util.ts'
-
-// GLSL ES 1.0 Vertex Shader with Instancing (using extension)
+// GLSL ES 1.0 Vertex Shader. Vertex highp is mandatory.
 const VERTEX_SHADER = /* glsl */`
 precision highp float;
 
@@ -12,7 +12,7 @@ attribute vec2 a_quadPos;
 uniform vec2 u_resolution;
 uniform vec2 u_atlasSize;
 
-// Instance attributes
+// Per-image attributes
 attribute vec4 a_destRect;  // x, y, w, h
 attribute vec2 a_srcXY;     // atlas x, y
 attribute vec4 a_color;     // r, g, b, a
@@ -20,7 +20,7 @@ attribute vec4 a_color;     // r, g, b, a
 varying highp vec2 v_quadPos;
 varying highp vec2 v_srcUV;
 varying highp vec2 v_sizeUV;
-varying vec4 v_color;
+varying mediump vec4 v_color;
 
 void main() {
   vec2 pixelPos = a_destRect.xy + a_quadPos * a_destRect.zw;
@@ -38,15 +38,21 @@ void main() {
 // GLSL ES 1.0 Fragment Shader
 // WebGL1 has no texture arrays or texelFetch, so images are packed into 2D atlas pages.
 const FRAGMENT_SHADER = /* glsl */`
-precision mediump float;
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+#define PRECISION highp
+#else
+#define PRECISION mediump
+#endif
+
+precision PRECISION float;
 
 uniform sampler2D u_tex;
 uniform mat3 u_colorMatrix;
 
-varying highp vec2 v_quadPos;
-varying highp vec2 v_srcUV;
-varying highp vec2 v_sizeUV;
-varying vec4 v_color;
+varying PRECISION vec2 v_quadPos;
+varying PRECISION vec2 v_srcUV;
+varying PRECISION vec2 v_sizeUV;
+varying mediump vec4 v_color;
 
 void main() {
   // The alpha channel contains the mask.
@@ -71,16 +77,35 @@ const ATLAS_ROUND = 64
 const MAX_ATLAS_PAGES = 64
 const MAX_ATLAS_BYTES = 256 * 1024 * 1024
 
+// Per-image record: destination rect (4), atlas position (2), color (4).
+const IMAGE_FLOATS = 10
+const IMAGE_BYTES = IMAGE_FLOATS * 4
+
+// Expanded vertex record: quad position (2) followed by the image record.
+const VERTEX_FLOATS = IMAGE_FLOATS + 2
+const VERTEX_BYTES = VERTEX_FLOATS * 4
+const QUAD_POSITIONS = new Float32Array([
+  0.0, 0.0,
+  1.0, 0.0,
+  0.0, 1.0,
+  1.0, 0.0,
+  1.0, 1.0,
+  0.0, 1.0
+])
+
 interface WebGL1AtlasItem extends AtlasItem {
   packW: number
   uploadStrided: boolean
 }
 
-// gl.getExtension('ANGLE_instanced_arrays') for instanced attributes and draws
-// gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT).precision for the highp varyings the shader uses
+// highp is used when the fragment stage supports it, otherwise mediump is used with a smaller atlas so texture coordinates keep enough precision
+// ANGLE_instanced_arrays is optional, without it the renderer expands each image into the vertex buffer and uses drawArrays()
 export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
+  maxAtlasSize = 0
+  atlasPadding = 0
+
   // Extensions
-  instancedArraysExt!: ANGLE_instanced_arrays
+  instancedArraysExt: ANGLE_instanced_arrays | null = null
 
   // Uniform locations
   u_tex: WebGLUniformLocation | null = null
@@ -92,27 +117,23 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
   a_srcXY = -1
   a_color = -1
 
-  // Quad vertex buffer (shared for all instances)
+  // Quad vertex buffer for the instanced path
   quadPosBuffer!: WebGLBuffer
 
-  // Instance attribute buffers
-  instanceDestRectBuffer!: WebGLBuffer
-  instanceSrcBuffer!: WebGLBuffer
-  instanceColorBuffer!: WebGLBuffer
-
-  // Instance data arrays
-  instanceDestRectData = new Float32Array(INITIAL_INSTANCES * 4)
-  instanceSrcData = new Float32Array(INITIAL_INSTANCES * 2)
-  instanceColorData = new Float32Array(INITIAL_INSTANCES * 4)
+  // Per-image records for the instanced path, or expanded vertices for the
+  // non-instanced path. Only one layout is used at a time.
+  instanceBuffer!: WebGLBuffer
+  instanceData = new Float32Array(0)
   instanceCapacity = 0
+  instanceStride = 0
 
   atlasPages: WebGLTexture[] = []
   atlasSize = 0
   maxTextureSize = 0
   uploadCache = new Set<string>()
 
-  // A reusable buffer for strided bitmap data
-  tightData: Uint8Array | null = null
+  // A reusable copy buffer for bitmap uploads
+  copyData = new Uint8Array(0)
 
   constructor (canvas: OffscreenCanvas) {
     super(canvas)
@@ -136,24 +157,25 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     }
     this.gl = gl
 
-    // The fragment shader declares highp varyings.
-    if (!gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT)?.precision) {
-      throw new Error('WebGL1 does not support highp texture coordinates')
-    }
-
+    // The fragment shader picks highp or mediump from GL_FRAGMENT_PRECISION_HIGH.
+    const highp = !!gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT)?.precision
     this.atlasPages = []
     this.atlasSize = 0
     this.uploadCache.clear()
     this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE)
 
-    // vertexAttribDivisorANGLE and drawArraysInstancedANGLE need this extension.
-    const instancedArraysExt = this.gl.getExtension('ANGLE_instanced_arrays')
-    if (!instancedArraysExt) {
-      throw new Error('ANGLE_instanced_arrays extension not supported')
-    }
-    this.instancedArraysExt = instancedArraysExt
+    this.instancedArraysExt = this.gl.getExtension('ANGLE_instanced_arrays')
 
     this.createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
+
+    // mediump cannot address a large atlas exactly, so size it from the reported
+    // precision. In both modes, keep MAX_ATLAS_PAGES pages inside MAX_ATLAS_BYTES.
+    // Growing to MAX_TEXTURE_SIZE would collapse maxPages to 1 at 4K/8K.
+    const mediumpBits = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.MEDIUM_FLOAT)?.precision ?? 10
+    this.maxAtlasSize = highp
+      ? Math.min(this.maxTextureSize, Math.floor(Math.sqrt(MAX_ATLAS_BYTES / MAX_ATLAS_PAGES)))
+      : Math.min(this.maxTextureSize, 2 ** Math.max(6, mediumpBits - 1))
+    this.atlasPadding = highp ? 0 : 1
 
     this.u_resolution = this.gl.getUniformLocation(this.program, 'u_resolution')
     this.u_tex = this.gl.getUniformLocation(this.program, 'u_tex')
@@ -165,67 +187,66 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     this.a_srcXY = this.gl.getAttribLocation(this.program, 'a_srcXY')
     this.a_color = this.gl.getAttribLocation(this.program, 'a_color')
 
-    // Create quad position buffer (6 vertices for 2 triangles)
+    // Create the instanced quad position buffer (6 vertices for 2 triangles)
     this.quadPosBuffer = this.gl.createBuffer()
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.quadPosBuffer)
-    const quadPositions = new Float32Array([
-      0.0, 0.0,
-      1.0, 0.0,
-      0.0, 1.0,
-      1.0, 0.0,
-      1.0, 1.0,
-      0.0, 1.0
-    ])
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, quadPositions, this.gl.STATIC_DRAW)
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, QUAD_POSITIONS, this.gl.STATIC_DRAW)
 
-    // Create instance attribute buffers
-    this.instanceDestRectBuffer = this.gl.createBuffer()
-    this.instanceSrcBuffer = this.gl.createBuffer()
-    this.instanceColorBuffer = this.gl.createBuffer()
-
+    // Create the instance data buffer
+    this.instanceBuffer = this.gl.createBuffer()
     this.instanceCapacity = 0
-    this.ensureInstanceCapacity(INITIAL_INSTANCES)
+    const stride = this.instancedArraysExt ? IMAGE_FLOATS : 6 * VERTEX_FLOATS
+    this.ensureInstanceCapacity(INITIAL_INSTANCES, stride)
 
     // Set up vertex attributes
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.quadPosBuffer)
-    this.gl.enableVertexAttribArray(this.a_quadPos)
-    this.gl.vertexAttribPointer(this.a_quadPos, 2, this.gl.FLOAT, false, 0, 0)
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceBuffer)
+    if (this.instancedArraysExt) {
+      this.vertexAttrib(this.a_destRect, 4, IMAGE_BYTES, 0, 1)
+      this.vertexAttrib(this.a_srcXY, 2, IMAGE_BYTES, 16, 1)
+      this.vertexAttrib(this.a_color, 4, IMAGE_BYTES, 24, 1)
 
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceDestRectBuffer)
-    this.gl.enableVertexAttribArray(this.a_destRect)
-    this.gl.vertexAttribPointer(this.a_destRect, 4, this.gl.FLOAT, false, 0, 0)
-    this.instancedArraysExt.vertexAttribDivisorANGLE(this.a_destRect, 1)
-
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceSrcBuffer)
-    this.gl.enableVertexAttribArray(this.a_srcXY)
-    this.gl.vertexAttribPointer(this.a_srcXY, 2, this.gl.FLOAT, false, 0, 0)
-    this.instancedArraysExt.vertexAttribDivisorANGLE(this.a_srcXY, 1)
-
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceColorBuffer)
-    this.gl.enableVertexAttribArray(this.a_color)
-    this.gl.vertexAttribPointer(this.a_color, 4, this.gl.FLOAT, false, 0, 0)
-    this.instancedArraysExt.vertexAttribDivisorANGLE(this.a_color, 1)
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.quadPosBuffer)
+      this.vertexAttrib(this.a_quadPos, 2, 0, 0)
+    } else {
+      this.vertexAttrib(this.a_quadPos, 2, VERTEX_BYTES, 0)
+      this.vertexAttrib(this.a_destRect, 4, VERTEX_BYTES, 8)
+      this.vertexAttrib(this.a_srcXY, 2, VERTEX_BYTES, 24)
+      this.vertexAttrib(this.a_color, 4, VERTEX_BYTES, 32)
+    }
 
     this.applyCommonState(this.u_tex)
     this.gl.uniform2f(this.u_atlasSize, 1, 1)
   }
 
-  ensureInstanceCapacity (count: number) {
+  vertexAttrib (location: number, size: number, stride: number, offset: number, divisor = 0) {
+    this.gl.enableVertexAttribArray(location)
+    this.gl.vertexAttribPointer(location, size, this.gl.FLOAT, false, stride, offset)
+    if (divisor) this.instancedArraysExt?.vertexAttribDivisorANGLE(location, divisor)
+  }
+
+  ensureInstanceCapacity (count: number, stride: number) {
     if (count <= this.instanceCapacity) return
 
     this.instanceCapacity = Math.max(count, this.instanceCapacity * 2, INITIAL_INSTANCES)
-    this.instanceDestRectData = new Float32Array(this.instanceCapacity * 4)
-    this.instanceSrcData = new Float32Array(this.instanceCapacity * 2)
-    this.instanceColorData = new Float32Array(this.instanceCapacity * 4)
+    this.instanceStride = stride
+    this.instanceData = new Float32Array(this.instanceCapacity * stride)
 
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceDestRectBuffer)
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceCapacity * 16, this.gl.DYNAMIC_DRAW)
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceBuffer)
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceData.byteLength, this.gl.DYNAMIC_DRAW)
+  }
 
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceSrcBuffer)
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceCapacity * 8, this.gl.DYNAMIC_DRAW)
-
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceColorBuffer)
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, this.instanceCapacity * 16, this.gl.DYNAMIC_DRAW)
+  writeImage (offset: number, img: ASSImage, x: number, y: number) {
+    const data = this.instanceData
+    data[offset] = img.dst_x
+    data[offset + 1] = img.dst_y
+    data[offset + 2] = img.w
+    data[offset + 3] = img.h
+    data[offset + 4] = x
+    data[offset + 5] = y
+    data[offset + 6] = ((img.color >>> 24) & 0xFF) / 255
+    data[offset + 7] = ((img.color >>> 16) & 0xFF) / 255
+    data[offset + 8] = ((img.color >>> 8) & 0xFF) / 255
+    data[offset + 9] = (img.color & 0xFF) / 255
   }
 
   createAtlasPage (size: number) {
@@ -275,15 +296,10 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     for (const img of images) {
       if (img.w <= 0 || img.h <= 0 || img.w > this.maxTextureSize || img.h > this.maxTextureSize) continue
 
-      // WebGL1 has no UNPACK_ROW_LENGTH. Upload the stride as the texture width instead of copying rows.
-      let uploadStrided = img.stride >= img.w && img.stride <= this.maxTextureSize &&
-        img.bitmap + img.stride * img.h <= heap.length
-      let packW = uploadStrided ? img.stride : img.w
-
-      if (packW > this.maxTextureSize) {
-        uploadStrided = false
-        packW = img.w
-      }
+      // WebGL1 has no UNPACK_ROW_LENGTH. The stride becomes the texture width.
+      // Pack rows tight only when the stride exceeds MAX_TEXTURE_SIZE.
+      const uploadStrided = img.stride >= img.w && img.stride <= this.maxTextureSize
+      const packW = uploadStrided ? img.stride : img.w
 
       items.push({
         img,
@@ -305,16 +321,18 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     }
 
     const requestedSize = Math.max(ATLAS_ROUND, Math.ceil(Math.max(maxDimension, Math.ceil(Math.sqrt(totalArea))) / ATLAS_ROUND) * ATLAS_ROUND)
-    let size = Math.min(this.maxTextureSize, Math.max(this.atlasSize, requestedSize))
+    // Keep pages inside the atlas size cap. A single larger image must
+    // still fit, so maxDimension can raise the size above the cap.
+    let size = Math.min(this.maxTextureSize, Math.max(this.atlasSize, requestedSize), Math.max(this.maxAtlasSize, maxDimension))
 
     // Pack images into atlas pages.
     let maxPages = Math.max(1, Math.min(MAX_ATLAS_PAGES, Math.floor(MAX_ATLAS_BYTES / (size * size))))
-    let pageCount = this.packAtlas(items, size)
+    let pageCount = this.packAtlas(items, size, this.atlasPadding)
 
-    if (pageCount > maxPages && size < this.maxTextureSize) {
-      size = this.maxTextureSize
+    if (pageCount > maxPages && size < this.maxAtlasSize) {
+      size = this.maxAtlasSize
       maxPages = Math.max(1, Math.min(MAX_ATLAS_PAGES, Math.floor(MAX_ATLAS_BYTES / (size * size))))
-      pageCount = this.packAtlas(items, size)
+      pageCount = this.packAtlas(items, size, this.atlasPadding)
     }
 
     if (pageCount > maxPages) {
@@ -324,7 +342,7 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     }
 
     this.ensureAtlas(size, pageCount)
-    this.ensureInstanceCapacity(items.length)
+    this.ensureInstanceCapacity(items.length, this.instanceStride)
 
     const oldCache = this.uploadCache
     this.uploadCache = new Set<string>()
@@ -353,6 +371,15 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
         const { img } = item
 
         if (item.uploadStrided) {
+          const length = img.stride * img.h
+          const source = heap.subarray(img.bitmap, img.bitmap + length)
+
+          // HACK 3 [see util.ts for explanation]
+          if (NEEDS_WASM_BUFFER_COPY) {
+            if (length > this.copyData.length) this.copyData = new Uint8Array(length)
+            this.copyData.set(source)
+          }
+
           this.gl.texSubImage2D(
             this.gl.TEXTURE_2D,
             0,
@@ -362,17 +389,16 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
             img.h,
             this.gl.ALPHA,
             this.gl.UNSIGNED_BYTE,
-            heap.subarray(img.bitmap, img.bitmap + img.stride * img.h)
+            NEEDS_WASM_BUFFER_COPY ? this.copyData.subarray(0, length) : source
           )
         } else {
           const length = img.w * img.h
-          let tightData = this.tightData
-          if (!tightData || tightData.length < length) tightData = this.tightData = new Uint8Array(length)
+          if (length > this.copyData.length) this.copyData = new Uint8Array(length)
 
           const sourceView = heap.subarray(img.bitmap, img.bitmap + img.stride * img.h)
           for (let y = 0; y < img.h; y++) {
             const srcOffset = y * img.stride
-            tightData.set(sourceView.subarray(srcOffset, srcOffset + img.w), y * img.w)
+            this.copyData.set(sourceView.subarray(srcOffset, srcOffset + img.w), y * img.w)
           }
 
           this.gl.texSubImage2D(
@@ -384,49 +410,43 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
             img.h,
             this.gl.ALPHA,
             this.gl.UNSIGNED_BYTE,
-            tightData.subarray(0, length)
+            this.copyData.subarray(0, length)
           )
         }
       }
     }
 
-    // Draw one instanced batch per page.
+    // Draw one batch per page.
     for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
       const page = pageItems[pageIndex]!
       if (!page.length) continue
 
       for (let i = 0; i < page.length; i++) {
         const { img, x, y } = page[i]!
-        const d = i * 4
-        const s = i * 2
-        const c = i * 4
 
-        this.instanceDestRectData[d] = img.dst_x
-        this.instanceDestRectData[d + 1] = img.dst_y
-        this.instanceDestRectData[d + 2] = img.w
-        this.instanceDestRectData[d + 3] = img.h
-
-        this.instanceSrcData[s] = x
-        this.instanceSrcData[s + 1] = y
-
-        this.instanceColorData[c] = ((img.color >>> 24) & 0xFF) / 255
-        this.instanceColorData[c + 1] = ((img.color >>> 16) & 0xFF) / 255
-        this.instanceColorData[c + 2] = ((img.color >>> 8) & 0xFF) / 255
-        this.instanceColorData[c + 3] = (img.color & 0xFF) / 255
+        if (this.instancedArraysExt) {
+          this.writeImage(i * IMAGE_FLOATS, img, x, y)
+        } else {
+          for (let v = 0; v < 6; v++) {
+            const o = (i * 6 + v) * VERTEX_FLOATS
+            this.instanceData[o] = QUAD_POSITIONS[v * 2]!
+            this.instanceData[o + 1] = QUAD_POSITIONS[v * 2 + 1]!
+            this.writeImage(o + 2, img, x, y)
+          }
+        }
       }
 
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceDestRectBuffer)
-      this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.instanceDestRectData.subarray(0, page.length * 4))
-
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceSrcBuffer)
-      this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.instanceSrcData.subarray(0, page.length * 2))
-
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceColorBuffer)
-      this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.instanceColorData.subarray(0, page.length * 4))
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.instanceBuffer)
+      this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.instanceData.subarray(0, page.length * this.instanceStride))
 
       this.gl.bindTexture(this.gl.TEXTURE_2D, this.atlasPages[pageIndex]!)
       this.gl.uniform2f(this.u_atlasSize, this.atlasSize, this.atlasSize)
-      this.instancedArraysExt.drawArraysInstancedANGLE(this.gl.TRIANGLES, 0, 6, page.length)
+
+      if (this.instancedArraysExt) {
+        this.instancedArraysExt.drawArraysInstancedANGLE(this.gl.TRIANGLES, 0, 6, page.length)
+      } else {
+        this.gl.drawArrays(this.gl.TRIANGLES, 0, page.length * 6)
+      }
     }
 
     this.gl.flush()
@@ -441,12 +461,10 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     this.uploadCache.clear()
 
     this.gl.deleteBuffer(this.quadPosBuffer)
-    this.gl.deleteBuffer(this.instanceDestRectBuffer)
-    this.gl.deleteBuffer(this.instanceSrcBuffer)
-    this.gl.deleteBuffer(this.instanceColorBuffer)
+    this.gl.deleteBuffer(this.instanceBuffer)
     this.gl.deleteProgram(this.program)
     this.gl.getExtension('WEBGL_lose_context')?.loseContext()
 
-    this.quadPosBuffer = this.instanceDestRectBuffer = this.instanceSrcBuffer = this.instanceColorBuffer = this.program = this.gl = this.tightData = null!
+    this.quadPosBuffer = this.instanceBuffer = this.program = this.gl = this.copyData = null!
   }
 }

@@ -68,9 +68,7 @@ export const WEIGHT_MAP = [
 
 export type WeightValue = typeof WEIGHT_MAP[number]
 
-const UA = navigator.userAgent.toLowerCase()
-export const IS_FIREFOX = UA.includes('firefox')
-export const IS_SAFARI = /applewebkit\/[\d.]+ \(khtml, like gecko\)(?!.*chrome\/)/.test(UA)
+const IS_INCOMPETENT_BROWSER = /firefox/i.test(navigator.userAgent) || /applewebkit\/[\d.]+ \(khtml, like gecko\)(?!.*chrome\/)/i.test(navigator.userAgent)
 
 const a = 'BT601'
 const b = 'BT709'
@@ -87,14 +85,17 @@ export async function fetchtext (url: string) {
 
 export const THREAD_COUNT = self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1
 
-export const SUPPORTS_GROWTH = !!WebAssembly.Memory.prototype.toResizableBuffer
+const USES_GROWABLE_OR_SHARED_MEMORY = !!WebAssembly.Memory.prototype.toResizableBuffer || THREAD_COUNT > 1
 
 // HACK: 3 memory hacks to support here:
-// 1. Chrome WASM Growable memory which can use a reference to the buffer to fix visual artifacts, which happen both with multithreading or without [fastest]
-// 2. Chrome WASM non-growable, but mult-threaded only memory which needs to re-create the HEAPU8 on growth because of race conditions [medium]
-// 3. Firefox non-growable memory which needs a copy of the data into a non-resizable buffer and can't use a reference [fastest single threaded, but only on Firefox, on Chrome this is slowest]
-// Additionally safari is inconsistent with this, sometimes it works with sharedarraybuffers, and sometimes it doesn't, probably some version compat diffs?
-export const SHOULD_REFERENCE_MEMORY = !IS_FIREFOX && !IS_SAFARI && (SUPPORTS_GROWTH || THREAD_COUNT > 1)
+// 1. Chromium growable memory can reference the buffer directly. Refresh the HEAPU8 view so it never goes stale.
+// 2. Chromium non-growable multithreaded memory needs the HEAPU8 view recreated after growth because of race conditions.
+// 3. Firefox and Safari reject resizable or shared WASM buffer views in WebGL, so the bitmap data is copied into a normal buffer.
+// Safari's SharedArrayBuffer support is inconsistent across versions, it is treated like Firefox here.
+export const SHOULD_REFERENCE_MEMORY = !IS_INCOMPETENT_BROWSER && USES_GROWABLE_OR_SHARED_MEMORY
+
+// Firefox and Safari reject resizable or shared WASM buffer views in WebGL.
+export const NEEDS_WASM_BUFFER_COPY = IS_INCOMPETENT_BROWSER && USES_GROWABLE_OR_SHARED_MEMORY
 
 export const IDENTITY_MATRIX = new Float32Array([
   1, 0, 0,
@@ -102,7 +103,7 @@ export const IDENTITY_MATRIX = new Float32Array([
   0, 0, 1
 ])
 
-// Color matrix conversion map - mat3x3 for WebGL2
+// Color matrix conversion map - 3x3 matrices for the renderers
 // Each matrix converts FROM the key color space TO the nested key color space
 const colorMatrixConversionMap = {
   BT601: {

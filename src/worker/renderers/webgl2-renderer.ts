@@ -1,5 +1,5 @@
-// fallback for browsers that don't support WebGL2
-import { IS_FIREFOX, IS_SAFARI, SHOULD_REFERENCE_MEMORY, type ASSImage } from '../util.ts'
+// WebGL2 renderer
+import { NEEDS_WASM_BUFFER_COPY, SHOULD_REFERENCE_MEMORY, type ASSImage } from '../util.ts'
 
 import { WebGLRendererBase, type AtlasItem } from './webgl-base.ts'
 
@@ -117,7 +117,7 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
 
   u_atlas: WebGLUniformLocation | null = null
 
-  // Interleaved instance buffer: dest rect, atlas position, then color
+  // Interleaved instance buffer: dest rect, atlas position, color, then layer
   instanceBuffer!: WebGLBuffer
   instanceData!: ArrayBuffer
   instanceFloats!: Float32Array
@@ -128,6 +128,9 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
   maxTextureSize = 0
   maxArrayTextureLayers = 0
   uploadCache = new Set<string>()
+
+  // A reusable copy buffer for bitmap data on Firefox and Safari.
+  copyData = new Uint8Array(0)
 
   _createInstanceData () {
     this.instanceData = new ArrayBuffer(this.instanceCapacity * INSTANCE_STRIDE)
@@ -299,7 +302,7 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
     this.uploadCache = new Set<string>()
     let instanceCount = 0
 
-    // HACK 1 and 2 [see above for explanation]
+    // HACK 1 and 2 [see util.ts for explanation]
     if ((self.HEAPU8RAW.buffer !== self.WASMMEMORY.buffer) || SHOULD_REFERENCE_MEMORY) {
       heap = self.HEAPU8RAW = new Uint8Array(self.WASMMEMORY.buffer)
     }
@@ -317,37 +320,31 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
       if (!cached) {
         // Upload bitmap data to texture array layer
         this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, img.stride)
+        let source = heap
+        let offset = img.bitmap
 
-        if (IS_FIREFOX || IS_SAFARI) {
+        if (NEEDS_WASM_BUFFER_COPY) {
           // HACK 3 [see util.ts for explanation]
-          const sourceView = new Uint8Array(heap.buffer, img.bitmap, img.stride * img.h)
-          const bitmapData = new Uint8Array(sourceView)
+          const length = img.stride * img.h
+          if (length > this.copyData.length) this.copyData = new Uint8Array(length)
+          this.copyData.set(heap.subarray(img.bitmap, img.bitmap + length))
 
-          this.gl.texSubImage3D(
-            this.gl.TEXTURE_2D_ARRAY,
-            0,
-            x, y, layer, // x, y, z offset
-            img.w,
-            img.h,
-            1, // depth (1 layer)
-            this.gl.RED,
-            this.gl.UNSIGNED_BYTE,
-            bitmapData
-          )
-        } else {
-          this.gl.texSubImage3D(
-            this.gl.TEXTURE_2D_ARRAY,
-            0,
-            x, y, layer, // x, y, z offset
-            img.w,
-            img.h,
-            1, // depth (1 layer)
-            this.gl.RED,
-            this.gl.UNSIGNED_BYTE,
-            heap,
-            img.bitmap
-          )
+          source = this.copyData
+          offset = 0
         }
+
+        this.gl.texSubImage3D(
+          this.gl.TEXTURE_2D_ARRAY,
+          0,
+          x, y, layer, // x, y, z offset
+          img.w,
+          img.h,
+          1, // depth (1 layer)
+          this.gl.RED,
+          this.gl.UNSIGNED_BYTE,
+          source,
+          offset
+        )
       }
       // Fill the interleaved instance data
       const f = instanceCount * 8
@@ -396,6 +393,6 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
     this.gl.deleteProgram(this.program)
     this.gl.getExtension('WEBGL_lose_context')?.loseContext()
 
-    this.instanceBuffer = this.vao = this.program = this.gl = this.atlas = null!
+    this.instanceBuffer = this.vao = this.program = this.gl = this.atlas = this.copyData = null!
   }
 }

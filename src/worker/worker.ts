@@ -65,7 +65,7 @@ export class ASSRenderer {
     // }).then(adapter => adapter?.requestDevice())
     // WebGL2 is barely faster than WebGL1 in most cases,
     // in rare cases the better texture-dedupe, drawing everything in one call, no fake stride and no page ordering
-    // can help it's performance, but those cases are rare
+    // can help its performance, but those cases are rare
     if (WebGL2Renderer.isSupported()) {
       this._gpurender = new WebGL2Renderer(ctrl)
     } else if (WebGL1Renderer.isSupported()) {

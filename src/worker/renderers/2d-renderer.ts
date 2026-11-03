@@ -6,26 +6,26 @@ import { CanvasRendererBase } from './canvas-base.ts'
 // clamp to 0-255 with rounding, matching rgba8unorm GPU behaviour
 const clamp = (v: number) => (v < 0 ? 0 : v > 1 ? 255 : Math.round(v * 255))
 
+const CTX_OPTS = {
+  alpha: true,
+  desynchronized: true,
+  willReadFrequently: false
+}
+
 export class Canvas2DRenderer extends CanvasRendererBase {
   ctx
+  bufferCtx
   bufferCanvas = new OffscreenCanvas(1, 1)
-  bufferCtx = this.bufferCanvas.getContext('2d', {
-    alpha: true,
-    desynchronized: true,
-    willReadFrequently: false
-  })!
-
   colorMatrix: Float32Array = IDENTITY_MATRIX
 
   constructor (canvas: OffscreenCanvas) {
     super(canvas)
-    this.ctx = canvas.getContext('2d', {
-      alpha: true,
-      desynchronized: true,
-      willReadFrequently: false
-    })!
+    const ctx = canvas.getContext('2d', CTX_OPTS)
+    const bufferCtx = this.bufferCanvas.getContext('2d', CTX_OPTS)
 
-    if (!this.ctx || !this.bufferCtx) throw new Error('Could not get 2D context')
+    if (!ctx || !bufferCtx) throw new Error('Could not get 2D context')
+    this.ctx = ctx
+    this.bufferCtx = bufferCtx
   }
 
   // this should be an svg filter which is cheaper, but not supported

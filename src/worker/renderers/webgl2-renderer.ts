@@ -394,6 +394,7 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
     this.gl.deleteBuffer(this.instanceBuffer)
     this.gl.deleteVertexArray(this.vao)
     this.gl.deleteProgram(this.program)
+    this.gl.getExtension('WEBGL_lose_context')?.loseContext()
 
     this.instanceBuffer = this.vao = this.program = this.gl = this.atlas = null!
   }

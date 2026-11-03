@@ -85,6 +85,7 @@ export abstract class WebGLRendererBase<T extends WebGLRenderingContext | WebGL2
 
     // Create program
     const program = this.gl.createProgram()
+    if (!program) throw new Error('Failed to create program')
 
     this.gl.attachShader(program, vertexShader)
     this.gl.attachShader(program, fragmentShader)

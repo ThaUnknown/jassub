@@ -76,6 +76,8 @@ interface WebGL1AtlasItem extends AtlasItem {
   uploadStrided: boolean
 }
 
+// gl.getExtension('ANGLE_instanced_arrays') for instanced attributes and draws
+// gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT).precision for the highp varyings the shader uses
 export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
   // Extensions
   instancedArraysExt!: ANGLE_instanced_arrays
@@ -134,6 +136,7 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     }
     this.gl = gl
 
+    // The fragment shader declares highp varyings.
     if (!gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT)?.precision) {
       throw new Error('WebGL1 does not support highp texture coordinates')
     }
@@ -143,7 +146,7 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     this.uploadCache.clear()
     this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE)
 
-    // Get instanced arrays extension (required for instancing in WebGL1)
+    // vertexAttribDivisorANGLE and drawArraysInstancedANGLE need this extension.
     const instancedArraysExt = this.gl.getExtension('ANGLE_instanced_arrays')
     if (!instancedArraysExt) {
       throw new Error('ANGLE_instanced_arrays extension not supported')
@@ -442,6 +445,7 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     this.gl.deleteBuffer(this.instanceSrcBuffer)
     this.gl.deleteBuffer(this.instanceColorBuffer)
     this.gl.deleteProgram(this.program)
+    this.gl.getExtension('WEBGL_lose_context')?.loseContext()
 
     this.quadPosBuffer = this.instanceDestRectBuffer = this.instanceSrcBuffer = this.instanceColorBuffer = this.program = this.gl = this.tightData = null!
   }

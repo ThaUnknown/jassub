@@ -6,6 +6,13 @@ export class CanvasRendererBase {
     this.canvas = canvas
   }
 
+  static isSupported () {
+    try {
+      new this(new OffscreenCanvas(1, 1)).destroy()
+      return true
+    } catch {}
+  }
+
   resizeCanvas (width: number, height: number) {
     // WebGL doesn't allow 0-sized canvases
     if (!width || !height) return
@@ -26,4 +33,6 @@ export class CanvasRendererBase {
     this.canvas.height = resize.height
     return resize
   }
+
+  destroy () {}
 }

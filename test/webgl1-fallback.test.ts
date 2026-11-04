@@ -68,6 +68,21 @@ test('WebGL1 uses mediump when the fragment stage has no highp', () => {
   }
 })
 
+test('WebGL1 renders a bitmap whose last row ends at the end of the heap', () => {
+  // libass guarantees only stride * (h - 1) + w bytes for a bitmap.
+  const stride = IMAGE_SIZE * 2
+  const heap = new Uint8Array(stride * (IMAGE_SIZE - 1) + IMAGE_SIZE).fill(255)
+  const img = { ...makeImage().img, stride }
+  const renderer = new WebGL1Renderer(new OffscreenCanvas(CANVAS_SIZE, CANVAS_SIZE))
+
+  try {
+    renderer.render([img], heap)
+    expect(countOpaque(renderer.canvas)).toBe(IMAGE_SIZE * IMAGE_SIZE)
+  } finally {
+    renderer.destroy()
+  }
+})
+
 test('WebGL1 renders without ANGLE_instanced_arrays', () => {
   const proto = WebGLRenderingContext.prototype as any
   const getExtension = proto.getExtension

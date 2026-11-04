@@ -41,7 +41,6 @@ export class Canvas2DRenderer extends CanvasRendererBase {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
 
     for (const img of images) {
-      if (img.w <= 0 || img.h <= 0) continue
       const imageData = new ImageData(img.w, img.h)
       const pixels = new Uint32Array(imageData.data.buffer)
 

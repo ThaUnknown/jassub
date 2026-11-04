@@ -299,11 +299,12 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     let totalArea = 0
 
     for (const img of images) {
-      if (img.w <= 0 || img.h <= 0 || img.w > this.maxTextureSize || img.h > this.maxTextureSize) continue
+      if (img.w > this.maxTextureSize || img.h > this.maxTextureSize) continue
 
       // WebGL1 has no UNPACK_ROW_LENGTH. The stride becomes the texture width.
-      // Pack rows tight only when the stride exceeds MAX_TEXTURE_SIZE.
-      const uploadStrided = img.stride >= img.w && img.stride <= this.maxTextureSize
+      // Pack rows tight when the stride exceeds MAX_TEXTURE_SIZE, or when the
+      // last row is not padded to the stride at the end of the heap.
+      const uploadStrided = img.stride >= img.w && img.stride <= this.maxTextureSize && img.bitmap + img.stride * img.h <= heap.length
       const packW = uploadStrided ? img.stride : img.w
 
       items.push({

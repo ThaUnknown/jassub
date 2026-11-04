@@ -150,6 +150,8 @@ public:
 
     emscripten::val arr = emscripten::val::array();
     for (ASS_Image *img = imgs; img; img = img->next) {
+      // libass returns clipped images with zero size.
+      if (img->w <= 0 || img->h <= 0) continue;
       emscripten::val obj = emscripten::val::object();
       obj.set("w", img->w);
       obj.set("h", img->h);

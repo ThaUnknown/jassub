@@ -253,7 +253,7 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
     const items: AtlasItem[] = []
 
     for (const img of images) {
-      if (img.w <= 0 || img.h <= 0 || img.w > this.maxTextureSize || img.h > this.maxTextureSize) continue
+      if (img.w > this.maxTextureSize || img.h > this.maxTextureSize) continue
       items.push({
         img,
         x: 0,

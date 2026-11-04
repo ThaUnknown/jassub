@@ -5,6 +5,8 @@ import JASSUB from '../src/jassub.ts'
 import { LATO } from './support/fonts.ts'
 import { diff, EMPTY_ASS } from './support/harness.ts'
 
+import COLLISIONS from './fixtures/subtitles/perf/collisions-1000.ass?raw'
+
 const WIDTH = 640
 const HEIGHT = 360
 const FRAME = { mediaTime: 1, width: WIDTH, height: HEIGHT, expectedDisplayTime: 0 }
@@ -125,6 +127,19 @@ describe('worker', () => {
       await changed.jassub.destroy()
     }
   })
+})
+
+test('rawRender skips empty images', async () => {
+  // Most lines collide and move off-screen, so libass clips them to zero size.
+  const { jassub, renderer } = await create(COLLISIONS)
+  try {
+    await jassub.manualRender(FRAME)
+    const images: Array<{ w: number, h: number }> = await renderer._wasm.rawRender(FRAME.mediaTime, 1)
+    expect(images.length).toBeGreaterThan(0)
+    expect(images.filter(image => image.w <= 0 || image.h <= 0)).toHaveLength(0)
+  } finally {
+    await jassub.destroy()
+  }
 })
 
 describe('event and style API', () => {

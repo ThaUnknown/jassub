@@ -371,9 +371,6 @@ export class WebGPURenderer {
     for (let i = 0, texIndex = -1; i < images.length; i++) {
       const img = images[i]!
 
-      // Skip images with invalid dimensions (WebGPU doesn't allow 0-sized textures)
-      if (img.w <= 0 || img.h <= 0) continue
-
       let texInfo = this.textures[++texIndex]!
 
       // Recreate texture if size changed (use actual w, not stride)

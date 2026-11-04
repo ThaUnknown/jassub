@@ -132,7 +132,7 @@ export default class JASSUB {
         defaultFont: opts.defaultFont ?? 'liberation sans',
         debug: !!opts.debug,
         // the libass default of about 192 MB of caches can grow the WASM heap to over 600 MB, and that memory is never released, and realistically that much cache doesn't help much.
-        libassMemoryLimit: opts.libassMemoryLimit ?? (navigator.deviceMemory ?? Infinity) <= 2 ? 32 : 64,
+        libassMemoryLimit: opts.libassMemoryLimit ?? ((navigator.deviceMemory ?? Infinity) <= 2 ? 32 : 64),
         libassGlyphLimit: opts.libassGlyphLimit ?? 0,
         queryFonts: opts.queryFonts ?? 'local'
       },

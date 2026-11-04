@@ -13,6 +13,7 @@ import type { queryRemoteFonts } from 'lfa-ponyfill'
 declare const self: typeof globalThis & {
   queryLocalFonts: (opts?: { postscriptNames?: string[] }) => ReturnType<typeof queryRemoteFonts>
 }
+declare const navigator: Navigator & { deviceMemory?: number }
 
 export const webYCbCrMap = {
   rgb: 'RGB',
@@ -99,8 +100,10 @@ export default class JASSUB {
     this.debug = opts.debug ? new Debug() : null
 
     this.prescaleFactor = opts.prescaleFactor ?? 1.0
+    // for <1 this is a floor, for >1 this is a ceiling, for =1 it does nothing
     this.prescaleHeightLimit = opts.prescaleHeightLimit ?? 1080
-    this.maxRenderHeight = opts.maxRenderHeight ?? 0 // 0 - no limit.
+    // limit to 4K, higher renders cost far more memory and time for little visible gain. 0 - no limit
+    this.maxRenderHeight = opts.maxRenderHeight ?? 2160
 
     // yes this is awful, but bundlers check for new Worker(new URL()) patterns, so can't use new Worker(workerUrl ?? new URL(...)) ... bruh
     this._worker = opts.workerUrl
@@ -128,7 +131,8 @@ export default class JASSUB {
         availableFonts,
         defaultFont: opts.defaultFont ?? 'liberation sans',
         debug: !!opts.debug,
-        libassMemoryLimit: opts.libassMemoryLimit ?? 0,
+        // the libass default of about 192 MB of caches can grow the WASM heap to over 600 MB, and that memory is never released, and realistically that much cache doesn't help much.
+        libassMemoryLimit: opts.libassMemoryLimit ?? (navigator.deviceMemory ?? Infinity) <= 2 ? 32 : 64,
         libassGlyphLimit: opts.libassGlyphLimit ?? 0,
         queryFonts: opts.queryFonts ?? 'local'
       },

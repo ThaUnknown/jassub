@@ -82,6 +82,66 @@ describe('client', () => {
     }
   })
 
+  test('libassMemoryLimit defaults to a smaller cache on low-memory devices', async () => {
+    const findKey = (value: unknown, key: string, depth = 0): unknown => {
+      if (!value || typeof value !== 'object' || depth > 6) return undefined
+      if (key in value) return (value as Record<string, unknown>)[key]
+      for (const child of Object.values(value)) {
+        const found = findKey(child, key, depth + 1)
+        if (found !== undefined) return found
+      }
+    }
+
+    const sent: unknown[] = []
+    const postMessage = Worker.prototype.postMessage
+    Worker.prototype.postMessage = function (this: Worker, ...args: Parameters<Worker['postMessage']>) {
+      sent.push(args[0])
+      return postMessage.apply(this, args as [unknown, Transferable[]])
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'deviceMemory')
+
+    const sentLimit = async (deviceMemory: number | undefined, libassMemoryLimit?: number) => {
+      Object.defineProperty(navigator, 'deviceMemory', { value: deviceMemory, configurable: true })
+      sent.length = 0
+      const jassub = new JASSUB({ canvas: document.createElement('canvas'), subContent: EMPTY_ASS, fonts: [LATO], queryFonts: false, libassMemoryLimit })
+      jassub._ro.disconnect()
+      await jassub.ready
+      await jassub.destroy()
+      return findKey(sent, 'libassMemoryLimit')
+    }
+
+    try {
+      expect(await sentLimit(8), 'high memory').toBe(64)
+      expect(await sentLimit(2), 'low memory').toBe(32)
+      expect(await sentLimit(undefined), 'no deviceMemory API').toBe(64)
+      expect(await sentLimit(2, 128), 'explicit limit wins').toBe(128)
+      expect(await sentLimit(8, 0), 'explicit 0 keeps the libass default').toBe(0)
+    } finally {
+      Worker.prototype.postMessage = postMessage
+      if (descriptor) Object.defineProperty(navigator, 'deviceMemory', descriptor)
+      else delete (navigator as { deviceMemory?: number }).deviceMemory
+    }
+  })
+
+  test('the render size is limited to 4K by default', async () => {
+    const make = (maxRenderHeight?: number) => new JASSUB({ canvas: document.createElement('canvas'), subContent: EMPTY_ASS, fonts: [LATO], queryFonts: false, maxRenderHeight })
+    const limited = make()
+    const unlimited = make(0)
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio')
+    Object.defineProperty(window, 'devicePixelRatio', { value: 1, configurable: true })
+    try {
+      expect(limited._computeRenderSize(7680, 4320), '8K is limited').toEqual({ width: 3840, height: 2160 })
+      expect(limited._computeRenderSize(3840, 2160), '4K is unchanged').toEqual({ width: 3840, height: 2160 })
+      expect(limited._computeRenderSize(1920, 1080), '1080p is unchanged').toEqual({ width: 1920, height: 1080 })
+      expect(unlimited._computeRenderSize(7680, 4320), 'explicit 0 has no limit').toEqual({ width: 7680, height: 4320 })
+    } finally {
+      if (descriptor) Object.defineProperty(window, 'devicePixelRatio', descriptor)
+      else delete (window as { devicePixelRatio?: number }).devicePixelRatio
+      await limited.destroy()
+      await unlimited.destroy()
+    }
+  })
+
   test('setVideo stops the frame loop of the old video', async () => {
     const { jassub } = await create(EMPTY_ASS)
     // Do not render. This test checks only the frame loop.

@@ -76,6 +76,8 @@ const INITIAL_INSTANCES = 256
 const ATLAS_ROUND = 64
 const MAX_ATLAS_PAGES = 64
 const MAX_ATLAS_BYTES = 256 * 1024 * 1024
+// Free atlas pages that no frame used for this time.
+const ATLAS_IDLE_MS = 30_000
 
 // Per-image record: destination rect (4), atlas position (2), color (4).
 const IMAGE_FLOATS = 10
@@ -128,6 +130,8 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
   instanceStride = 0
 
   atlasPages: WebGLTexture[] = []
+  // The last time a frame used every atlas page.
+  atlasFullAt = 0
   atlasSize = 0
   maxTextureSize = 0
   uploadCache = new Set<string>()
@@ -288,6 +292,14 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
 
     while (this.atlasPages.length < pages) {
       this.atlasPages.push(this.createAtlasPage(size))
+    }
+
+    // A frame always uses the first pages, so only trailing pages become idle.
+    const now = performance.now()
+    if (pages === this.atlasPages.length) {
+      this.atlasFullAt = now
+    } else if (now - this.atlasFullAt > ATLAS_IDLE_MS) {
+      for (const page of this.atlasPages.splice(pages)) this.gl.deleteTexture(page)
     }
   }
 

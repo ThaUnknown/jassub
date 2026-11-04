@@ -1,6 +1,6 @@
 {
   "name": "jassub",
-  "version": "2.5.26",
+  "version": "2.5.27",
   "description": "The Fastest JavaScript SSA/ASS Subtitle Renderer For Browsers",
   "main": "dist/jassub.js",
   "types": "dist/jassub.d.ts",
@@ -19,6 +19,7 @@
   ],
   "scripts": {
     "build": "tsc --noCheck && node -e \"const fs = require('fs'); for (const file of ['wasm/types.d.ts', 'wasm/jassub-worker.wasm', 'wasm/jassub-worker-modern.wasm', 'default.woff2']) fs.copyFileSync('src/' + file, 'dist/' + file)\"",
+    "prepublishOnly": "pnpm run build",
     "dev": "vite --host",
     "test": "vitest run",
     "test:watch": "vitest",

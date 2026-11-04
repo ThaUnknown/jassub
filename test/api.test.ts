@@ -59,6 +59,29 @@ function opaquePixels (frame: { data: Uint8ClampedArray }) {
 }
 
 describe('client', () => {
+  test('a failed draw does not stop later frames', async () => {
+    const { jassub, renderer } = await create(EMPTY_ASS)
+    try {
+      let draws = 0
+      jassub.renderer = new Proxy(renderer, {
+        get (target, key) {
+          if (key !== '_draw') return Reflect.get(target, key)
+          return async (...args: unknown[]) => {
+            if (++draws === 1) throw new Error('draw failed')
+            return await target._draw(...args)
+          }
+        }
+      })
+
+      await expect(jassub.manualRender(FRAME)).rejects.toThrow('draw failed')
+      await jassub.manualRender(FRAME)
+      expect(draws, 'the frame after the failure is drawn').toBe(2)
+    } finally {
+      jassub.renderer = renderer
+      await jassub.destroy()
+    }
+  })
+
   test('setVideo stops the frame loop of the old video', async () => {
     const { jassub } = await create(EMPTY_ASS)
     // Do not render. This test checks only the frame loop.

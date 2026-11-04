@@ -320,11 +320,13 @@ export default class JASSUB {
     this.busy = true
     this._skipped = false
 
-    this.debug?._startFrame()
-    await this.renderer._draw(mediaTime + this.timeOffset, repaint)
-    this.debug?._endFrame(this._lastDemandTime)
-
-    this.busy = false
+    try {
+      this.debug?._startFrame()
+      await this.renderer._draw(mediaTime + this.timeOffset, repaint)
+      this.debug?._endFrame(this._lastDemandTime)
+    } finally {
+      this.busy = false
+    }
     if (this._skipped) await this._demandRender()
   }
 

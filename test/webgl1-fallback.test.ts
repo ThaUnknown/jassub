@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import { WebGL1Renderer } from '../src/worker/renderers/webgl1-renderer.ts'
 
@@ -79,6 +79,34 @@ test('WebGL1 renders a bitmap whose last row ends at the end of the heap', () =>
     renderer.render([img], heap)
     expect(countOpaque(renderer.canvas)).toBe(IMAGE_SIZE * IMAGE_SIZE)
   } finally {
+    renderer.destroy()
+  }
+})
+
+test('WebGL1 frees atlas pages that no frame used for a while', () => {
+  const tile = 64
+  const heap = new Uint8Array(tile * tile).fill(255)
+  const images = (count: number) => Array.from({ length: count }, (_, i) => ({ ...makeImage().img, w: tile, h: tile, stride: tile, dst_x: (i % 2) * tile, dst_y: Math.floor(i / 2) * tile, cache_id: 0 }))
+  const renderer = new WebGL1Renderer(new OffscreenCanvas(tile * 2, tile * 2))
+  // One image fills one page.
+  renderer.maxAtlasSize = tile
+  let now = 1000
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+
+  try {
+    renderer.render(images(4), heap)
+    expect(renderer.atlasPages).toHaveLength(4)
+
+    now += 1000
+    renderer.render(images(1), heap)
+    expect(renderer.atlasPages, 'recently used pages stay').toHaveLength(4)
+
+    now += 30_000
+    renderer.render(images(1), heap)
+    expect(renderer.atlasPages, 'idle pages are freed').toHaveLength(1)
+    expect(countOpaque(renderer.canvas)).toBe(tile * tile)
+  } finally {
+    clock.mockRestore()
     renderer.destroy()
   }
 })

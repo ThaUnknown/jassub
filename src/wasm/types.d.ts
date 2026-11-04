@@ -47,6 +47,8 @@ export interface JASSUB extends ClassHandle {
   removeStyle(_0: number): boolean;
   setMemoryLimits(_0: number, _1: number): void;
   setThreads(_0: number): number;
+  pruneEvents(_0: number): boolean;
+  configurePrune(_0: number): boolean;
   createTrackMem(_0: EmbindString): void;
   processData(_0: EmbindString): boolean;
   processChunk(_0: EmbindString, _1: number, _2: number): boolean;

@@ -189,6 +189,37 @@ describe('worker', () => {
     }
   })
 
+  test('a restored WebGL context draws the last frame again', async () => {
+    const { jassub, renderer } = await create(track({ events: ['Default,,0,0,0,,paused'] }))
+    try {
+      await jassub.manualRender(FRAME)
+      // Run code in the worker scope. _malloc is a plain function, so its constructor is Function.
+      const inWorker = async (code: string) => await (await new renderer._malloc.constructor(code))()
+      const isLost = async () => {
+        try {
+          return !!(await renderer._gpurender.gl.isContextLost())
+        } catch {
+          // The renderer sets gl to null while the context is lost.
+          return true
+        }
+      }
+
+      // Chrome loses the oldest WebGL context of a thread when the thread has too many.
+      await inWorker("self.extraContexts = Array.from({ length: 20 }, () => new OffscreenCanvas(1, 1).getContext('webgl2'))")
+      expect(await isLost(), 'the JASSUB context is lost').toBe(true)
+
+      // Chrome restores the context when the other contexts are gone.
+      await inWorker("for (const gl of self.extraContexts) gl.getExtension('WEBGL_lose_context')?.loseContext(); self.extraContexts = []; self.gc?.()")
+      await vi.waitFor(async () => expect(await isLost()).toBe(false), { timeout: 60_000, interval: 100 })
+
+      // The restored context starts with an empty upload cache. The redraw fills it again.
+      // A paused video sends no new frame, so without the redraw the canvas stays blank.
+      expect(await renderer._gpurender.uploadCache.size, 'the last frame is drawn again').toBeGreaterThan(0)
+    } finally {
+      await jassub.destroy()
+    }
+  })
+
   test('setTrack applies the color space of the new track', async () => {
     const text = 'Default,,0,0,0,,{\\1c&H0000FF&}red {\\1c&H00FF00&}green {\\1c&HFF0000&}blue'
     const plain = track({ events: [text] })
@@ -210,6 +241,23 @@ describe('worker', () => {
       await changed.jassub.destroy()
     }
   })
+})
+
+test('rawRender skips unchanged frames and clears when the subtitles end', async () => {
+  const { jassub, renderer } = await create(track({ events: ['Default,,0,0,0,,static'] }))
+  try {
+    const frame = async (time: number, force = 0) => {
+      const images: unknown[] | null = await renderer._wasm.rawRender(time, force)
+      return images === null ? 'unchanged' : images.length ? 'images' : 'empty'
+    }
+    expect(await frame(1)).toBe('images')
+    expect(await frame(2), 'the canvas still shows the same frame').toBe('unchanged')
+    expect(await frame(2, 1), 'a repaint draws the frame again').toBe('images')
+    expect(await frame(6), 'the event ended, so the canvas is cleared').toBe('empty')
+    expect(await frame(7)).toBe('unchanged')
+  } finally {
+    await jassub.destroy()
+  }
 })
 
 test('rawRender skips empty images', async () => {
@@ -273,6 +321,70 @@ describe('event and style API', () => {
     }
   })
 
+  const LATE_EVENT = 'Dialogue: 0,0:00:10.00,0:00:12.00,Default,,0,0,0,,late'
+  const texts = async (renderer: any) => (await renderer.getEvents()).map((event: { Text: string }) => event.Text)
+
+  test('pruneEvents removes only the events that ended before the deadline', async () => {
+    const { jassub, renderer } = await create(track({ events: ['Default,,0,0,0,,early'] }))
+    try {
+      await renderer.processData(LATE_EVENT)
+      await renderer.pruneEvents(5000)
+      expect(await texts(renderer), 'an event that ends at the deadline is kept').toEqual(['early', 'late'])
+      await renderer.pruneEvents(6000)
+      expect(await texts(renderer)).toEqual(['late'])
+    } finally {
+      await jassub.destroy()
+    }
+  })
+
+  test('configurePrune removes ended events after a render and applies to later tracks', async () => {
+    const content = track({ events: ['Default,,0,0,0,,early'] })
+    const { jassub, renderer } = await create(content)
+    try {
+      await renderer.processData(LATE_EVENT)
+      await renderer._draw(11)
+      expect(await texts(renderer), 'pruning is disabled by default').toEqual(['early', 'late'])
+
+      await renderer.configurePrune(0)
+      await renderer._draw(11)
+      expect(await texts(renderer)).toEqual(['late'])
+
+      await renderer.setTrack(content)
+      await renderer.processData(LATE_EVENT)
+      await renderer._draw(11)
+      expect(await texts(renderer), 'the new track keeps the prune delay').toEqual(['late'])
+    } finally {
+      await jassub.destroy()
+    }
+  })
+
+  test('setEvent can move an event to a time after a render', async () => {
+    const { jassub, renderer } = await create(track({ events: ['Default,,0,0,0,,moved'] }))
+    try {
+      const frameAt = async (time: number) => opaquePixels(await renderer._drawCapture(time))
+      expect(await frameAt(1), 'the event is visible at its first time').toBeGreaterThan(0)
+
+      await renderer.setEvent({ Start: 10000, Duration: 2000 }, 0)
+      expect(await frameAt(1), 'the event is gone from its first time').toBe(0)
+      expect(await frameAt(11), 'the event is visible at its new time').toBeGreaterThan(0)
+    } finally {
+      await jassub.destroy()
+    }
+  })
+
+  test('removeAllEvents keeps the styles', async () => {
+    const { jassub, renderer, capture } = await create(track({ events: ['Default,,0,0,0,,text'] }))
+    try {
+      const styles = await renderer.getStyles()
+      await renderer.removeAllEvents()
+      expect(await renderer.getEvents()).toEqual([])
+      expect(await renderer.getStyles()).toEqual(styles)
+      expect(opaquePixels(await capture())).toBe(0)
+    } finally {
+      await jassub.destroy()
+    }
+  })
+
   test('the API is safe to call after freeTrack', async () => {
     const { jassub, renderer, capture } = await create(track({ events: ['Default,,0,0,0,,text'] }))
     try {
@@ -280,6 +392,9 @@ describe('event and style API', () => {
       expect(await renderer.getEvents()).toEqual([])
       expect(await renderer.getStyles()).toEqual([])
       await expect(renderer.processData('Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,text')).rejects.toThrow(/no track is loaded/)
+      await expect(renderer.pruneEvents(0)).rejects.toThrow(/no track is loaded/)
+      await expect(renderer.removeAllEvents()).rejects.toThrow(/no track is loaded/)
+      await renderer.configurePrune(0)
       expect(opaquePixels(await capture())).toBe(0)
     } finally {
       await jassub.destroy()

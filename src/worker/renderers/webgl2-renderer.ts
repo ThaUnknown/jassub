@@ -376,6 +376,7 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
   }
 
   destroy () {
+    this.ctrl.abort()
     this.uploadCache.clear()
 
     if (!this.gl) return

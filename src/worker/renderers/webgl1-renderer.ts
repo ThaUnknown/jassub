@@ -471,6 +471,7 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
   }
 
   destroy () {
+    this.ctrl.abort()
     if (!this.gl) return
 
     // Delete atlas pages.

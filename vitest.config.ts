@@ -15,7 +15,8 @@ export default defineConfig({
     fileParallelism: false,
     browser: {
       enabled: true,
-      provider: playwright(),
+      // --expose-gc lets the context restore test free WebGL contexts at once.
+      provider: playwright({ launchOptions: { args: ['--js-flags=--expose-gc'] } }),
       headless: true,
       instances: [{ browser: 'chromium', viewport: { width: 1280, height: 720 } }]
     }

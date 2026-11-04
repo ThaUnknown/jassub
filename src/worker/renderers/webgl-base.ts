@@ -1,4 +1,4 @@
-import { IDENTITY_MATRIX, resolveColorMatrix, type ASSImage } from '../util.ts'
+import { IDENTITY_MATRIX, resolveColorMatrix, type ASSImage, type SubtitleColorSpace, type VideoColorSpace } from '../util.ts'
 
 import { CanvasRendererBase } from './canvas-base.ts'
 
@@ -20,14 +20,16 @@ export abstract class WebGLRendererBase<T extends WebGLRenderingContext | WebGL2
   u_colorMatrix: WebGLUniformLocation | null = null
   colorMatrix: Float32Array = IDENTITY_MATRIX
 
+  ctrl = new AbortController()
+
   constructor (canvas: OffscreenCanvas) {
     super(canvas)
 
     canvas.addEventListener('webglcontextlost', e => {
       e.preventDefault()
       this.gl = null!
-    })
-    canvas.addEventListener('webglcontextrestored', () => this._initGL())
+    }, this.ctrl)
+    canvas.addEventListener('webglcontextrestored', () => this._initGL(), this.ctrl)
   }
 
   abstract _initGL (): void
@@ -121,7 +123,7 @@ export abstract class WebGLRendererBase<T extends WebGLRenderingContext | WebGL2
 
   // Set the color matrix for color space conversion.
   // Pass null or undefined to use identity (no conversion).
-  setColorMatrix (subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC', videoColorSpace?: 'BT601' | 'BT709') {
+  setColorMatrix (subtitleColorSpace?: SubtitleColorSpace, videoColorSpace?: VideoColorSpace) {
     this.colorMatrix = resolveColorMatrix(subtitleColorSpace, videoColorSpace)
     if (!this.gl || !this.u_colorMatrix) return
 

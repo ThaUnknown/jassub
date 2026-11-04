@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest'
 
 import { WebGL1Renderer } from '../src/worker/renderers/webgl1-renderer.ts'
+import { WebGL2Renderer } from '../src/worker/renderers/webgl2-renderer.ts'
 
 const IMAGE_SIZE = 4
 const CANVAS_SIZE = 32
@@ -108,6 +109,35 @@ test('WebGL1 frees atlas pages that no frame used for a while', () => {
   } finally {
     clock.mockRestore()
     renderer.destroy()
+  }
+})
+
+test('a WebGL2 renderer that failed to start ignores the context events of the canvas', () => {
+  const canvas = new OffscreenCanvas(CANVAS_SIZE, CANVAS_SIZE)
+  const proto = OffscreenCanvas.prototype as any
+  const getContext = proto.getContext
+  const initGL = vi.spyOn(WebGL2Renderer.prototype, '_initGL')
+  let renderer: WebGL1Renderer | undefined
+
+  // The worker tries WebGL2 first, then falls back to WebGL1 on the same canvas.
+  proto.getContext = function (type: string, ...args: unknown[]) {
+    return type === 'webgl2' ? null : getContext.call(this, type, ...args)
+  }
+  try {
+    expect(WebGL2Renderer.isSupported(canvas)).toBeUndefined()
+    proto.getContext = getContext
+    renderer = new WebGL1Renderer(canvas)
+    initGL.mockClear()
+
+    // Headless Chrome does not restore a lost context here, so send the event directly.
+    canvas.dispatchEvent(new Event('webglcontextrestored'))
+
+    expect(initGL, 'the failed WebGL2 renderer does not try to start again').not.toHaveBeenCalled()
+    expect(draw(renderer), 'the WebGL1 renderer still draws').toBe(IMAGE_SIZE * IMAGE_SIZE)
+  } finally {
+    proto.getContext = getContext
+    initGL.mockRestore()
+    renderer?.destroy()
   }
 })
 

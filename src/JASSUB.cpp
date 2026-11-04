@@ -140,13 +140,8 @@ public:
 
     int changed = 0;
     ASS_Image *imgs = ass_render_frame(ass_renderer, track, (long long)(tm * 1e+3 + 0.5), &changed);
-    if (imgs == NULL) {
-      if ((changed == 0 && !force)) {
-        return emscripten::val::null();
-      } else {
-        return emscripten::val::array();
-      }
-    }
+    // The canvas still shows an unchanged frame. A changed frame with no images clears the canvas.
+    if (changed == 0 && !force) return emscripten::val::null();
 
     emscripten::val arr = emscripten::val::array();
     for (ASS_Image *img = imgs; img; img = img->next) {
@@ -289,6 +284,18 @@ public:
     return true;
   }
 
+  bool pruneEvents(double deadline) {
+    if (!track) return false;
+    ass_prune_events(track, (long long)deadline);
+    return true;
+  }
+
+  bool configurePrune(double delay) {
+    if (!track) return false;
+    ass_configure_prune(track, (long long)delay);
+    return true;
+  }
+
   void setMemoryLimits(int glyph_limit, int bitmap_cache_limit) {
     ass_set_cache_limits(ass_renderer, glyph_limit, bitmap_cache_limit);
   }
@@ -385,6 +392,8 @@ EMSCRIPTEN_BINDINGS(JASSUB) {
     .function("setThreads", &JASSUB::setThreads)
     .function("removeStyle", &JASSUB::removeStyle)
     .function("removeAllEvents", &JASSUB::removeAllEvents)
+    .function("pruneEvents", &JASSUB::pruneEvents)
+    .function("configurePrune", &JASSUB::configurePrune)
     .function("setMemoryLimits", &JASSUB::setMemoryLimits)
     .function("processData", &JASSUB::processData)
     .function("processChunk", &JASSUB::processChunk)

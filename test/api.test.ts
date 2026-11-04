@@ -222,20 +222,20 @@ describe('worker', () => {
 
   test('setTrack applies the color space of the new track', async () => {
     const text = 'Default,,0,0,0,,{\\1c&H0000FF&}red {\\1c&H00FF00&}green {\\1c&HFF0000&}blue'
-    const plain = track({ events: [text] })
+    const plain = track({ scriptInfo: 'YCbCr Matrix: None', events: [text] })
     const converted = track({ scriptInfo: 'YCbCr Matrix: TV.601', events: [text] })
 
     const expected = await create(plain)
     const changed = await create(converted)
     try {
-      await expected.renderer._setColorSpace('BT709')
-      await changed.renderer._setColorSpace('BT709')
+      await expected.renderer._setColorSpace('bt709', false)
+      await changed.renderer._setColorSpace('bt709', false)
 
       // The test is only valid if the first track changes the colors.
       expect(diff(await changed.capture(), await expected.capture(), 0).maxDelta, 'TV.601 track is converted').toBeGreaterThan(0)
 
       await changed.renderer.setTrack(plain)
-      expect(diff(await changed.capture(), await expected.capture(), 0).maxDelta, 'track without a matrix is not converted').toBe(0)
+      expect(diff(await changed.capture(), await expected.capture(), 0).maxDelta, 'a None track is not converted').toBe(0)
     } finally {
       await expected.jassub.destroy()
       await changed.jassub.destroy()

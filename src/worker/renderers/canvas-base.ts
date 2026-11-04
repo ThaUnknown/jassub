@@ -1,6 +1,9 @@
+import { IDENTITY_MATRIX } from '../color-conversions'
+
 export class CanvasRendererBase {
   canvas
   _scheduledResize?: { width: number, height: number }
+  colorMatrix: Float32Array = IDENTITY_MATRIX
 
   constructor (canvas: OffscreenCanvas) {
     this.canvas = canvas

@@ -1,6 +1,6 @@
-import { IDENTITY_MATRIX, resolveColorMatrix, type ASSImage, type SubtitleColorSpace, type VideoColorSpace } from '../util.ts'
-
 import { CanvasRendererBase } from './canvas-base.ts'
+
+import type { ASSImage } from '../util.ts'
 
 export interface AtlasItem {
   img: ASSImage
@@ -18,7 +18,7 @@ export abstract class WebGLRendererBase<T extends WebGLRenderingContext | WebGL2
   // Uniform locations
   u_resolution: WebGLUniformLocation | null = null
   u_colorMatrix: WebGLUniformLocation | null = null
-  colorMatrix: Float32Array = IDENTITY_MATRIX
+  u_colorOffset: WebGLUniformLocation | null = null
 
   ctrl = new AbortController()
 
@@ -121,14 +121,11 @@ export abstract class WebGLRendererBase<T extends WebGLRenderingContext | WebGL2
     return shader
   }
 
-  // Set the color matrix for color space conversion.
-  // Pass null or undefined to use identity (no conversion).
-  setColorMatrix (subtitleColorSpace?: SubtitleColorSpace, videoColorSpace?: VideoColorSpace) {
-    this.colorMatrix = resolveColorMatrix(subtitleColorSpace, videoColorSpace)
-    if (!this.gl || !this.u_colorMatrix) return
-
-    this.gl.useProgram(this.program)
-    this.gl.uniformMatrix3fv(this.u_colorMatrix, false, this.colorMatrix)
+  setColorConversion (matrix: Float32Array) {
+    this.colorMatrix = matrix
+    if (!this.gl) return
+    this.gl.uniformMatrix3fv(this.u_colorMatrix, false, matrix.subarray(0, 9))
+    this.gl.uniform3fv(this.u_colorOffset, matrix.subarray(9))
   }
 
   beginFrame (images: ASSImage[]) {
@@ -161,8 +158,7 @@ export abstract class WebGLRendererBase<T extends WebGLRenderingContext | WebGL2
     // Set texture unit
     this.gl.uniform1i(textureUniform, 0)
 
-    // Set initial color matrix
-    this.gl.uniformMatrix3fv(this.u_colorMatrix, false, this.colorMatrix)
+    this.setColorConversion(this.colorMatrix)
 
     // Set one-time GL state
     this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1)

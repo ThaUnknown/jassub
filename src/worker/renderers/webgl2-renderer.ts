@@ -52,6 +52,7 @@ precision highp sampler2DArray;
 
 uniform sampler2DArray u_atlas;
 uniform mat3 u_colorMatrix;
+uniform vec3 u_colorOffset;
 uniform vec2 u_resolution;
 
 flat in vec2 v_destXY;
@@ -81,8 +82,8 @@ void main() {
   // texelFetch: integer coords, no interpolation, no precision issues
   float mask = texelFetch(u_atlas, ivec3(ivec2(v_srcXY) + texCoord, int(v_layer)), 0).r;
 
-  // Apply color matrix conversion (identity if no conversion needed)
-  vec3 correctedColor = u_colorMatrix * v_color.rgb;
+  // Convert to the color space of the video (identity if no conversion needed)
+  vec3 correctedColor = clamp(u_colorMatrix * v_color.rgb + u_colorOffset, 0.0, 1.0);
 
   // libass color alpha: 0 = opaque, 255 = transparent (inverted)
   float colorAlpha = 1.0 - v_color.a;
@@ -179,6 +180,7 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
     this.u_resolution = this.gl.getUniformLocation(this.program, 'u_resolution')
     this.u_atlas = this.gl.getUniformLocation(this.program, 'u_atlas')
     this.u_colorMatrix = this.gl.getUniformLocation(this.program, 'u_colorMatrix')
+    this.u_colorOffset = this.gl.getUniformLocation(this.program, 'u_colorOffset')
 
     // Create the interleaved instance buffer
     this.instanceBuffer = this.gl.createBuffer()

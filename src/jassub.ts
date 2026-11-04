@@ -15,14 +15,6 @@ declare const self: typeof globalThis & {
 }
 declare const navigator: Navigator & { deviceMemory?: number }
 
-export const webYCbCrMap = {
-  rgb: 'RGB',
-  bt709: 'BT709',
-  // these might not be exactly correct? oops?
-  bt470bg: 'BT601', // alias BT.601 PAL... whats the difference?
-  smpte170m: 'BT601'// alias BT.601 NTSC... whats the difference?
-} as const
-
 export type JASSUBOptions = {
   timeOffset?: number
   debug?: boolean
@@ -341,10 +333,10 @@ export default class JASSUB {
       if (this._destroyed || this._video !== target) return
       try {
         const frame = new VideoFrame(this._video)
-        const colorSpace = webYCbCrMap[frame.colorSpace.matrix!]
+        const { matrix, fullRange } = frame.colorSpace
         frame.close()
         await this.ready
-        await this.renderer._setColorSpace(colorSpace)
+        await this.renderer._setColorSpace(matrix, fullRange)
       } catch (e) {
         // sources can be tainted
         console.warn(e)

@@ -48,6 +48,7 @@ precision PRECISION float;
 
 uniform sampler2D u_tex;
 uniform mat3 u_colorMatrix;
+uniform vec3 u_colorOffset;
 
 varying PRECISION vec2 v_quadPos;
 varying PRECISION vec2 v_srcUV;
@@ -58,8 +59,8 @@ void main() {
   // The alpha channel contains the mask.
   float mask = texture2D(u_tex, v_srcUV + v_quadPos * v_sizeUV).a;
 
-  // Apply color matrix conversion (identity if no conversion needed)
-  vec3 correctedColor = u_colorMatrix * v_color.rgb;
+  // Convert to the color space of the video (identity if no conversion needed)
+  vec3 correctedColor = clamp(u_colorMatrix * v_color.rgb + u_colorOffset, 0.0, 1.0);
 
   // libass color alpha: 0 = opaque, 255 = transparent (inverted)
   float colorAlpha = 1.0 - v_color.a;
@@ -189,6 +190,7 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     this.u_resolution = this.gl.getUniformLocation(this.program, 'u_resolution')
     this.u_tex = this.gl.getUniformLocation(this.program, 'u_tex')
     this.u_colorMatrix = this.gl.getUniformLocation(this.program, 'u_colorMatrix')
+    this.u_colorOffset = this.gl.getUniformLocation(this.program, 'u_colorOffset')
     this.u_atlasSize = this.gl.getUniformLocation(this.program, 'u_atlasSize')
 
     this.a_quadPos = this.gl.getAttribLocation(this.program, 'a_quadPos')

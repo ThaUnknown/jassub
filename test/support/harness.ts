@@ -136,7 +136,7 @@ export async function createModern (ass: string, opts: Partial<RenderOptions> = 
       await renderer.setTrack(content)
     },
     setColorSpace: async (colorSpace: 'BT709' | 'BT601') => {
-      await renderer._setColorSpace(colorSpace)
+      await renderer._setColorSpace(colorSpace === 'BT709' ? 'bt709' : 'smpte170m', false)
     },
     destroy: () => jassub.destroy()
   }

@@ -4,10 +4,11 @@ import { queryRemoteFonts } from 'lfa-ponyfill'
 
 import WASM from '../wasm/jassub-worker.js'
 
+import { COLOR_CONVERSIONS, IDENTITY_MATRIX, LIBASS_YCBCR_MATRIX, WEB_MATRIX_COEFFICIENTS, type ColorSpace, type WebMatrixCoefficients } from './color-conversions.ts'
 import { Canvas2DRenderer } from './renderers/2d-renderer.ts'
 import { WebGL1Renderer } from './renderers/webgl1-renderer.ts'
 import { WebGL2Renderer } from './renderers/webgl2-renderer.ts'
-import { fetchok, fetchtext, LIBASS_YCBCR_MAP, SHOULD_REFERENCE_MEMORY, THREAD_COUNT, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
+import { fetchok, fetchtext, SHOULD_REFERENCE_MEMORY, THREAD_COUNT, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
 
 import type { JASSUB, MainModule } from '../wasm/types.d.ts'
 // import { WebGPURenderer } from './webgpu-renderer'
@@ -41,8 +42,8 @@ const WEIGHT_SUFFIX = new RegExp(`^(.+)\\s+(${WEIGHT_MAP.join('|')})$`)
 
 export class ASSRenderer {
   _wasm!: JASSUB
-  _subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC' | null
-  _videoColorSpace?: 'BT709' | 'BT601'
+  // undefined: no conversion
+  _videoColorSpace?: ColorSpace
   _malloc!: (size: number) => number
   _gpurender!: WebGL2Renderer | WebGL1Renderer | Canvas2DRenderer
 
@@ -72,6 +73,10 @@ export class ASSRenderer {
     // can help its performance, but those cases are rare
     this._gpurender = WebGL2Renderer.isSupported(ctrl) ?? WebGL1Renderer.isSupported(ctrl) ?? new Canvas2DRenderer(ctrl)
 
+    ctrl.addEventListener('webglcontextrestored', () => {
+      if (this._lastDrawTime) this._draw(this._lastDrawTime, true)
+    })
+
     this._loadedInitialFonts = !data.fonts.length
     // Emscripten pre-spawns pthread workers from this pool size.
     // A pool size of 0 pre-spawns no workers.
@@ -89,8 +94,6 @@ export class ASSRenderer {
     if (!this._loadedInitialFonts) await this._loadInitialFonts(data.fonts)
 
     this._wasm.createTrackMem(data.subContent ?? await fetchtext(data.subUrl!))
-
-    this._subtitleColorSpace = LIBASS_YCBCR_MAP[this._wasm.trackColorSpace]
 
     if (data.libassMemoryLimit > 0 || data.libassGlyphLimit > 0) {
       this._wasm.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)
@@ -110,6 +113,23 @@ export class ASSRenderer {
   // useful for streaming subtitles from Matroska-style demuxers
   processChunk (data: string, timecode: number, duration: number) {
     if (!this._wasm.processChunk(data, timecode, duration)) throw new Error(NO_TRACK)
+  }
+
+  // removes all events that ended before the deadline, in milliseconds
+  pruneEvents (deadline: number) {
+    if (!this._wasm.pruneEvents(deadline)) throw new Error(NO_TRACK)
+  }
+
+  // after every render, libass removes the events that ended more than delay milliseconds ago
+  _pruneDelay = -1
+  configurePrune (delay: number) {
+    this._pruneDelay = delay
+    this._wasm.configurePrune(delay)
+  }
+
+  // removes all events, but keeps the styles and the script info
+  removeAllEvents () {
+    if (!this._wasm.removeAllEvents()) throw new Error(NO_TRACK)
   }
 
   createEvent (event: ASSEvent) {
@@ -154,8 +174,8 @@ export class ASSRenderer {
 
   setTrack (content: string) {
     this._wasm.createTrackMem(content)
+    this._wasm.configurePrune(this._pruneDelay)
 
-    this._subtitleColorSpace = LIBASS_YCBCR_MAP[this._wasm.trackColorSpace]
     this._checkColorSpace()
   }
 
@@ -168,7 +188,11 @@ export class ASSRenderer {
   }
 
   _checkColorSpace () {
-    this._gpurender.setColorMatrix(this._subtitleColorSpace ?? undefined, this._videoColorSpace)
+    const subtitle = LIBASS_YCBCR_MATRIX[this._wasm.trackColorSpace]
+    this._gpurender.setColorConversion(new Float32Array(
+      (subtitle && this._videoColorSpace && COLOR_CONVERSIONS[subtitle][this._videoColorSpace]) ?? IDENTITY_MATRIX
+    ))
+    if (this._lastDrawTime) this._draw(this._lastDrawTime, true)
   }
 
   _defaultFont!: string
@@ -302,7 +326,9 @@ export class ASSRenderer {
     return self.HEAPU8RAW
   }
 
+  _lastDrawTime?: number
   _draw (time: number, repaint = false) {
+    this._lastDrawTime = time
     const images = this._wasm.rawRender(time, Number(repaint)) as ASSImage[] | null
     if (!images) return
 
@@ -324,8 +350,8 @@ export class ASSRenderer {
     return { data: ctx.getImageData(0, 0, width, height).data, width, height }
   }
 
-  _setColorSpace (videoColorSpace?: 'RGB' | 'BT709' | 'BT601') {
-    this._videoColorSpace = videoColorSpace === 'RGB' ? undefined : videoColorSpace
+  _setColorSpace (matrix?: WebMatrixCoefficients | null, fullRange?: boolean | null) {
+    this._videoColorSpace = matrix && matrix !== 'rgb' ? `${WEB_MATRIX_COEFFICIENTS[matrix]} ${fullRange ? 'PC' : 'TV'}` : undefined
     this._checkColorSpace()
   }
 }

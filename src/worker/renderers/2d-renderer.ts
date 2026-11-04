@@ -1,7 +1,7 @@
 // fallback for browsers that don't support GPU acceleration
-import { IDENTITY_MATRIX, resolveColorMatrix, type ASSImage } from '../util.ts'
-
 import { CanvasRendererBase } from './canvas-base.ts'
+
+import type { ASSImage } from '../util.ts'
 
 // clamp to 0-255 with rounding, matching rgba8unorm GPU behaviour
 const clamp = (v: number) => (v < 0 ? 0 : v > 1 ? 255 : Math.round(v * 255))
@@ -16,7 +16,6 @@ export class Canvas2DRenderer extends CanvasRendererBase {
   ctx
   bufferCtx
   bufferCanvas = new OffscreenCanvas(1, 1)
-  colorMatrix: Float32Array = IDENTITY_MATRIX
 
   constructor (canvas: OffscreenCanvas) {
     super(canvas)
@@ -30,8 +29,8 @@ export class Canvas2DRenderer extends CanvasRendererBase {
 
   // this should be an svg filter which is cheaper, but not supported
   // https://issues.chromium.org/u/1/issues/40910142
-  setColorMatrix (subtitleColorSpace?: 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC', videoColorSpace?: 'BT601' | 'BT709') {
-    this.colorMatrix = resolveColorMatrix(subtitleColorSpace, videoColorSpace)
+  setColorConversion (matrix: Float32Array) {
+    this.colorMatrix = matrix
   }
 
   // this is horribly inefficient, but it's a fallback for systems without a GPU, this is the least of their problems
@@ -44,14 +43,14 @@ export class Canvas2DRenderer extends CanvasRendererBase {
       const imageData = new ImageData(img.w, img.h)
       const pixels = new Uint32Array(imageData.data.buffer)
 
-      // libass 0xRRGGBBAA → ImageData little-endian RGBA, apply colour matrix per image
+      // libass 0xRRGGBBAA → ImageData little-endian RGBA, convert the color per image
       const m = this.colorMatrix
       const r = ((img.color >>> 24) & 0xff) / 255
       const g = ((img.color >>> 16) & 0xff) / 255
       const bl = ((img.color >>> 8) & 0xff) / 255
-      const cr = clamp(m[0]! * r + m[3]! * g + m[6]! * bl)
-      const cg = clamp(m[1]! * r + m[4]! * g + m[7]! * bl)
-      const cb = clamp(m[2]! * r + m[5]! * g + m[8]! * bl)
+      const cr = clamp(m[0]! * r + m[3]! * g + m[6]! * bl + m[9]!)
+      const cg = clamp(m[1]! * r + m[4]! * g + m[7]! * bl + m[10]!)
+      const cb = clamp(m[2]! * r + m[5]! * g + m[8]! * bl + m[11]!)
       const color = (cb << 16) | (cg << 8) | cr
       const alpha = (255 - (img.color & 255)) / 255
 

@@ -1,13 +1,7 @@
 // WebGL2 renderer
-import { NEEDS_WASM_BUFFER_COPY, SHOULD_REFERENCE_MEMORY, type ASSImage } from '../util.ts'
+import { NEEDS_WASM_BUFFER_COPY, type ASSImage } from '../util.ts'
 
 import { WebGLRendererBase, type AtlasItem } from './webgl-base.ts'
-
-declare const self: DedicatedWorkerGlobalScope &
-  typeof globalThis & {
-    HEAPU8RAW: Uint8Array<ArrayBuffer>
-    WASMMEMORY: WebAssembly.Memory
-  }
 
 // GLSL ES 3.0 Vertex Shader with Instancing
 const VERTEX_SHADER = /* glsl */`#version 300 es
@@ -306,11 +300,6 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
 
     this.uploadCache = new Set<string>()
     let instanceCount = 0
-
-    // HACK 1 and 2 [see util.ts for explanation]
-    if ((self.HEAPU8RAW.buffer !== self.WASMMEMORY.buffer) || SHOULD_REFERENCE_MEMORY) {
-      heap = self.HEAPU8RAW = new Uint8Array(self.WASMMEMORY.buffer)
-    }
 
     // Upload textures
     for (const { img, x, y, layer, sourceKey } of items) {

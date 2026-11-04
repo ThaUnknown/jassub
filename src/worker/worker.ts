@@ -7,7 +7,7 @@ import WASM from '../wasm/jassub-worker.js'
 import { Canvas2DRenderer } from './renderers/2d-renderer.ts'
 import { WebGL1Renderer } from './renderers/webgl1-renderer.ts'
 import { WebGL2Renderer } from './renderers/webgl2-renderer.ts'
-import { _fetch, fetchtext, LIBASS_YCBCR_MAP, THREAD_COUNT, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
+import { fetchok, fetchtext, LIBASS_YCBCR_MAP, SHOULD_REFERENCE_MEMORY, THREAD_COUNT, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
 
 import type { JASSUB, MainModule } from '../wasm/types.d.ts'
 // import { WebGPURenderer } from './webgpu-renderer'
@@ -34,6 +34,10 @@ interface opts {
 }
 
 const constructor = Symbol.for('constructor')
+
+const NO_TRACK = 'JASSUB: no track is loaded'
+
+const WEIGHT_SUFFIX = new RegExp(`^(.+)\\s+(${WEIGHT_MAP.join('|')})$`)
 
 export class ASSRenderer {
   _wasm!: JASSUB
@@ -75,6 +79,8 @@ export class ASSRenderer {
     // THREAD_COUNT is 1 when rendering is serial. Pass 0 in that case.
     // eslint-disable-next-line @typescript-eslint/unbound-method
     const { _malloc, JASSUB } = await (WASM({ __url: data.wasmUrl, __poolSize: THREAD_COUNT > 1 ? THREAD_COUNT : 0, __out: (log: string) => this._log(log) }) as Promise<MainModule>)
+    // lfa-ponyfill uses the global fetch.
+    globalThis.fetch = _fetch
     this._malloc = _malloc
 
     this._wasm = new JASSUB(data.width, data.height, this._defaultFont)
@@ -97,17 +103,17 @@ export class ASSRenderer {
   // this passes a string of track data to libass, be it styles, events etc, which it then processes and adds to the track
   // useful for streaming subtitles
   processData (events: string) {
-    this._wasm.processData(events)
+    if (!this._wasm.processData(events)) throw new Error(NO_TRACK)
   }
 
   // processes a single subtitle packet with ReadOrder, timecode and duration
   // useful for streaming subtitles from Matroska-style demuxers
   processChunk (data: string, timecode: number, duration: number) {
-    this._wasm.processChunk(data, timecode, duration)
+    if (!this._wasm.processChunk(data, timecode, duration)) throw new Error(NO_TRACK)
   }
 
   createEvent (event: ASSEvent) {
-    this._wasm.createEvent(event)
+    if (!this._wasm.createEvent(event)) throw new Error(NO_TRACK)
   }
 
   getEvents (): Array<Partial<ASSEvent>> {
@@ -115,15 +121,15 @@ export class ASSRenderer {
   }
 
   setEvent (event: ASSEvent, index: number) {
-    this._wasm.setEvent(index, event)
+    if (!this._wasm.setEvent(index, event)) throw new RangeError(`JASSUB: no event at index ${index}`)
   }
 
   removeEvent (index: number) {
-    this._wasm.removeEvent(index)
+    if (!this._wasm.removeEvent(index)) throw new RangeError(`JASSUB: no event at index ${index}`)
   }
 
   createStyle (style: ASSStyle) {
-    this._wasm.createStyle(style)
+    if (!this._wasm.createStyle(style)) throw new Error(NO_TRACK)
   }
 
   getStyles (): ASSStyle[] {
@@ -131,11 +137,11 @@ export class ASSRenderer {
   }
 
   setStyle (style: ASSStyle, index: number) {
-    this._wasm.setStyle(index, style)
+    if (!this._wasm.setStyle(index, style)) throw new RangeError(`JASSUB: no style at index ${index}`)
   }
 
   removeStyle (index: number) {
-    this._wasm.removeStyle(index)
+    if (!this._wasm.removeStyle(index)) throw new RangeError(`JASSUB: no style at index ${index}`)
   }
 
   styleOverride (style: ASSStyle) {
@@ -149,7 +155,8 @@ export class ASSRenderer {
   setTrack (content: string) {
     this._wasm.createTrackMem(content)
 
-    this._subtitleColorSpace = LIBASS_YCBCR_MAP[this._wasm.trackColorSpace]!
+    this._subtitleColorSpace = LIBASS_YCBCR_MAP[this._wasm.trackColorSpace]
+    this._checkColorSpace()
   }
 
   freeTrack () {
@@ -161,8 +168,7 @@ export class ASSRenderer {
   }
 
   _checkColorSpace () {
-    if (!this._subtitleColorSpace || !this._videoColorSpace) return
-    this._gpurender.setColorMatrix(this._subtitleColorSpace, this._videoColorSpace)
+    this._gpurender.setColorMatrix(this._subtitleColorSpace ?? undefined, this._videoColorSpace)
   }
 
   _defaultFont!: string
@@ -195,7 +201,11 @@ export class ASSRenderer {
 
     // this isn't batched like uint8s because software like jellyfin exists, which loads 50+ fonts over the network which takes time...
     // is connection exhaustion a concern here?
-    return !!await Promise.allSettled(strings.map(url => this._asyncWrite(url)))
+    const results = await Promise.allSettled(strings.map(url => this._asyncWrite(url)))
+    for (const result of results) {
+      if (result.status === 'rejected') console.warn('JASSUB: failed to load font', result.reason)
+    }
+    return true
   }
 
   // we don't want to run _findAvailableFont before initial fonts are loaded
@@ -215,15 +225,13 @@ export class ASSRenderer {
 
     // Roboto Medium, null -> Roboto, Medium
     // Roboto Medium, Medium -> Roboto, Medium
+    // Roboto Medium, Bold -> Roboto, Medium
     // Roboto, null -> Roboto, Regular
     // italic is not handled I guess
-    for (const _weight of WEIGHT_MAP) {
-      // check if fontname has this weight name in it, if yes remove it
-      if (fontName.includes(_weight)) {
-        fontName = fontName.replace(_weight, '').trim()
-        weight ??= _weight
-        break
-      }
+    const match = fontName.match(WEIGHT_SUFFIX)
+    if (match) {
+      fontName = match[1]!
+      weight = match[2] as WeightValue
     }
 
     weight ??= 'regular'
@@ -256,7 +264,7 @@ export class ASSRenderer {
   }
 
   async _asyncWrite (font: string) {
-    const res = await _fetch(font)
+    const res = await fetchok(font)
     this._allocFonts([new Uint8Array(await res.arrayBuffer())])
   }
 
@@ -265,7 +273,7 @@ export class ASSRenderer {
     // TODO: this should re-draw last frame!
     for (const uint8 of uint8s) {
       const ptr = this._malloc(uint8.byteLength)
-      self.HEAPU8RAW.set(uint8, ptr)
+      this._heap().set(uint8, ptr)
       this._wasm.addFont('font-' + (this._fontId++), ptr, uint8.byteLength)
     }
     this._wasm.reloadFonts()
@@ -286,17 +294,25 @@ export class ASSRenderer {
     this._availableFonts = {}
   }
 
+  // HACK 1 and 2 [see util.ts for explanation]
+  _heap () {
+    if (self.HEAPU8RAW.buffer !== self.WASMMEMORY.buffer || SHOULD_REFERENCE_MEMORY) {
+      self.HEAPU8RAW = new Uint8Array(self.WASMMEMORY.buffer)
+    }
+    return self.HEAPU8RAW
+  }
+
   _draw (time: number, repaint = false) {
     const images = this._wasm.rawRender(time, Number(repaint)) as ASSImage[] | null
     if (!images) return
 
-    this._gpurender.render(images, self.HEAPU8RAW)
+    this._gpurender.render(images, this._heap())
   }
 
   // single-frame readback for tests
   _drawCapture (time: number) {
     const images = (this._wasm.rawRender(time, 1) ?? []) as ASSImage[]
-    this._gpurender.render(images, self.HEAPU8RAW)
+    this._gpurender.render(images, this._heap())
 
     const canvas = this._gpurender.canvas
     if (!canvas) return
@@ -308,9 +324,8 @@ export class ASSRenderer {
     return { data: ctx.getImageData(0, 0, width, height).data, width, height }
   }
 
-  _setColorSpace (videoColorSpace: 'RGB' | 'BT709' | 'BT601') {
-    if (videoColorSpace === 'RGB') return
-    this._videoColorSpace = videoColorSpace
+  _setColorSpace (videoColorSpace?: 'RGB' | 'BT709' | 'BT601') {
+    this._videoColorSpace = videoColorSpace === 'RGB' ? undefined : videoColorSpace
     this._checkColorSpace()
   }
 }

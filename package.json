@@ -13,7 +13,6 @@
     "!dist/wasm/jassub-worker-modern.js",
     "README.md",
     "LICENSE",
-    "index.d.ts",
     "src/**/*.ts",
     "!src/default.woff2"
   ],

@@ -66,8 +66,10 @@ export default class JASSUB {
   _videoColorSpace: string | null = null
   _canvas
   _ro = new ResizeObserver(async () => {
-    await this.ready
-    this.resize()
+    try {
+      await this.ready
+      this.resize()
+    } catch {}
   })
 
   _destroyed = false
@@ -263,8 +265,10 @@ export default class JASSUB {
       this._updateColorSpace({ target })
     }
 
+    const loop = ++this._rvfcLoop
     await this.ready
-    this._video.requestVideoFrameCallback((now, data) => this._handleRVFC(data))
+    if (loop !== this._rvfcLoop) return
+    target.requestVideoFrameCallback((now, data) => this._handleRVFC(loop, data))
   }
 
   async _getLocalFont (font: string, weight: WeightValue = 'regular') {
@@ -285,12 +289,13 @@ export default class JASSUB {
     }
   }
 
-  _handleRVFC (data: VideoFrameCallbackMetadata) {
-    if (this._destroyed) return
+  _rvfcLoop = 0
+  _handleRVFC (loop: number, data: VideoFrameCallbackMetadata) {
+    if (this._destroyed || loop !== this._rvfcLoop) return
 
     this.manualRender(data)
 
-    this._video!.requestVideoFrameCallback((now, data) => this._handleRVFC(data))
+    this._video!.requestVideoFrameCallback((now, data) => this._handleRVFC(loop, data))
   }
 
   manualRender (data: Pick<VideoFrameCallbackMetadata, 'expectedDisplayTime' | 'width' | 'height' | 'mediaTime'>, repaint = false) {

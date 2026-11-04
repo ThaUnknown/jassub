@@ -77,9 +77,14 @@ const d = 'FCC'
 
 export const LIBASS_YCBCR_MAP = [null, a, null, a, a, b, b, c, c, d, d] as const
 
-export const _fetch = globalThis.fetch
+export async function fetchok (url: string) {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`JASSUB: failed to fetch ${url}: HTTP ${res.status}`)
+  return res
+}
+
 export async function fetchtext (url: string) {
-  const res = await _fetch(url)
+  const res = await fetchok(url)
   return await res.text()
 }
 

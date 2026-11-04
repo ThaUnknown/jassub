@@ -31,9 +31,9 @@ static char *copyString(emscripten::val v) {
 static void applyStyleStringFields(ASS_Style &style, emscripten::val obj) {
   auto read = [&](const char *key) { return obj[key]; };
   auto v = read("Name");
-  if (!v.isUndefined()) style.Name = copyString(v);
+  if (!v.isUndefined()) { free(style.Name); style.Name = copyString(v); }
   v = read("FontName");
-  if (!v.isUndefined()) style.FontName = copyString(v);
+  if (!v.isUndefined()) { free(style.FontName); style.FontName = copyString(v); }
 }
 
 static void applyStyleCommonFields(ASS_Style &style, emscripten::val obj) {
@@ -72,7 +72,7 @@ private:
   int canvas_w;
   int canvas_h;
 
-  const char *defaultFont;
+  char *defaultFont;
 
 public:
   ASS_Track *track;
@@ -136,6 +136,8 @@ public:
   }
 
   emscripten::val rawRender(double tm, int force) {
+    if (!track) return force ? emscripten::val::array() : emscripten::val::null();
+
     int changed = 0;
     ASS_Image *imgs = ass_render_frame(ass_renderer, track, (long long)(tm * 1e+3 + 0.5), &changed);
     if (imgs == NULL) {
@@ -164,6 +166,7 @@ public:
 
   emscripten::val getEvents() {
     emscripten::val arr = emscripten::val::array();
+    if (!track) return arr;
     for (int i = 0; i < track->n_events; i++) {
       ASS_Event &evt = track->events[i];
       emscripten::val obj = emscripten::val::object();
@@ -185,6 +188,7 @@ public:
 
   emscripten::val getStyles() {
     emscripten::val arr = emscripten::val::array();
+    if (!track) return arr;
     for (int i = 0; i < track->n_styles; i++) {
       ASS_Style &style = track->styles[i];
       emscripten::val obj = emscripten::val::object();
@@ -223,9 +227,11 @@ public:
     removeTrack();
     ass_renderer_done(ass_renderer);
     ass_library_done(ass_library);
+    free(defaultFont);
   }
 
   void setDefaultFont(emscripten::val name) {
+    free(defaultFont);
     defaultFont = copyString(name);
     reloadFonts();
   }
@@ -249,35 +255,61 @@ public:
     return ass_set_threads(ass_renderer, threads);
   }
 
-  void removeEvent(int eid) {
+  // ass_free_event does not remove the entry from the array.
+  bool removeEvent(int eid) {
+    if (!track || eid < 0 || eid >= track->n_events) return false;
     ass_free_event(track, eid);
+    memmove(track->events + eid, track->events + eid + 1, (track->n_events - eid - 1) * sizeof(ASS_Event));
+    track->n_events--;
+    return true;
   }
 
-  void removeStyle(int sid) {
+  bool removeStyle(int sid) {
+    if (!track || sid < 0 || sid >= track->n_styles) return false;
     ass_free_style(track, sid);
+    memmove(track->styles + sid, track->styles + sid + 1, (track->n_styles - sid - 1) * sizeof(ASS_Style));
+    track->n_styles--;
+
+    if (track->default_style == sid) track->default_style = 0;
+    else if (track->default_style > sid) track->default_style--;
+
+    for (int i = 0; i < track->n_events; i++) {
+      int &style = track->events[i].Style;
+      if (style == sid) style = track->default_style;
+      else if (style > sid) style--;
+    }
+    return true;
   }
 
-  void removeAllEvents() {
+  bool removeAllEvents() {
+    if (!track) return false;
     ass_flush_events(track);
+    return true;
   }
 
   void setMemoryLimits(int glyph_limit, int bitmap_cache_limit) {
     ass_set_cache_limits(ass_renderer, glyph_limit, bitmap_cache_limit);
   }
 
-  void processData(const std::string &data) {
+  bool processData(const std::string &data) {
+    if (!track) return false;
     ass_process_data(track, data.data(), data.size());
+    return true;
   }
 
-  void processChunk(const std::string &data, double timecode, double duration) {
+  bool processChunk(const std::string &data, double timecode, double duration) {
+    if (!track) return false;
     ass_process_chunk(track, data.data(), data.size(), (long long)timecode, (long long)duration);
+    return true;
   }
 
-  void createEvent(emscripten::val obj) {
-    setEvent(ass_alloc_event(track), obj);
+  bool createEvent(emscripten::val obj) {
+    if (!track) return false;
+    return setEvent(ass_alloc_event(track), obj);
   }
 
-  void setEvent(int index, emscripten::val obj) {
+  bool setEvent(int index, emscripten::val obj) {
+    if (!track || index < 0 || index >= track->n_events) return false;
     ASS_Event &evt = track->events[index];
     auto read = [&](const char *key) { return obj[key]; };
 
@@ -289,25 +321,32 @@ public:
     v = read("MarginL");       if (!v.isUndefined()) evt.MarginL = v.as<int>();
     v = read("MarginR");       if (!v.isUndefined()) evt.MarginR = v.as<int>();
     v = read("MarginV");       if (!v.isUndefined()) evt.MarginV = v.as<int>();
-    v = read("Name");          if (!v.isUndefined()) evt.Name = copyString(v);
-    v = read("Text");          if (!v.isUndefined()) evt.Text = copyString(v);
-    v = read("Effect");        if (!v.isUndefined()) evt.Effect = copyString(v);
+    v = read("Name");          if (!v.isUndefined()) { free(evt.Name); evt.Name = copyString(v); }
+    v = read("Text");          if (!v.isUndefined()) { free(evt.Text); evt.Text = copyString(v); }
+    v = read("Effect");        if (!v.isUndefined()) { free(evt.Effect); evt.Effect = copyString(v); }
+    return true;
   }
 
-  void createStyle(emscripten::val obj) {
-    setStyle(ass_alloc_style(track), obj);
+  bool createStyle(emscripten::val obj) {
+    if (!track) return false;
+    return setStyle(ass_alloc_style(track), obj);
   }
 
-  void setStyle(int index, emscripten::val obj) {
+  bool setStyle(int index, emscripten::val obj) {
+    if (!track || index < 0 || index >= track->n_styles) return false;
     ASS_Style &style = track->styles[index];
     applyStyleStringFields(style, obj);
     applyStyleCommonFields(style, obj);
+    return true;
   }
 
   void styleOverride(emscripten::val obj) {
     ASS_Style style = {};
-    applyStyleStringFields(style, obj);
+    style.ScaleX = 1.0;
+    style.ScaleY = 1.0;
     applyStyleCommonFields(style, obj);
+    auto fontName = obj["FontName"];
+    style.FontName = fontName.isUndefined() ? strdup(defaultFont) : copyString(fontName);
 
     int set_force_flags = ASS_OVERRIDE_BIT_STYLE | ASS_OVERRIDE_BIT_SELECTIVE_FONT_SCALE;
 
@@ -315,7 +354,6 @@ public:
     ass_set_selective_style_override(ass_renderer, &style);
     ass_set_font_scale(ass_renderer, 0.3);
 
-    free(style.Name);
     free(style.FontName);
   }
 

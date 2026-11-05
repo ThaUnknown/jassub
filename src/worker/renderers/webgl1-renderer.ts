@@ -1,6 +1,6 @@
 import { NEEDS_WASM_BUFFER_COPY, type ASSImage } from '../util.ts'
 
-import { ATLAS_IDLE_MS, MAX_ATLAS_SCREENS, WebGLRendererBase, type AtlasItem } from './webgl-base.ts'
+import { ATLAS_IDLE_MS, MAX_ATLAS_SCREENS, WebGLRendererBase, atlasPosition, type AtlasItem } from './webgl-base.ts'
 
 // GLSL ES 1.0 Vertex Shader. Vertex highp is mandatory.
 const VERTEX_SHADER = /* glsl */`
@@ -135,7 +135,8 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
   atlasFullAt = 0
   atlasSize = 0
   maxTextureSize = 0
-  uploadCache = new Set<string>()
+  // source key to the position its pixels have in the atlas, see atlasPosition()
+  uploadCache = new Map<string, number>()
 
   // A reusable copy buffer for bitmap uploads
   copyData = new Uint8Array(0)
@@ -366,7 +367,7 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     this.ensureInstanceCapacity(items.length, this.instanceStride)
 
     const oldCache = this.uploadCache
-    this.uploadCache = new Set<string>()
+    this.uploadCache = new Map()
 
     const pageItems: WebGL1AtlasItem[][] = Array.from({ length: pageCount }, () => [])
     for (const item of items) pageItems[item.layer]!.push(item)
@@ -378,20 +379,15 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
 
       this.gl.bindTexture(this.gl.TEXTURE_2D, this.atlasPages[pageIndex]!)
 
-      for (const item of page) {
-        const key = item.sourceKey && `${item.sourceKey}:${item.layer}:${item.x}:${item.y}`
-
-        if (key) {
-          if (oldCache.has(key) || this.uploadCache.has(key)) {
-            this.uploadCache.add(key)
-            continue
-          }
-          this.uploadCache.add(key)
+      for (const { img, x, y, layer, sourceKey, packW, uploadStrided } of page) {
+        if (sourceKey) {
+          const position = atlasPosition(x, y, layer)
+          const cached = oldCache.get(sourceKey) === position || this.uploadCache.get(sourceKey) === position
+          this.uploadCache.set(sourceKey, position)
+          if (cached) continue
         }
 
-        const { img } = item
-
-        if (item.uploadStrided) {
+        if (uploadStrided) {
           const length = img.stride * img.h
           const source = heap.subarray(img.bitmap, img.bitmap + length)
 
@@ -404,9 +400,9 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
           this.gl.texSubImage2D(
             this.gl.TEXTURE_2D,
             0,
-            item.x,
-            item.y,
-            item.packW,
+            x,
+            y,
+            packW,
             img.h,
             this.gl.ALPHA,
             this.gl.UNSIGNED_BYTE,
@@ -425,8 +421,8 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
           this.gl.texSubImage2D(
             this.gl.TEXTURE_2D,
             0,
-            item.x,
-            item.y,
+            x,
+            y,
             img.w,
             img.h,
             this.gl.ALPHA,

@@ -1,7 +1,7 @@
 // WebGL2 renderer
 import { NEEDS_WASM_BUFFER_COPY, type ASSImage } from '../util.ts'
 
-import { ATLAS_IDLE_MS, MAX_ATLAS_SCREENS, WebGLRendererBase, type AtlasItem } from './webgl-base.ts'
+import { ATLAS_IDLE_MS, MAX_ATLAS_SCREENS, WebGLRendererBase, atlasPosition, type AtlasItem } from './webgl-base.ts'
 
 // GLSL ES 3.0 Vertex Shader with Instancing
 const VERTEX_SHADER = /* glsl */`#version 300 es
@@ -102,6 +102,10 @@ const INITIAL_INSTANCES = 256
 const INSTANCE_STRIDE = 32
 
 const ATLAS_ROUND = 64
+// size layers so a frame fills about this many, many small layers make the packer try each one per image
+const ATLAS_TARGET_LAYERS = 8
+// the area may not raise the layer size above this, large layers leave wide gaps next to long lines
+const ATLAS_AREA_SIZE_CAP = 1024
 
 interface AtlasTexture {
   texture: WebGLTexture
@@ -125,7 +129,8 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
   atlasFullAt = 0
   maxTextureSize = 0
   maxArrayTextureLayers = 0
-  uploadCache = new Set<string>()
+  // source key to the position its pixels have in the atlas
+  uploadCache = new Map<string, number>()
 
   // A reusable copy buffer for bitmap data on Firefox and Safari.
   copyData = new Uint8Array(0)
@@ -255,6 +260,7 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
 
     // Filter valid images and build atlas items in one pass
     let maxDimension = 0
+    let totalArea = 0
     const items: AtlasItem[] = []
 
     for (const img of images) {
@@ -267,6 +273,7 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
         sourceKey: img.cache_id && `${img.cache_id}:${img.bitmap}:${img.w}:${img.h}:${img.stride}`
       })
       maxDimension = Math.max(maxDimension, img.w, img.h)
+      totalArea += img.w * img.h
     }
 
     if (items.length === 0) {
@@ -274,7 +281,8 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
       return
     }
 
-    const initialSize = Math.min(this.maxTextureSize, Math.ceil(maxDimension / ATLAS_ROUND) * ATLAS_ROUND)
+    const areaSize = Math.min(ATLAS_AREA_SIZE_CAP, Math.sqrt(totalArea / ATLAS_TARGET_LAYERS))
+    const initialSize = Math.min(this.maxTextureSize, Math.ceil(Math.max(maxDimension, areaSize) / ATLAS_ROUND) * ATLAS_ROUND)
     let size = Math.max(this.atlas?.size ?? 0, initialSize)
     const maxLayers = this.maxArrayTextureLayers || 256
 
@@ -314,17 +322,17 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
 
     this.ensureInstanceCapacity(items.length)
 
-    this.uploadCache = new Set<string>()
+    this.uploadCache = new Map()
     let instanceCount = 0
 
     // Upload textures
     for (const { img, x, y, layer, sourceKey } of items) {
-      const key = sourceKey && `${sourceKey}:${x}:${y}:${layer}`
       let cached = false
 
-      if (key) {
-        cached = oldCache.has(key) || this.uploadCache.has(key)
-        this.uploadCache.add(key)
+      if (sourceKey) {
+        const position = atlasPosition(x, y, layer)
+        cached = oldCache.get(sourceKey) === position || this.uploadCache.get(sourceKey) === position
+        this.uploadCache.set(sourceKey, position)
       }
 
       if (!cached) {

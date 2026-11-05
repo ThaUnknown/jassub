@@ -2,6 +2,9 @@ import { CanvasRendererBase } from './canvas-base.ts'
 
 import type { ASSImage } from '../util.ts'
 
+export const MAX_ATLAS_SCREENS = 128
+export const ATLAS_IDLE_MS = 20_000
+
 export interface AtlasItem {
   img: ASSImage
   packW?: number
@@ -30,6 +33,13 @@ export abstract class WebGLRendererBase<T extends WebGLRenderingContext | WebGL2
       this.gl = null!
     }, this.ctrl)
     canvas.addEventListener('webglcontextrestored', () => this._initGL(), this.ctrl)
+  }
+
+  // caller calls this after libass renders the next frame, so libass runs while the GPU still draws the last frame
+  // while this call blocks, the main thread drops video frames, so a slow GPU skips frames instead of queuing them
+  // a WebGLSync lock could replace finish() here in the future
+  finish () {
+    this.gl?.finish()
   }
 
   abstract _initGL (): void

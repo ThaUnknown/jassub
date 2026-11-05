@@ -141,6 +141,43 @@ test('a WebGL2 renderer that failed to start ignores the context events of the c
   }
 })
 
+test('WebGL1 drops a frame that needs more atlas memory than the screen limit', () => {
+  const tile = 64
+  const heap = new Uint8Array(tile * tile).fill(255)
+  const images = (count: number) => Array.from({ length: count }, () => ({ ...makeImage().img, w: tile, h: tile, stride: tile, cache_id: 0 }))
+  // The limit is 128 screens of 8 x 8 pixels, which is 8192 bytes. That is 2 pages of tile x tile.
+  const renderer = new WebGL1Renderer(new OffscreenCanvas(8, 8))
+  // One image fills one page.
+  renderer.maxAtlasSize = tile
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+  try {
+    renderer.render(images(2), heap)
+    expect(renderer.atlasPages).toHaveLength(2)
+
+    renderer.render(images(4), heap)
+    expect(warn).toHaveBeenCalledWith('JASSUB: frame exceeds WebGL1 atlas capacity')
+    expect(renderer.atlasPages, 'the atlas does not grow past the limit').toHaveLength(2)
+  } finally {
+    warn.mockRestore()
+    renderer.destroy()
+  }
+})
+
+test('WebGL1 waits for the last frame with finish()', () => {
+  const finish = vi.spyOn(WebGLRenderingContext.prototype, 'finish')
+  const renderer = new WebGL1Renderer(new OffscreenCanvas(CANVAS_SIZE, CANVAS_SIZE))
+
+  try {
+    draw(renderer)
+    renderer.finish()
+    expect(finish).toHaveBeenCalledTimes(1)
+  } finally {
+    finish.mockRestore()
+    renderer.destroy()
+  }
+})
+
 test('WebGL1 renders without ANGLE_instanced_arrays', () => {
   const proto = WebGLRenderingContext.prototype as any
   const getExtension = proto.getExtension

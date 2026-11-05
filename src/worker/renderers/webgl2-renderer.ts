@@ -1,7 +1,7 @@
 // WebGL2 renderer
 import { NEEDS_WASM_BUFFER_COPY, type ASSImage } from '../util.ts'
 
-import { WebGLRendererBase, type AtlasItem } from './webgl-base.ts'
+import { ATLAS_IDLE_MS, MAX_ATLAS_SCREENS, WebGLRendererBase, type AtlasItem } from './webgl-base.ts'
 
 // GLSL ES 3.0 Vertex Shader with Instancing
 const VERTEX_SHADER = /* glsl */`#version 300 es
@@ -101,6 +101,8 @@ const INITIAL_INSTANCES = 256
 // One instance is 4 floats (dest rect), 2 floats (atlas position), 4 normalized bytes (color) and 1 float (atlas layer)
 const INSTANCE_STRIDE = 32
 
+const ATLAS_ROUND = 64
+
 interface AtlasTexture {
   texture: WebGLTexture
   size: number
@@ -120,6 +122,7 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
   instanceCapacity = 0
 
   atlas: AtlasTexture | null = null
+  atlasFullAt = 0
   maxTextureSize = 0
   maxArrayTextureLayers = 0
   uploadCache = new Set<string>()
@@ -271,32 +274,38 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
       return
     }
 
-    const initialSize = Math.min(this.maxTextureSize, 2 ** Math.max(0, Math.ceil(Math.log2(maxDimension))))
+    const initialSize = Math.min(this.maxTextureSize, Math.ceil(maxDimension / ATLAS_ROUND) * ATLAS_ROUND)
     let size = Math.max(this.atlas?.size ?? 0, initialSize)
     const maxLayers = this.maxArrayTextureLayers || 256
 
     // Place tallest-first, keep original draw order.
     const ordered = [...items].sort((a, b) => b.img.h - a.img.h)
     let pageCount = this.packAtlas(ordered, size, ATLAS_PADDING, true)
-    // triggered when a LOT of small textures are created, so small atlas, a lot of images, somewhat cheap-ish to recalculate
+    // A larger layer holds more images. This only helps against the layer limit of the hardware.
     while (pageCount > maxLayers && size < this.maxTextureSize) {
       size = Math.min(this.maxTextureSize, size * 2)
       pageCount = this.packAtlas(ordered, size, ATLAS_PADDING, true)
     }
 
-    if (pageCount > maxLayers) {
+    // A single layer always fits, so one large image still draws.
+    const maxBytes = MAX_ATLAS_SCREENS * this.canvas.width * this.canvas.height
+    if (pageCount > maxLayers || (pageCount > 1 && size * size * pageCount > maxBytes)) {
       console.warn('JASSUB: frame exceeds texture array capacity')
       this.gl.flush()
       return
     }
 
     const oldCache = this.uploadCache
+    const now = performance.now()
 
-    // Resize atlas texture if needed
-    if (!this.atlas || this.atlas.size < size || this.atlas.depth < pageCount) {
-      this.createAtlasTexture(size, Math.max(this.atlas?.depth ?? 0, pageCount))
+    // Packing fills the first layers, so only trailing layers become idle.
+    const grow = !this.atlas || this.atlas.size < size || this.atlas.depth < pageCount
+    const shrink = !grow && pageCount < this.atlas!.depth && now - this.atlasFullAt > ATLAS_IDLE_MS
+    if (grow || shrink) {
+      this.createAtlasTexture(size, pageCount)
       oldCache.clear()
     }
+    if (pageCount === this.atlas!.depth) this.atlasFullAt = now
 
     this.ensureInstanceCapacity(items.length)
 
@@ -390,6 +399,6 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
     this.gl.deleteProgram(this.program)
     this.gl.getExtension('WEBGL_lose_context')?.loseContext()
 
-    this.instanceBuffer = this.vao = this.program = this.gl = this.atlas = this.copyData = null!
+    this.instanceBuffer = this.vao = this.program = this.gl = this.atlas = this.copyData = this.frameSync = null!
   }
 }

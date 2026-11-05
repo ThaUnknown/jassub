@@ -1,6 +1,6 @@
 import { NEEDS_WASM_BUFFER_COPY, type ASSImage } from '../util.ts'
 
-import { WebGLRendererBase, type AtlasItem } from './webgl-base.ts'
+import { ATLAS_IDLE_MS, MAX_ATLAS_SCREENS, WebGLRendererBase, type AtlasItem } from './webgl-base.ts'
 
 // GLSL ES 1.0 Vertex Shader. Vertex highp is mandatory.
 const VERTEX_SHADER = /* glsl */`
@@ -75,10 +75,10 @@ void main() {
 
 const INITIAL_INSTANCES = 256
 const ATLAS_ROUND = 64
+// Each page is one draw call, so the page count has its own limit
 const MAX_ATLAS_PAGES = 64
+// Sets the highp page size, so that MAX_ATLAS_PAGES pages fit in this many bytes
 const MAX_ATLAS_BYTES = 256 * 1024 * 1024
-// Free atlas pages that no frame used for this time.
-const ATLAS_IDLE_MS = 30_000
 
 // Per-image record: destination rect (4), atlas position (2), color (4).
 const IMAGE_FLOATS = 10
@@ -296,7 +296,7 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
       this.atlasPages.push(this.createAtlasPage(size))
     }
 
-    // A frame always uses the first pages, so only trailing pages become idle.
+    // A frame always uses the first pages, so only trailing pages become idle
     const now = performance.now()
     if (pages === this.atlasPages.length) {
       this.atlasFullAt = now
@@ -315,9 +315,9 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     for (const img of images) {
       if (img.w > this.maxTextureSize || img.h > this.maxTextureSize) continue
 
-      // WebGL1 has no UNPACK_ROW_LENGTH. The stride becomes the texture width.
+      // WebGL1 has no UNPACK_ROW_LENGTH. The stride becomes the texture width
       // Pack rows tight when the stride exceeds MAX_TEXTURE_SIZE, or when the
-      // last row is not padded to the stride at the end of the heap.
+      // last row is not padded to the stride at the end of the heap
       const uploadStrided = img.stride >= img.w && img.stride <= this.maxTextureSize && img.bitmap + img.stride * img.h <= heap.length
       const packW = uploadStrided ? img.stride : img.w
 
@@ -341,21 +341,19 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
     }
 
     const requestedSize = Math.max(ATLAS_ROUND, Math.ceil(Math.max(maxDimension, Math.ceil(Math.sqrt(totalArea))) / ATLAS_ROUND) * ATLAS_ROUND)
-    // Keep pages inside the atlas size cap. A single larger image must
-    // still fit, so maxDimension can raise the size above the cap.
+    // Keep pages inside the atlas size cap, a single larger image must still fit, so maxDimension can raise the size above the cap
     let size = Math.min(this.maxTextureSize, Math.max(this.atlasSize, requestedSize), Math.max(this.maxAtlasSize, maxDimension))
 
-    // Pack images into atlas pages.
-    let maxPages = Math.max(1, Math.min(MAX_ATLAS_PAGES, Math.floor(MAX_ATLAS_BYTES / (size * size))))
     let pageCount = this.packAtlas(items, size, this.atlasPadding)
 
-    if (pageCount > maxPages && size < this.maxAtlasSize) {
+    // A larger page holds more images, this only helps against the page limit
+    if (pageCount > MAX_ATLAS_PAGES && size < this.maxAtlasSize) {
       size = this.maxAtlasSize
-      maxPages = Math.max(1, Math.min(MAX_ATLAS_PAGES, Math.floor(MAX_ATLAS_BYTES / (size * size))))
       pageCount = this.packAtlas(items, size, this.atlasPadding)
     }
 
-    if (pageCount > maxPages) {
+    const maxBytes = MAX_ATLAS_SCREENS * this.canvas.width * this.canvas.height
+    if (pageCount > MAX_ATLAS_PAGES || (pageCount > 1 && size * size * pageCount > maxBytes)) {
       console.warn('JASSUB: frame exceeds WebGL1 atlas capacity')
       this.gl.flush()
       return

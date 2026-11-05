@@ -295,6 +295,11 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
       return
     }
 
+    // wait for the previous frame before uploading, so a slow GPU drops frames instead of queuing them
+    // while this call blocks, the main thread drops video frames, so a slow GPU skips frames instead of queuing them
+    // a WebGLSync lock could replace finish() here in the future
+    this.gl.finish()
+
     const oldCache = this.uploadCache
     const now = performance.now()
 
@@ -399,6 +404,6 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
     this.gl.deleteProgram(this.program)
     this.gl.getExtension('WEBGL_lose_context')?.loseContext()
 
-    this.instanceBuffer = this.vao = this.program = this.gl = this.atlas = this.copyData = this.frameSync = null!
+    this.instanceBuffer = this.vao = this.program = this.gl = this.atlas = this.copyData = null!
   }
 }

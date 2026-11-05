@@ -332,7 +332,6 @@ export class ASSRenderer {
     const images = this._wasm.rawRender(time, Number(repaint)) as ASSImage[] | null
     if (!images) return
 
-    this._gpurender.finish()
     this._gpurender.render(images, this._heap())
   }
 

@@ -86,20 +86,22 @@ test('WebGL2 frees atlas layers that no frame used for a while', () => {
   }
 })
 
-test('WebGL2 waits for the last frame with finish()', () => {
+test('WebGL2 waits for the last frame with finish() before the expensive work of a frame', () => {
   const finish = vi.spyOn(WebGL2RenderingContext.prototype, 'finish')
+  const allocate = vi.spyOn(WebGL2RenderingContext.prototype, 'texImage3D')
   const renderer = new WebGL2Renderer(new OffscreenCanvas(TILE * 2, TILE * 2))
 
   try {
-    renderer.render(images(1), heap)
-    renderer.finish()
-    expect(finish).toHaveBeenCalledTimes(1)
+    renderer.render([], heap)
+    expect(finish, 'a frame without images has nothing to wait for').not.toHaveBeenCalled()
 
-    renderer.canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }))
-    expect(() => renderer.finish(), 'a lost context must not block drawing').not.toThrow()
-    expect(finish, 'there is no context to wait for').toHaveBeenCalledTimes(1)
+    renderer.render(images(1), heap)
+    expect(finish).toHaveBeenCalledTimes(1)
+    // After the allocation and uploads, the wait would not stop the new work from queuing behind the last frame.
+    expect(finish.mock.invocationCallOrder[0]).toBeLessThan(allocate.mock.invocationCallOrder[0]!)
   } finally {
     finish.mockRestore()
+    allocate.mockRestore()
     renderer.destroy()
   }
 })

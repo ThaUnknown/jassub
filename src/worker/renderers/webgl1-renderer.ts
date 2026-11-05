@@ -359,6 +359,9 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
       return
     }
 
+    // wait for the previous frame before uploading, so a slow GPU drops frames instead of queuing them
+    this.gl.finish()
+
     this.ensureAtlas(size, pageCount)
     this.ensureInstanceCapacity(items.length, this.instanceStride)
 

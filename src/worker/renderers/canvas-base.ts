@@ -37,7 +37,5 @@ export class CanvasRendererBase {
     return resize
   }
 
-  finish () {}
-
   destroy () {}
 }

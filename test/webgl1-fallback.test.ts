@@ -164,16 +164,22 @@ test('WebGL1 drops a frame that needs more atlas memory than the screen limit', 
   }
 })
 
-test('WebGL1 waits for the last frame with finish()', () => {
+test('WebGL1 waits for the last frame with finish() before the expensive work of a frame', () => {
   const finish = vi.spyOn(WebGLRenderingContext.prototype, 'finish')
+  const allocate = vi.spyOn(WebGLRenderingContext.prototype, 'texImage2D')
   const renderer = new WebGL1Renderer(new OffscreenCanvas(CANVAS_SIZE, CANVAS_SIZE))
 
   try {
+    renderer.render([], new Uint8Array(0))
+    expect(finish, 'a frame without images has nothing to wait for').not.toHaveBeenCalled()
+
     draw(renderer)
-    renderer.finish()
     expect(finish).toHaveBeenCalledTimes(1)
+    // After the allocation and uploads, the wait would not stop the new work from queuing behind the last frame.
+    expect(finish.mock.invocationCallOrder[0]).toBeLessThan(allocate.mock.invocationCallOrder[0]!)
   } finally {
     finish.mockRestore()
+    allocate.mockRestore()
     renderer.destroy()
   }
 })

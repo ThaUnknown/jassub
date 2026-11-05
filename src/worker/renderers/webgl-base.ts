@@ -35,13 +35,6 @@ export abstract class WebGLRendererBase<T extends WebGLRenderingContext | WebGL2
     canvas.addEventListener('webglcontextrestored', () => this._initGL(), this.ctrl)
   }
 
-  // caller calls this after libass renders the next frame, so libass runs while the GPU still draws the last frame
-  // while this call blocks, the main thread drops video frames, so a slow GPU skips frames instead of queuing them
-  // a WebGLSync lock could replace finish() here in the future
-  finish () {
-    this.gl?.finish()
-  }
-
   abstract _initGL (): void
   abstract render (images: ASSImage[], heap: Uint8Array): void
   abstract destroy (): void

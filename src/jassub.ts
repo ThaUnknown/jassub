@@ -24,6 +24,8 @@ export type JASSUBOptions = {
   workerUrl?: string
   wasmUrl?: string
   modernWasmUrl?: string
+  wasmWorkerUrl?: string
+  modernWasmWorkerUrl?: string
   fonts?: Array<string | Uint8Array>
   availableFonts?: Record<string, Uint8Array | string>
   defaultFont?: string
@@ -106,6 +108,10 @@ export default class JASSUB {
 
     const modern = opts.modernWasmUrl ?? new URL('./wasm/jassub-worker-modern.wasm', import.meta.url).href
     const normal = opts.wasmUrl ?? new URL('./wasm/jassub-worker.wasm', import.meta.url).href
+    const modernWorker = opts.modernWasmWorkerUrl ?? new URL('./wasm/jassub-worker-modern.js', import.meta.url).href
+    const normalWorker = opts.wasmWorkerUrl ?? new URL('./wasm/jassub-worker.js', import.meta.url).href
+    // the modern build uses mimalloc, which is faster but grows the heap 2 to 3 times more, so low memory devices use the legacy build
+    const useModern = !!JASSUB._supportsSIMD && (navigator.deviceMemory ?? Infinity) > 2
 
     const availableFonts = opts.availableFonts ?? {}
     if (!availableFonts['liberation sans'] && !opts.defaultFont) {
@@ -114,7 +120,8 @@ export default class JASSUB {
 
     this.ready = new Renderer(
       {
-        wasmUrl: JASSUB._supportsSIMD ? modern : normal,
+        wasmUrl: useModern ? modern : normal,
+        wasmWorkerUrl: useModern ? modernWorker : normalWorker,
         width: ctrl.width,
         height: ctrl.height,
         subUrl: opts.subUrl,
@@ -123,9 +130,8 @@ export default class JASSUB {
         availableFonts,
         defaultFont: opts.defaultFont ?? 'liberation sans',
         debug: !!opts.debug,
-        // the libass default of about 192 MB of caches can grow the WASM heap to over 600 MB, and that memory is never released, and realistically that much cache doesn't help much.
-        libassMemoryLimit: opts.libassMemoryLimit ?? ((navigator.deviceMemory ?? Infinity) <= 2 ? 32 : 64),
-        libassGlyphLimit: opts.libassGlyphLimit ?? 0,
+        libassMemoryLimit: opts.libassMemoryLimit ?? ((navigator.deviceMemory ?? Infinity) <= 2 ? 32 : 128),
+        libassGlyphLimit: opts.libassGlyphLimit ?? ((navigator.deviceMemory ?? Infinity) <= 2 ? 1000 : 3000),
         queryFonts: opts.queryFonts ?? 'local'
       },
       proxy(font => this._getLocalFont(font)),
@@ -289,7 +295,7 @@ export default class JASSUB {
   _handleRVFC (loop: number, data: VideoFrameCallbackMetadata) {
     if (this._destroyed || loop !== this._rvfcLoop) return
 
-    this.manualRender(data)
+    this.manualRender(data).catch(console.error)
 
     this._video!.requestVideoFrameCallback((now, data) => this._handleRVFC(loop, data))
   }
@@ -320,6 +326,8 @@ export default class JASSUB {
       this.debug?._startFrame()
       await this.renderer._draw(mediaTime + this.timeOffset, repaint)
       this.debug?._endFrame(this._lastDemandTime)
+    } catch (e) {
+      console.error(e)
     } finally {
       this.busy = false
     }

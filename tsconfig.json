@@ -24,7 +24,6 @@
     "src"
   ],
   "exclude": [
-    "src/worker/pre-worker.js",
-    "src/wasm/jassub-worker-modern.js"
+    "src/worker/pre-worker.js"
   ]
 }

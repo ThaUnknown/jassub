@@ -82,14 +82,18 @@ If you use a custom bundler, and need to override the worker and wasm URLs you c
 import JASSUB from 'jassub'
 import workerUrl from 'jassub/dist/jassub-worker.js?worker&url'
 import wasmUrl from 'jassub/dist/jassub-worker.wasm?url' // non-SIMD fallback
+import wasmWorkerUrl from 'jassub/dist/wasm/jassub-worker.js?url'
 import modernWasmUrl from 'jassub/dist/jassub-worker-modern.wasm?url' // SIMD
+import modernWasmWorkerUrl from 'jassub/dist/wasm/jassub-worker-modern.js?url'
 
 const instance = new JASSUB({
   video: document.querySelector('video'),
   subContent: subtitleString,
   workerUrl, // you can also use: `new URL('jassub/dist/jassub-worker.js', import.meta.url)` instead of importing it as an url, or whatever solution suits you
   wasmUrl,
-  modernWasmUrl
+  wasmWorkerUrl,
+  modernWasmUrl,
+  modernWasmWorkerUrl
 })
 ```
 

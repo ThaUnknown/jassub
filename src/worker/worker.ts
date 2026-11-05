@@ -2,8 +2,6 @@ import { finalizer } from 'abslink'
 import { expose } from 'abslink/w3c'
 import { queryRemoteFonts } from 'lfa-ponyfill'
 
-import WASM from '../wasm/jassub-worker.js'
-
 import { COLOR_CONVERSIONS, IDENTITY_MATRIX, LIBASS_YCBCR_MATRIX, WEB_MATRIX_COEFFICIENTS, type ColorSpace, type WebMatrixCoefficients } from './color-conversions.ts'
 import { Canvas2DRenderer } from './renderers/2d-renderer.ts'
 import { WebGL1Renderer } from './renderers/webgl1-renderer.ts'
@@ -20,6 +18,7 @@ declare const self: DedicatedWorkerGlobalScope &
 
 interface opts {
   wasmUrl: string
+  wasmWorkerUrl: string
   width: number
   height: number
   subUrl: string | undefined
@@ -51,6 +50,13 @@ function readImages (view: Int32Array) {
     })
   }
   return images
+}
+
+function renderError (e: unknown) {
+  if (e instanceof Error) return e
+  if (e === 'unwind') return new Error('JASSUB: a render thread crashed, the WASM heap probably could not grow')
+  if (!e) return new Error('JASSUB: rendering aborted, the WASM heap probably could not grow')
+  return new Error(`JASSUB: rendering failed: ${JSON.stringify(e)}`)
 }
 
 const NO_TRACK = 'JASSUB: no track is loaded'
@@ -95,12 +101,14 @@ export class ASSRenderer {
     })
 
     this._loadedInitialFonts = !data.fonts.length
+
+    const { default: WASM } = await import(/* @vite-ignore */ /* webpackIgnore: true */ data.wasmWorkerUrl) as { default: (moduleArg: object) => Promise<MainModule> }
     // Emscripten pre-spawns pthread workers from this pool size.
     // A pool size of 0 pre-spawns no workers.
     // libass reads 0 as auto, but emscripten does not.
     // THREAD_COUNT is 1 when rendering is serial. Pass 0 in that case.
     // eslint-disable-next-line @typescript-eslint/unbound-method
-    const { _malloc, JASSUB } = await (WASM({ __url: data.wasmUrl, __poolSize: THREAD_COUNT > 1 ? THREAD_COUNT : 0, __out: (log: string) => this._log(log) }) as Promise<MainModule>)
+    const { _malloc, JASSUB } = await WASM({ __url: data.wasmUrl, __workerUrl: data.wasmWorkerUrl, __poolSize: THREAD_COUNT > 1 ? THREAD_COUNT : 0, __out: (log: string) => this._log(log) })
     // lfa-ponyfill uses the global fetch.
     globalThis.fetch = _fetch
     this._malloc = _malloc
@@ -338,10 +346,14 @@ export class ASSRenderer {
   _lastDrawTime?: number
   _draw (time: number, repaint = false) {
     this._lastDrawTime = time
-    const view = this._wasm.rawRender(time, Number(repaint)) as Int32Array | null
-    if (!view) return
+    try {
+      const view = this._wasm.rawRender(time, Number(repaint)) as Int32Array | null
+      if (!view) return
 
-    this._gpurender.render(readImages(view), self.HEAPU8RAW)
+      this._gpurender.render(readImages(view), self.HEAPU8RAW)
+    } catch (e) {
+      throw renderError(e)
+    }
   }
 
   // single-frame readback for tests

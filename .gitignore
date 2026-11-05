@@ -10,5 +10,4 @@ build/lib/*
 .vitest/
 .pnpm-store
 dist/*
-src/wasm/jassub-worker-modern.js
 .svelte-kit/

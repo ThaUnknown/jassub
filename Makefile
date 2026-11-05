@@ -34,10 +34,12 @@ SIMD_ARGS = \
 	-mfma \
 	-mrelaxed-simd
 
+# mimalloc is faster, emmalloc keeps the heap 2 to 3 times smaller. At 4K with 8 threads emmalloc was about 20% slower on heavy TS
+# mimalloc grew the heap to the 2 GB maximum on 4K tracks, and 32-bit devices can not grow it past about 200 MB
 ifeq (${MODERN},1)
 	WORKER_NAME = jassub-worker-modern
 	WORKER_ARGS = \
-		-s WASM=1 \
+		-s MALLOC=mimalloc \
 		$(SIMD_ARGS)
 
 	override CFLAGS += $(SIMD_ARGS)
@@ -46,7 +48,7 @@ ifeq (${MODERN},1)
 else
 	WORKER_NAME = jassub-worker
 	WORKER_ARGS = \
-		-s WASM=1
+		-s MALLOC=emmalloc
 
 endif
 
@@ -193,7 +195,6 @@ PERFORMANCE_ARGS = \
 		-s DISABLE_EXCEPTION_CATCHING=1 \
 		-s TEXTDECODER=2 \
 		-s INITIAL_MEMORY=64MB \
-		-s MALLOC=mimalloc \
 		-s DYNAMIC_EXECUTION=0 \
 		-s EMBIND_AOT=1 \
 		-s MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION=1 \
@@ -222,6 +223,7 @@ SIZE_ARGS = \
 
 # args that are required for this to even work at all
 COMPAT_ARGS = \
+		-s WASM=1 \
 		-s EXPORTED_FUNCTIONS="['_malloc']" \
 		-s EXPORT_KEEPALIVE=1 \
 		-s DISABLE_EXCEPTION_THROWING=1 \

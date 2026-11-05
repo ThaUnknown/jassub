@@ -23,8 +23,10 @@ out = moduleArg.__out || out
 if (!self.name.startsWith('em-pthread')) {
   const OriginalWorker = globalThis.Worker
   globalThis.Worker = class extends OriginalWorker {
+    // emscripten starts the pthreads from a fixed file name, a bundler or a custom URL can rename this file,
+    // so worker.ts passes the URL that it loaded this file from
     constructor(scriptURL, options = {}) {
-      super(scriptURL, {
+      super(moduleArg.__workerUrl || scriptURL, {
         ...options,
         name: 'em-pthread-' + moduleArg.__url
       })

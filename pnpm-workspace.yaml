@@ -2,4 +2,4 @@ allowBuilds:
   esbuild: false
   lfa-ponyfill: true
 minimumReleaseAgeExclude:
-  - jassub@2.5.22 || 2.5.24 || 2.5.28 || 2.5.29 || 2.5.30 || 2.5.34
+  - jassub@2.5.22 || 2.5.24 || 2.5.28 || 2.5.29 || 2.5.30 || 2.5.34 || 2.5.35

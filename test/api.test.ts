@@ -61,6 +61,7 @@ function opaquePixels (frame: { data: Uint8ClampedArray }) {
 describe('client', () => {
   test('a failed draw does not stop later frames', async () => {
     const { jassub, renderer } = await create(EMPTY_ASS)
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       let draws = 0
       jassub.renderer = new Proxy(renderer, {
@@ -73,10 +74,12 @@ describe('client', () => {
         }
       })
 
-      await expect(jassub.manualRender(FRAME)).rejects.toThrow('draw failed')
+      await jassub.manualRender(FRAME)
+      expect(String(error.mock.calls[0]?.[0]), 'the failure is reported').toContain('draw failed')
       await jassub.manualRender(FRAME)
       expect(draws, 'the frame after the failure is drawn').toBe(2)
     } finally {
+      error.mockRestore()
       jassub.renderer = renderer
       await jassub.destroy()
     }
@@ -111,9 +114,9 @@ describe('client', () => {
     }
 
     try {
-      expect(await sentLimit(8), 'high memory').toBe(64)
+      expect(await sentLimit(8), 'high memory').toBe(128)
       expect(await sentLimit(2), 'low memory').toBe(32)
-      expect(await sentLimit(undefined), 'no deviceMemory API').toBe(64)
+      expect(await sentLimit(undefined), 'no deviceMemory API').toBe(128)
       expect(await sentLimit(2, 128), 'explicit limit wins').toBe(128)
       expect(await sentLimit(8, 0), 'explicit 0 keeps the libass default').toBe(0)
     } finally {

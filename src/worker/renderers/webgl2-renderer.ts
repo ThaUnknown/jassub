@@ -1,7 +1,7 @@
 // WebGL2 renderer
-import { NEEDS_WASM_BUFFER_COPY, type ASSImage } from '../util.ts'
-
 import { ATLAS_IDLE_MS, MAX_ATLAS_SCREENS, WebGLRendererBase, atlasPosition, type AtlasItem } from './webgl-base.ts'
+
+import type { ASSImage } from '../util.ts'
 
 // GLSL ES 3.0 Vertex Shader with Instancing
 const VERTEX_SHADER = /* glsl */`#version 300 es
@@ -131,9 +131,6 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
   maxArrayTextureLayers = 0
   // source key to the position its pixels have in the atlas
   uploadCache = new Map<string, number>()
-
-  // A reusable copy buffer for bitmap data on Firefox and Safari.
-  copyData = new Uint8Array(0)
 
   _createInstanceData () {
     this.instanceData = new ArrayBuffer(this.instanceCapacity * INSTANCE_STRIDE)
@@ -338,19 +335,6 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
       if (!cached) {
         // Upload bitmap data to texture array layer
         this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, img.stride)
-        let source = heap
-        let offset = img.bitmap
-
-        if (NEEDS_WASM_BUFFER_COPY) {
-          // HACK 3 [see util.ts for explanation]
-          const length = img.stride * img.h
-          if (length > this.copyData.length) this.copyData = new Uint8Array(length)
-          this.copyData.set(heap.subarray(img.bitmap, img.bitmap + length))
-
-          source = this.copyData
-          offset = 0
-        }
-
         this.gl.texSubImage3D(
           this.gl.TEXTURE_2D_ARRAY,
           0,
@@ -360,8 +344,8 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
           1, // depth (1 layer)
           this.gl.RED,
           this.gl.UNSIGNED_BYTE,
-          source,
-          offset
+          heap,
+          img.bitmap
         )
       }
       // Fill the interleaved instance data
@@ -412,6 +396,6 @@ export class WebGL2Renderer extends WebGLRendererBase<WebGL2RenderingContext> {
     this.gl.deleteProgram(this.program)
     this.gl.getExtension('WEBGL_lose_context')?.loseContext()
 
-    this.instanceBuffer = this.vao = this.program = this.gl = this.atlas = this.copyData = null!
+    this.instanceBuffer = this.vao = this.program = this.gl = this.atlas = null!
   }
 }

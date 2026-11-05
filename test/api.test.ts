@@ -265,9 +265,11 @@ test('rawRender skips empty images', async () => {
   const { jassub, renderer } = await create(COLLISIONS)
   try {
     await jassub.manualRender(FRAME)
-    const images: Array<{ w: number, h: number }> = await renderer._wasm.rawRender(FRAME.mediaTime, 1)
-    expect(images.length).toBeGreaterThan(0)
-    expect(images.filter(image => image.w <= 0 || image.h <= 0)).toHaveLength(0)
+    // 8 values per image, w and h come first, see JASSUB.cpp
+    const view: Int32Array = await renderer._wasm.rawRender(FRAME.mediaTime, 1)
+    const sizes = Array.from({ length: view.length / 8 }, (_, i) => ({ w: view[i * 8]!, h: view[i * 8 + 1]! }))
+    expect(sizes.length).toBeGreaterThan(0)
+    expect(sizes.filter(size => size.w <= 0 || size.h <= 0)).toHaveLength(0)
   } finally {
     await jassub.destroy()
   }

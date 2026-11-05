@@ -1,6 +1,6 @@
-import { NEEDS_WASM_BUFFER_COPY, type ASSImage } from '../util.ts'
-
 import { ATLAS_IDLE_MS, MAX_ATLAS_SCREENS, WebGLRendererBase, atlasPosition, type AtlasItem } from './webgl-base.ts'
+
+import type { ASSImage } from '../util.ts'
 
 // GLSL ES 1.0 Vertex Shader. Vertex highp is mandatory.
 const VERTEX_SHADER = /* glsl */`
@@ -388,15 +388,6 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
         }
 
         if (uploadStrided) {
-          const length = img.stride * img.h
-          const source = heap.subarray(img.bitmap, img.bitmap + length)
-
-          // HACK 3 [see util.ts for explanation]
-          if (NEEDS_WASM_BUFFER_COPY) {
-            if (length > this.copyData.length) this.copyData = new Uint8Array(length)
-            this.copyData.set(source)
-          }
-
           this.gl.texSubImage2D(
             this.gl.TEXTURE_2D,
             0,
@@ -406,7 +397,7 @@ export class WebGL1Renderer extends WebGLRendererBase<WebGLRenderingContext> {
             img.h,
             this.gl.ALPHA,
             this.gl.UNSIGNED_BYTE,
-            NEEDS_WASM_BUFFER_COPY ? this.copyData.subarray(0, length) : source
+            heap.subarray(img.bitmap, img.bitmap + img.stride * img.h)
           )
         } else {
           const length = img.w * img.h

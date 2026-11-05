@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <vector>
 
 #include <emscripten/bind.h>
 
@@ -74,6 +75,8 @@ private:
 
   char *defaultFont;
 
+  std::vector<int32_t> frameImages;
+
 public:
   ASS_Track *track;
 
@@ -136,29 +139,22 @@ public:
   }
 
   emscripten::val rawRender(double tm, int force) {
-    if (!track) return force ? emscripten::val::array() : emscripten::val::null();
-
     int changed = 0;
-    ASS_Image *imgs = ass_render_frame(ass_renderer, track, (long long)(tm * 1e+3 + 0.5), &changed);
+    ASS_Image *imgs = track ? ass_render_frame(ass_renderer, track, (long long)(tm * 1e+3 + 0.5), &changed) : NULL;
     // The canvas still shows an unchanged frame. A changed frame with no images clears the canvas.
     if (changed == 0 && !force) return emscripten::val::null();
 
-    emscripten::val arr = emscripten::val::array();
+    frameImages.clear();
+
     for (ASS_Image *img = imgs; img; img = img->next) {
       // libass returns clipped images with zero size.
       if (img->w <= 0 || img->h <= 0) continue;
-      emscripten::val obj = emscripten::val::object();
-      obj.set("w", img->w);
-      obj.set("h", img->h);
-      obj.set("dst_x", img->dst_x);
-      obj.set("dst_y", img->dst_y);
-      obj.set("bitmap", (uintptr_t)img->bitmap);
-      obj.set("color", img->color);
-      obj.set("stride", img->stride);
-      obj.set("cache_id", img->cache_id);
-      arr.call<emscripten::val>("push", obj);
+      frameImages.insert(frameImages.end(), {
+        img->w, img->h, img->dst_x, img->dst_y,
+        (int32_t)(uintptr_t)img->bitmap, (int32_t)img->color, img->stride, (int32_t)img->cache_id
+      });
     }
-    return arr;
+    return emscripten::val(emscripten::typed_memory_view(frameImages.size(), frameImages.data()));
   }
 
   emscripten::val getEvents() {

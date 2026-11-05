@@ -9,13 +9,10 @@ var _scriptName
 // waits. A worker can block, so clear the web flag before the runtime starts.
 ENVIRONMENT_IS_WEB = false
 
-// GROWABLE_ARRAYBUFFERS=1 makes emscripten handle resizable heap views itself,
-// including the Firefox and maximum-memory cases. Publish the heap for the
-// renderers, which run outside the module scope.
+// Publish the heap for the renderers, which run outside the module scope
 updateMemoryViews = (o => () => {
   o()
   self.HEAPU8RAW = HEAPU8
-  self.WASMMEMORY = wasmMemory
 })(updateMemoryViews)
 
 out = moduleArg.__out || out

@@ -68,8 +68,6 @@ export const WEIGHT_MAP = [
 
 export type WeightValue = typeof WEIGHT_MAP[number]
 
-const IS_INCOMPETENT_BROWSER = /firefox/i.test(navigator.userAgent) || /applewebkit\/[\d.]+ \(khtml, like gecko\)(?!.*chrome\/)/i.test(navigator.userAgent)
-
 export async function fetchok (url: string) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`JASSUB: failed to fetch ${url}: HTTP ${res.status}`)
@@ -82,15 +80,3 @@ export async function fetchtext (url: string) {
 }
 
 export const THREAD_COUNT = self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1
-
-const USES_GROWABLE_OR_SHARED_MEMORY = !!WebAssembly.Memory.prototype.toResizableBuffer || THREAD_COUNT > 1
-
-// HACK: 3 memory hacks to support here:
-// 1. Chromium growable memory can reference the buffer directly. Refresh the HEAPU8 view so it never goes stale
-// 2. Chromium non-growable multithreaded memory needs the HEAPU8 view recreated after growth because of race conditions
-// 3. Firefox and Safari reject resizable or shared WASM buffer views in WebGL, so the bitmap data is copied into a normal buffer
-// Safari's SharedArrayBuffer support is inconsistent across versions, it is treated like Firefox here
-export const SHOULD_REFERENCE_MEMORY = !IS_INCOMPETENT_BROWSER && USES_GROWABLE_OR_SHARED_MEMORY
-
-// Firefox and Safari reject resizable or shared WASM buffer views in WebGL
-export const NEEDS_WASM_BUFFER_COPY = IS_INCOMPETENT_BROWSER && USES_GROWABLE_OR_SHARED_MEMORY

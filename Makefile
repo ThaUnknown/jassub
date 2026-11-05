@@ -228,6 +228,7 @@ COMPAT_ARGS = \
 		-s DEFAULT_LIBRARY_FUNCS_TO_INCLUDE='["$$stringToNewUTF8"]' \
 		-mbulk-memory
 
+# turns out GROWABLE_ARRAYBUFFERS are just insanely not worth it, 0 perf gain, but a bunch of compat issues
 src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js src/worker/extern-pre-worker.js $(LIBASS_DEPS)
 	mkdir -p src/wasm
 	em++ src/JASSUB.cpp $(LIBASS_DEPS) \
@@ -241,7 +242,7 @@ src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js src/worker/e
 		-s ENVIRONMENT=worker \
 		-s EXIT_RUNTIME=0 \
 		-s ALLOW_MEMORY_GROWTH=1 \
-		-s GROWABLE_ARRAYBUFFERS=1 \
+		-s GROWABLE_ARRAYBUFFERS=0  \
 		-s MODULARIZE=1 \
 		-s EXPORT_ES6=1 \
 		-lembind \

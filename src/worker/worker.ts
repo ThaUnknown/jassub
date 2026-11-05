@@ -8,7 +8,7 @@ import { COLOR_CONVERSIONS, IDENTITY_MATRIX, LIBASS_YCBCR_MATRIX, WEB_MATRIX_COE
 import { Canvas2DRenderer } from './renderers/2d-renderer.ts'
 import { WebGL1Renderer } from './renderers/webgl1-renderer.ts'
 import { WebGL2Renderer } from './renderers/webgl2-renderer.ts'
-import { fetchok, fetchtext, SHOULD_REFERENCE_MEMORY, THREAD_COUNT, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
+import { fetchok, fetchtext, THREAD_COUNT, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
 
 import type { JASSUB, MainModule } from '../wasm/types.d.ts'
 // import { WebGPURenderer } from './webgpu-renderer'
@@ -16,7 +16,6 @@ import type { JASSUB, MainModule } from '../wasm/types.d.ts'
 declare const self: DedicatedWorkerGlobalScope &
   typeof globalThis & {
     HEAPU8RAW: Uint8Array<ArrayBuffer>
-    WASMMEMORY: WebAssembly.Memory
   }
 
 interface opts {
@@ -35,6 +34,24 @@ interface opts {
 }
 
 const constructor = Symbol.for('constructor')
+
+function readImages (view: Int32Array) {
+  const images: ASSImage[] = []
+  for (let i = 0; i < view.length; i += 8) {
+    images.push({
+      w: view[i]!,
+      h: view[i + 1]!,
+      dst_x: view[i + 2]!,
+      dst_y: view[i + 3]!,
+      // bitmap, color and cache_id are unsigned in C
+      bitmap: view[i + 4]! >>> 0,
+      color: view[i + 5]! >>> 0,
+      stride: view[i + 6]!,
+      cache_id: view[i + 7]! >>> 0
+    })
+  }
+  return images
+}
 
 const NO_TRACK = 'JASSUB: no track is loaded'
 
@@ -297,7 +314,7 @@ export class ASSRenderer {
     // TODO: this should re-draw last frame!
     for (const uint8 of uint8s) {
       const ptr = this._malloc(uint8.byteLength)
-      this._heap().set(uint8, ptr)
+      self.HEAPU8RAW.set(uint8, ptr)
       this._wasm.addFont('font-' + (this._fontId++), ptr, uint8.byteLength)
     }
     this._wasm.reloadFonts()
@@ -318,27 +335,19 @@ export class ASSRenderer {
     this._availableFonts = {}
   }
 
-  // HACK 1 and 2 [see util.ts for explanation]
-  _heap () {
-    if (self.HEAPU8RAW.buffer !== self.WASMMEMORY.buffer || SHOULD_REFERENCE_MEMORY) {
-      self.HEAPU8RAW = new Uint8Array(self.WASMMEMORY.buffer)
-    }
-    return self.HEAPU8RAW
-  }
-
   _lastDrawTime?: number
   _draw (time: number, repaint = false) {
     this._lastDrawTime = time
-    const images = this._wasm.rawRender(time, Number(repaint)) as ASSImage[] | null
-    if (!images) return
+    const view = this._wasm.rawRender(time, Number(repaint)) as Int32Array | null
+    if (!view) return
 
-    this._gpurender.render(images, this._heap())
+    this._gpurender.render(readImages(view), self.HEAPU8RAW)
   }
 
   // single-frame readback for tests
   _drawCapture (time: number) {
-    const images = (this._wasm.rawRender(time, 1) ?? []) as ASSImage[]
-    this._gpurender.render(images, this._heap())
+    const view = this._wasm.rawRender(time, 1) as Int32Array | null
+    this._gpurender.render(view ? readImages(view) : [], self.HEAPU8RAW)
 
     const canvas = this._gpurender.canvas
     if (!canvas) return

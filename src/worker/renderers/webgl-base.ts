@@ -5,88 +5,10 @@ import type { ASSImage } from '../util.ts'
 export const MAX_ATLAS_SCREENS = 128
 export const ATLAS_IDLE_MS = 20_000
 
-interface Segment { x: number, y: number, w: number }
-// the top edge of the used area of an atlas page, as segments from left to right
-type Skyline = Segment[]
-
-// the segment where a rectangle starts, and the y where it rests
-interface Spot { index: number, y: number }
-
-// find the lowest spot, then the leftmost, where a w x h rectangle fits, return false if it does not fit
-// the result goes into spot, so a search does not allocate
-function findSpot (segments: Skyline, w: number, h: number, limit: number, spot: Spot) {
-  // a spot must be lower than bestY, so the first spot that fits wins a tie
-  let bestY = limit - h + 1
-  const count = segments.length
-  for (let i = 0; i < count; i++) {
-    const segment = segments[i]!
-    const end = segment.x + w
-    if (end > limit) break
-    // the rectangle rests at least on this segment, so it cannot be lower than the best spot
-    if (segment.y >= bestY) continue
-
-    // the rectangle rests on the highest segment under it
-    let y = segment.y
-    for (let j = i + 1; j < count; j++) {
-      const next = segments[j]!
-      if (next.x >= end) break
-      if (next.y > y) {
-        y = next.y
-        if (y >= bestY) break
-      }
-    }
-
-    if (y < bestY) {
-      bestY = y
-      spot.index = i
-      spot.y = y
-    }
-  }
-  return bestY <= limit - h
-}
-
-// place a w x h rectangle at the spot, and return its x
-function addSegment (segments: Skyline, { index, y }: Spot, w: number, h: number) {
-  const x = segments[index]!.x
-  const end = x + w
-  const top = y + h
-
-  // replace the segments under the rectangle, and shorten the one it covers in part
-  let last = index
-  while (last < segments.length && segments[last]!.x + segments[last]!.w <= end) last++
-  if (last < segments.length && segments[last]!.x < end) {
-    const partial = segments[last]!
-    partial.w -= end - partial.x
-    partial.x = end
-  }
-  segments.splice(index, last - index, { x, y: top, w })
-
-  // merge the neighbours of the same height
-  if (index + 1 < segments.length && segments[index + 1]!.y === top) {
-    segments[index]!.w += segments[index + 1]!.w
-    segments.splice(index + 1, 1)
-  }
-  if (index > 0 && segments[index - 1]!.y === top) {
-    segments[index - 1]!.w += segments[index]!.w
-    segments.splice(index, 1)
-  }
-
-  return x
-}
-
 // one number for a position in the atlas, so the upload cache does not build a string per image
 // 14 bits for x and y fit a 16384 texture, and the result stays below 2^53 for 2^25 layers
 export function atlasPosition (x: number, y: number, layer: number) {
   return (layer * 16384 + y) * 16384 + x
-}
-
-export interface AtlasItem {
-  img: ASSImage
-  packW?: number
-  sourceKey: string | 0
-  x: number
-  y: number
-  layer: number
 }
 
 export abstract class WebGLRendererBase<T extends WebGLRenderingContext | WebGL2RenderingContext> extends CanvasRendererBase {
@@ -113,49 +35,6 @@ export abstract class WebGLRendererBase<T extends WebGLRenderingContext | WebGL2
   abstract _initGL (): void
   abstract render (images: ASSImage[], heap: Uint8Array): void
   abstract destroy (): void
-
-  // Skyline bottom-left packing, identical sources are placed once
-  // anyPage lets an image go on any page, WebGL1 draws page by page, so it only fills the last page to keep the draw order
-  packAtlas (items: AtlasItem[], size: number, padding = 0, anyPage = false) {
-    const placed = new Map<string, AtlasItem>()
-    const pages: Skyline[] = []
-    const spot: Spot = { index: 0, y: 0 }
-    // the padding goes after each image, so a page holds size + padding
-    const limit = size + padding
-
-    for (const item of items) {
-      const { img, sourceKey } = item
-
-      const cached = sourceKey && placed.get(sourceKey)
-      if (cached) {
-        item.x = cached.x
-        item.y = cached.y
-        item.layer = cached.layer
-        continue
-      }
-
-      const w = (item.packW ?? img.w) + padding
-      const h = img.h + padding
-
-      let layer = anyPage ? 0 : Math.max(0, pages.length - 1)
-      while (layer < pages.length && !findSpot(pages[layer]!, w, h, limit, spot)) layer++
-
-      if (layer === pages.length) {
-        // the callers size the page to the largest image, so it fits in the top left corner of a new page
-        pages.push([{ x: 0, y: 0, w: limit }])
-        if (!anyPage) placed.clear()
-        spot.index = 0
-        spot.y = 0
-      }
-
-      item.x = addSegment(pages[layer]!, spot, w, h)
-      item.y = spot.y
-      item.layer = layer
-      if (sourceKey) placed.set(sourceKey, item)
-    }
-
-    return pages.length
-  }
 
   createProgram (vertexSource: string, fragmentSource: string) {
     // Create shaders

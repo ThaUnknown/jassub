@@ -6,10 +6,10 @@ import { COLOR_CONVERSIONS, IDENTITY_MATRIX, LIBASS_YCBCR_MATRIX, WEB_MATRIX_COE
 import { Canvas2DRenderer } from './renderers/2d-renderer.ts'
 import { WebGL1Renderer } from './renderers/webgl1-renderer.ts'
 import { WebGL2Renderer } from './renderers/webgl2-renderer.ts'
+// import { WebGPURenderer } from './renderers/webgpu-renderer.ts'
 import { fetchok, fetchtext, THREAD_COUNT, WEIGHT_MAP, type ASSEvent, type ASSImage, type ASSStyle, type WeightValue } from './util.ts'
 
 import type { JASSUB, MainModule } from '../wasm/types.d.ts'
-// import { WebGPURenderer } from './webgpu-renderer'
 
 declare const self: DedicatedWorkerGlobalScope &
   typeof globalThis & {
@@ -88,9 +88,8 @@ export class ASSRenderer {
     const _fetch = globalThis.fetch
     globalThis.fetch = _ => _fetch(data.wasmUrl)
 
-    // const devicePromise = navigator.gpu?.requestAdapter({
-    //   powerPreference: 'high-performance'
-    // }).then(adapter => adapter?.requestDevice())
+    // the WebGPU device request is async, so it runs while the WASM loads
+    // const webgpu = WebGPURenderer.isSupported(ctrl)
     // WebGL2 is barely faster than WebGL1 in most cases,
     // in rare cases the better texture-dedupe, drawing everything in one call, no fake stride and no page ordering
     // can help its performance, but those cases are rare
@@ -321,7 +320,7 @@ export class ASSRenderer {
   _allocFonts (uint8s: Uint8Array[]) {
     // TODO: this should re-draw last frame!
     for (const uint8 of uint8s) {
-      const ptr = this._malloc(uint8.byteLength)
+      const ptr = this._malloc(uint8.byteLength) >>> 0
       self.HEAPU8RAW.set(uint8, ptr)
       this._wasm.addFont('font-' + (this._fontId++), ptr, uint8.byteLength)
     }

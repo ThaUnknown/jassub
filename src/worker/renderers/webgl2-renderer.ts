@@ -1,6 +1,7 @@
 // WebGL2 renderer
-import { ATLAS_IDLE_MS, MAX_ATLAS_SCREENS, WebGLRendererBase, atlasPosition, type AtlasItem } from './webgl-base.ts'
+import { ATLAS_IDLE_MS, MAX_ATLAS_SCREENS, WebGLRendererBase, atlasPosition } from './webgl-base.ts'
 
+import type { AtlasItem } from './canvas-base.ts'
 import type { ASSImage } from '../util.ts'
 
 // GLSL ES 3.0 Vertex Shader with Instancing

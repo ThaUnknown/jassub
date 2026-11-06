@@ -221,6 +221,10 @@ SIZE_ARGS = \
 		-s EXPORTED_RUNTIME_METHODS="[]" \
 		-s MINIMAL_RUNTIME=1 
 
+# mimalloc wrote out of bounds when one large allocation took the heap to about 4 GB, a heap of 3.9 GB still works
+MEMORY_ARGS = \
+		-s MAXIMUM_MEMORY=3584MB
+
 # args that are required for this to even work at all
 COMPAT_ARGS = \
 		-s WASM=1 \
@@ -244,6 +248,7 @@ src/wasm/$(WORKER_NAME).js: src/JASSUB.cpp src/worker/pre-worker.js src/worker/e
 		-s ENVIRONMENT=worker \
 		-s EXIT_RUNTIME=0 \
 		-s ALLOW_MEMORY_GROWTH=1 \
+		$(MEMORY_ARGS) \
 		-s GROWABLE_ARRAYBUFFERS=0  \
 		-s MODULARIZE=1 \
 		-s EXPORT_ES6=1 \

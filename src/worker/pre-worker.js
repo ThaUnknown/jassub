@@ -13,6 +13,7 @@ ENVIRONMENT_IS_WEB = false
 updateMemoryViews = (o => () => {
   o()
   self.HEAPU8RAW = HEAPU8
+  self.HEAPU32RAW = HEAPU32
 })(updateMemoryViews)
 
 out = moduleArg.__out || out

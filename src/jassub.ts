@@ -113,7 +113,7 @@ export default class JASSUB {
     // the modern build uses mimalloc, which is faster but grows the heap 2 to 3 times more, so low memory devices use the legacy build
     const useModern = !!JASSUB._supportsSIMD && (navigator.deviceMemory ?? Infinity) > 2
 
-    const availableFonts = opts.availableFonts ?? {}
+    const availableFonts = { ...opts.availableFonts }
     if (!availableFonts['liberation sans'] && !opts.defaultFont) {
       availableFonts['liberation sans'] = new URL('./default.woff2', import.meta.url).href
     }

@@ -17,17 +17,17 @@ const TOLERATED: Array<[string, string]> = [
   ['duplicate-styles', EMPTY + 'Style: Default,Lato,48,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,2,20,20,20,1\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,still fine\n']
 ]
 
-// Inputs with no track. libass calls exit(4) and stops the worker. The JS side
-// must reject the ready promise.
-const TERMINATING: Array<[string, string]> = [
+// Inputs with no track. libass rejects the content. The JS side must reject
+// the ready promise, and setTrack() must reject without killing the renderer.
+const INVALID: Array<[string, string]> = [
   ['empty-string', ''],
   ['not-ass-at-all', 'this is not a subtitle file, just text\nwith a few lines'],
   ['broken-events', '[Events]\nFormat: Layer\nDialogue: 0\n'],
   ['zero-playres', '[Script Info]\nPlayResX: 0\nPlayResY: 0\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,text with zero playres\n']
 ]
 
-// The exit(4) path rejects twice. The test asserts one rejection, so ignore the
-// duplicate.
+// A WASM build from before createTrackMem() returned bool rejects twice. The
+// test asserts one rejection, so ignore the duplicate.
 const ignoreDuplicate = (event: PromiseRejectionEvent) => {
   const reason = String((event as unknown as { reason?: unknown }).reason)
   if (reason.includes('Unserializable') || reason.includes('exit(')) event.preventDefault()
@@ -52,7 +52,7 @@ describe('error handling', () => {
     })
   }
 
-  for (const [name, content] of TERMINATING) {
+  for (const [name, content] of INVALID) {
     test(`rejects: ${name}`, async () => {
       const reason = await createModern(content, { fonts: [LATO] }).then(
         () => null,
@@ -62,6 +62,19 @@ describe('error handling', () => {
       // failure.
       expect(reason, 'init rejects').toBeTruthy()
       expect(String(reason)).not.toContain('Unserializable')
+    })
+
+    test(`setTrack rejects and the renderer survives: ${name}`, async () => {
+      const renderer = await createModern(EMPTY + 'Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,before\n', { fonts: [LATO] })
+      try {
+        await expect(renderer.setTrack(content)).rejects.toThrow('JASSUB: libass rejected')
+        // the bad call removed the old track, a new valid one must render again
+        await renderer.setTrack(EMPTY + 'Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,after\n')
+        const frame = await renderer.captureAt(1)
+        expect(diff(frame, frame, 0).nonZeroA).toBeGreaterThan(0)
+      } finally {
+        await renderer.destroy()
+      }
     })
   }
 

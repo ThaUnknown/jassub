@@ -113,15 +113,16 @@ public:
     log_level = level;
   }
 
-  void createTrackMem(std::string buf) {
+  bool createTrackMem(std::string buf) {
     removeTrack();
     track = ass_read_memory(ass_library, buf.data(), buf.size(), NULL);
     if (!track) {
       fprintf(stderr, "JASSUB: Failed to start a track\n");
-      exit(4);
+      return false;
     }
 
     trackColorSpace = track->YCbCrMatrix;
+    return true;
   }
 
   void removeTrack() {

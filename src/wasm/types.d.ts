@@ -49,7 +49,7 @@ export interface JASSUB extends ClassHandle {
   setThreads(_0: number): number;
   pruneEvents(_0: number): boolean;
   configurePrune(_0: number): boolean;
-  createTrackMem(_0: EmbindString): void;
+  createTrackMem(_0: EmbindString): boolean;
   processData(_0: EmbindString): boolean;
   processChunk(_0: EmbindString, _1: number, _2: number): boolean;
   addFont(_0: any, _1: number, _2: number): void;

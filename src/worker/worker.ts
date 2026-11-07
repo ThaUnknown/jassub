@@ -60,6 +60,7 @@ function renderError (e: unknown) {
 }
 
 const NO_TRACK = 'JASSUB: no track is loaded'
+const INVALID_TRACK = 'JASSUB: libass rejected the subtitle content, it is not a valid SSA/ASS track'
 
 const WEIGHT_SUFFIX = new RegExp(`^(.+)\\s+(${WEIGHT_MAP.join('|')})$`)
 
@@ -117,7 +118,7 @@ export class ASSRenderer {
 
     if (!this._loadedInitialFonts) await this._loadInitialFonts(data.fonts)
 
-    this._wasm.createTrackMem(data.subContent ?? await fetchtext(data.subUrl!))
+    if (!this._wasm.createTrackMem(data.subContent ?? await fetchtext(data.subUrl!))) throw new Error(INVALID_TRACK)
 
     if (data.libassMemoryLimit > 0 || data.libassGlyphLimit > 0) {
       this._wasm.setMemoryLimits(data.libassGlyphLimit || 0, data.libassMemoryLimit || 0)
@@ -197,7 +198,7 @@ export class ASSRenderer {
   }
 
   setTrack (content: string) {
-    this._wasm.createTrackMem(content)
+    if (!this._wasm.createTrackMem(content)) throw new Error(INVALID_TRACK)
     this._wasm.configurePrune(this._pruneDelay)
 
     this._checkColorSpace()

@@ -123,11 +123,11 @@ The library is fully typed, so you can simply browse the types of `instance` or 
 `instance.renderer` calls are ALWAYS async as it's a remote worker, which means you should always await/then them for the IPC call to be serialized!!! For example:
 
 ```ts
-const x = instance.renderer.useLocalFonts // does nothing, returns IPC proxy object
-const y = await instance.renderer.useLocalFonts // returns true/false
+const x = instance.renderer.queryFonts // does nothing, returns IPC proxy object
+const y = await instance.renderer.queryFonts // returns 'local', 'localandremote' or false
 
-instance.renderer.useLocalFonts = false // this is fine
-await (instance.renderer.useLocalFonts = false) // or u can await it for safety
+instance.renderer.queryFonts = false // this is fine
+await (instance.renderer.queryFonts = false) // or u can await it for safety
 
 instance.renderer.setDefaultFont('Gandhi Sans') // this is fine, sets default font
 await instance.renderer.setDefaultFont('Gandhi Sans') // or you can await if if you want

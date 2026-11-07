@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JASSUB on Chrome 34</title>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <main>
+    <h1>JASSUB on Chrome 34</h1>
+    <p>The page picks the lowest-level jassub build the browser can run, and polyfills every API jassub needs around it.</p>
+    <div class="player">
+      <video controls autoplay muted loop playsinline crossorigin="anonymous">
+        <source src="/media/beastars.webm" type="video/webm">
+        <source src="/media/beastars-baseline.mp4" type="video/mp4">
+      </video>
+    </div>
+  </main>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #121212;
+  color: #e6e6e6;
+  font: 14px/1.4 system-ui, "Segoe UI", Arial, sans-serif;
+}
+
+main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+h1 { margin: 0 0 8px; font-size: 22px; font-weight: 600; }
+p { margin: 0 0 16px; color: #b0b0b0; }
+
+/* jassub inserts an absolutely positioned canvas after the video. */
+.player { position: relative; background: #000; }
+.player video { display: block; width: 100%; }

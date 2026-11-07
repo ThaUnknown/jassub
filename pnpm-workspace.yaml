@@ -1,0 +1,4 @@
+allowBuilds:
+  core-js: false
+  core-js-bundle: false
+  lfa-ponyfill: false

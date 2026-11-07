@@ -1,0 +1,4 @@
+node_modules
+dist
+# Built by legacy-build/, not part of the repository.
+legacy

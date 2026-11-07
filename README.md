@@ -31,7 +31,7 @@ The
 
 ```json
 {
-  "Cross-Origin-Embedder-Policy": "require-corp",
+  "Cross-Origin-Embedder-Policy": "require-corp", // or "credentialless"
   "Cross-Origin-Opener-Policy": "same-origin"
 }
 ```
@@ -45,7 +45,7 @@ WASM:              57 11 52    /  51 11 47
 WebGL2:            56 15 51    /  43 10.1 42 // not necessary anymore as it falls back to WebGL1/Canvas2D
 TextDecoder:       38 10.1 20  /  38 10.1 19
 OffscreenCanvas:   69 17 105   /  58 16.2 44
-BigInt:            67 15 68
+BigInt:            85 15 68
 Web Workers:       4 4 3.5
 Promise:           33 7.1 29   /  4 3.1 2
 Proxy:             49 10 18
@@ -55,9 +55,13 @@ getVPQ/rVFC:       80 8 42     /  28 8 42
 -msign-ext         69 14 62
 -->
 
-JASSUB supports Chrome/Safari/Firefox 80/17/105, you bring the support down to 67/16.2/68 if you enable some flags/settings in your browser for these features. For other engines polyfills might be needed. Babel is also recommended if you need to support older JS engines as JASSUB ships as ES modules with modern syntax.
+JASSUB supports Chrome/Safari/Firefox 85/17/105, you bring the support down to 73/16.2/68 if you enable some flags/settings in your browser for these features. For other engines polyfills might be needed. Babel is also recommended if you need to support older JS engines as JASSUB ships as ES modules with modern syntax.
 
 <!-- See https://github.com/gpuweb/gpuweb/wiki/Implementation-Status for a WebGPU support table, and what flags you might need to enable it in your browser if you want to utilise it instead of WebGL2. -->
+
+### Looking for backwards compatibility with much older browser engines?
+
+The [legacy branch](https://github.com/ThaUnknown/jassub/tree/legacy) is a self-contained showcase that runs jassub down to Chrome 34, Firefox 34, Safari 9 and Edge 12: the published package, a single-thread WebAssembly MVP build of the same source, a wasm2js fallback for engines without WebAssembly, and polyfills for every API jassub needs around it. Its `legacy-build/` directory rebuilds those artifacts.
 
 ## Usage
 
@@ -200,16 +204,6 @@ const instance = new JASSUB({
 
 This finds fonts from the free and public Google Fonts API if they aren't available locally or embedded, which has some privacy implications \[in theory, not in practice]. Be mindful of the [licensing](https://fonts.google.com/knowledge/glossary/licensing).
 Note that Google Fonts doesn't include a lot of non-free fonts such as Arial, so this isn't a perfect solution.
-
-## Looking for backwards compatibility with much older browser engines?
-
-If you want to support even older engines, then please check the [v1.8.8 tag](https://github.com/ThaUnknown/jassub/releases/tag/1.8.8), or install it via:
-
-```shell
-[p]npm i jassub@1.8.8
-```
-
-Support for older browsers (without OffscreenCanvas, WebAssembly threads, etc) has been dropped in v2.0.0 and later.
 
 # On tests
 

@@ -65,6 +65,46 @@ Two more fixes are not polyfills:
 * Below Chrome 90 the worker drops the `desynchronized` canvas attribute, where a transferred `OffscreenCanvas`
   renders nothing with it.
 
+## Testing on old Chromium
+
+Chromium snapshots for every milestone are public at
+`https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html`.
+
+Builds up to about Chrome 60 are 32-bit under `Win/`, newer ones are under `Win_x64/`. Both answer XML listings, so you can search a range instead of browsing pages:
+
+```sh
+curl -s "https://commondatastorage.googleapis.com/chromium-browser-snapshots/?delimiter=/&prefix=Win_x64/7689"
+```
+
+That returns the revisions starting with `7689`, for example `Win_x64/768966/`. List that folder to find the archive:
+
+```sh
+curl -s "https://commondatastorage.googleapis.com/chromium-browser-snapshots/?prefix=Win_x64/768966/"
+```
+
+Download `chrome-win.zip`, or `chrome-win32.zip` under `Win/`, extract it and start `chrome.exe`. The version is the file version of `chrome.dll`:
+
+```powershell
+(Get-ChildItem -Recurse chrome.dll | Select-Object -First 1).VersionInfo.FileVersion
+```
+
+Revisions used for this demo. The tier is what the page picks by itself, no flags involved:
+
+| Chromium | Snapshot | Tier |
+|---|---|---|
+| 34.0.1847 | `Win/251904` | wasm2js |
+| 37.0.1986 | `Win/269627` | wasm2js |
+| 38.0.2125 | `Win/290052` | wasm2js |
+| 40.0.2214 | `Win/303348` | wasm2js |
+| 49.0.2623 | `Win/369909` | wasm2js |
+| 58.0.3029 | `Win/454473` | legacy-wasm |
+| 84.0.4147 | `Win_x64/768966` | legacy-wasm |
+| 85.0.4183 | `Win_x64/782797` | shipped |
+| 90.0.4430 | `Win_x64/857997` | shipped |
+| 100.0.4896 | `Win_x64/972766` | shipped |
+
+The snapshots have no H.264 decoder, so the page serves the WebM source first. Start `pnpm preview`, which sends the cross-origin isolation headers, open the page and check that the subtitles appear over the video.
+
 ## Layout
 
 ```

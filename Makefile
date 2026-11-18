@@ -14,7 +14,7 @@ endif
 BUILD_LIB_DIR := $(BASE_DIR)build/lib/$(BUILD_VARIANT)
 DIST_DIR := $(BASE_DIR)dist/libraries/$(BUILD_VARIANT)
 
-export CFLAGS = -O3 -flto -fno-rtti -fno-exceptions -fno-math-errno -pthread -mnontrapping-fptoint -msign-ext -mbulk-memory -mreference-types -ffast-math -matomics
+export CFLAGS = -O3 -flto -fvisibility=hidden -fno-rtti -fno-exceptions -fno-math-errno -pthread -mnontrapping-fptoint -msign-ext -mbulk-memory -mreference-types -ffast-math -matomics
 export CXXFLAGS = $(CFLAGS)
 export PKG_CONFIG_PATH = $(DIST_DIR)/lib/pkgconfig
 export EM_PKG_CONFIG_PATH = $(PKG_CONFIG_PATH)
